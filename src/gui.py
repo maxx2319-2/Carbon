@@ -207,16 +207,12 @@ class _MapleBridge(QObject):
         for i, latex in enumerate(latex_lines):
             rows.append(["code", latex])
             value = result.get(i, "")
-            if isinstance(value, Figure):
-                buf = io.BytesIO()
-                value.savefig(buf, format="png")
-                rows.append(
-                    [
-                        "image",
-                        "data:image/png;base64,"
-                        + base64.b64encode(buf.getvalue()).decode(),
-                    ]
-                )
+            values = value if isinstance(value, list) else [value]
+            for value in values:
+                if isinstance(value, Figure):
+                    buf = io.BytesIO()
+                    value.savefig(buf, format = "png")
+                    rows.append(["image","data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()])
                 continue
             for res in str(value).splitlines():
                 if res.startswith("Error"):
@@ -397,6 +393,27 @@ class LicenseWindow(QDialog):
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
+
+    def try_accept(self):
+        key = self.key_input.text().strip()
+
+        try:
+            licensed, data = license_manager.check_license(key)
+            if not licensed:
+                self.key_input.setText(data)
+                return
+
+            ok, msg = license_manager.activate(key)
+            if not ok:
+                self.key_input.setText(msg)
+                return
+
+            license_manager.save_activation(key, data)
+            self.accept()
+
+        except Exception:
+            self.key_input.setText("Fejl")
+
 
 
 # For biotek stamtræ
