@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="mathlive.min.js"></script>
+<style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    math-field {
+        display: block;
+        width: 100%; height: 100%; box-sizing: border-box;
+        font-size: 12px; padding: 0 6px;
+        color: #fff; background: #2b2b2b;
+        border: 1px solid #6fc6fb; border-radius: 4px;
+        outline: none;
+        --caret-color: #6fc6fb;
+        --selection-background-color: #6fc6fb55;
+    }
+    math-field { line-height: 1; }
+    math-field::part(container) { align-items: center; min-height: 0; }
+    math-field::part(content)   { padding: 0; min-height: 0; }
+    math-field:focus-within { outline: none; }
+    math-field::part(virtual-keyboard-toggle),
+    math-field::part(menu-toggle) { display: none; }
+    math-field::part(placeholder) { font-size: 12px; }
+</style></head>
+<body>
+<math-field id="mf"></math-field>
+<script>
+    MathfieldElement.fontsDirectory = "./fonts";
+    MathfieldElement.soundsDirectory = null;
+    const mf = document.getElementById("mf");
+    const params = new URLSearchParams(location.search);
+    if (params.get("mode") === "text") mf.defaultMode = "text";
+    const READONLY = params.get("readonly") === "1";
+    if (READONLY) {
+        mf.readOnly = true;
+        mf.style.setProperty("--caret-color", "transparent");
+    }
+
+    
+    const UI_FONT = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif";
+    function applyUiFont() {
+        const root = mf.shadowRoot;
+        if (!root || root.getElementById("ui-font")) return;
+        const style = document.createElement("style");
+        style.id = "ui-font";
+        style.textContent = `
+            .ML__cmr, .ML__mathit, .ML__mathbf, .ML__text {
+                font-family: ${UI_FONT} !important;
+                font-style: normal !important;
+            }`;
+        root.appendChild(style);
+    }
+    applyUiFont();
+    mf.addEventListener("mount", applyUiFont);
+
+function setValue(latex) { mf.value = latex; scheduleFit(); }
+    mf.mathVirtualKeyboardPolicy = "manual";
+    mf.keybindings = [
+        ...mf.keybindings,
+        {key: "ctrl+[Digit6]",ifMode: "math", command: "moveToSuperscript"},
+
+    ];
+    mf.inlineShortcuts = {...mf.inlineShortcuts, "*": "\\cdot", "**": "^{#?}","<->": "\\rightleftharpoons"};
+    mf.addEventListener("keydown", e => {
+        if (e.shiftKey && e.code === "BracketRight") {
+            e.preventDefault();
+            e.stopPropagation();
+            mf.executeCommand("moveToSuperscript");
+            }
+            if (e.key == "/") {
+                e.preventDefault();
+                e.stopPropagation();
+                mf.executeCommand(["insert","/"])
+            }
+            if (e.key == "[" && mf.mode === "math") {
+                e.preventDefault();
+                e.stopPropagation();
+                mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]);
+            }
+
+    }, true);
+    scheduleFit();
+    let bridge = null;
+
+    const BASE_SIZE = 12;   
+    const MIN_SIZE  = 7;    
+    const PAD_X     = 14;   
+
+
+
+    function fit() {
+        let size = BASE_SIZE;
+        mf.style.fontSize = size + "px";
+
+        const root = mf.shadowRoot;
+        const content = root && (root.querySelector(".ML__latex") || root.querySelector(".ML__content"));
+        if (!content) return;
+
+        const availW = mf.clientWidth - PAD_X;
+        const availH = mf.clientHeight - 2;
+
+        while (size > MIN_SIZE) {
+            const r = content.getBoundingClientRect();
+            if (r.width <= availW && r.height <= availH) break;
+            size -= 0.5;
+            mf.style.fontSize = size + "px";
+        }
+    }
+
+    function scheduleFit() { requestAnimationFrame(fit); }
+
+    mf.addEventListener("input", scheduleFit);
+    window.addEventListener("resize", scheduleFit);
+
+
+    function setPlaceholder(t) { mf.setAttribute("placeholder", "\\text{" + t + "}");}
+    function clearField() {mf.value = ""; if (bridge) bridge.setLatex(""); scheduleFit();}
+    function setAccent(c) {
+        mf.style.borderColor = c;
+        mf.style.setProperty("--caret-color", c);
+        mf.style.setProperty("--selection-background-color", c + "55");
+        }
+    
+    
+    if (!READONLY) {
+        new QWebChannel(qt.webChannelTransport, ch => {
+            bridge = ch.objects.bridge;
+            mf.addEventListener("input",() => bridge.setLatex(mf.value));
+            mf.addEventListener("keydown", e => {
+                if (e.key === "Enter") {
+                    bridge.setLatex(mf.value);
+                    bridge.pressEnter();
+                    e.preventDefault();
+                }
+            }, true);
+    
+  });
+}
+</script>
+</body></html>
+
+   
+
+
+
+
