@@ -410,6 +410,29 @@ class EV:
                     try:
                         if line.strip().startswith("#"):
                             pc += 1
+
+                        elif "+=" in line:
+                            a, b = (p.strip() for p in line.split("+=", 1))
+                            if a not in self.variables:
+                                raise ValueError(f'Ukendt variabel {a}')
+
+                            self.variables[a] = Variables(
+                                parser.evaluate(self.prep_ev(f"{a}+({b})")), "Quantity"
+                            )
+                            output[pc] = self.variables[a].value
+                            pc +=1
+
+                        elif "-=" in line:
+                            a, b = (p.strip() for p in line.split("-=", 1))
+                            if a not in self.variables:
+                                raise ValueError(f'Ukendt variabel {a}')
+
+                            self.variables[a] = Variables(
+                                parser.evaluate(self.prep_ev(f"{a}-({b})")), "Quantity"
+                            )
+                            output[pc] = self.variables[a].value
+                            pc +=1
+
                         elif "=" in line:
                             a, b = (p.strip() for p in line.split("=", 1))
                             if a == "" or b == "":
@@ -451,14 +474,18 @@ class EV:
                                     parser.evaluate(self.prep_ev(b)), "Quantity"
                                 )
                             self._invalidate_pattern()
+                            output[pc] = self.variables[a].value
                             pc += 1
+
+
+
 
 
                         else:
                             output[pc] = parser.evaluate(self.prep_ev(line))
                             pc += 1
-                    except:
-                        raise ValueError("Interpreter")
+                    except Exception as e:
+                        raise ValueError(e)
 
             except Exception as e:
                 output[pc] = f"Error: {e}"
