@@ -209,7 +209,7 @@ class EV:
                   
                         
 
-                            if unit == "SI":
+                            if unit.lower() == "si":
                                 result = quantity.si_convert(Qstart)
                             else:
                                 result = quantity.unit_convert(Qstart, unit)
@@ -254,7 +254,7 @@ class EV:
                                     pks_values.append((parser.evaluate(self.prep_ev(part))).value)
 
                             if len(pks_values) == 0:
-                                raise ValueError(self.error_text["BjerrumDiagram"])
+                                raise ValueError(f"ingen pKs værdier: {self.error_text["BjerrumDiagram"]}")
 
                             pks_values = [float(x) for x in pks_values]
 
