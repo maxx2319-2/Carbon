@@ -59,7 +59,7 @@ class EV:
 
         ]
 
-        self.help_text = {
+        self.error_text = {
             "Afstem": "Afstem(reaktion,opløsning(syre,base eller ingenting))",
             "pH": "pH(pKs eller syre/base navn,Koncentration)",
             "pOH": "pH(pBs eller syre/base navn,Koncentration)",
@@ -75,6 +75,8 @@ class EV:
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)"
 
         }
+        # temp fix
+        self.help_text = self.error_text
 
     def exclude_loops(self, lines):
         skip = []
@@ -122,12 +124,12 @@ class EV:
 
                         case "Loop":
                             if line.count(",") != 2:
-                                raise ValueError(self.help_text["Loop"])
+                                raise ValueError(self.error_text["Loop"])
 
                             l1, l2, count = input.split(",")
 
                             if l1 == "" or l2 == "" or count == "":
-                                raise ValueError(self.help_text["Loop"])
+                                raise ValueError(self.error_text["Loop"])
 
                             l1 = int(l1)
                             l2 = int(l2)
@@ -144,10 +146,8 @@ class EV:
                                 temp_interpreter.variables["i"] = Variables(
                                     i, "quantity"
                                 )
-                                results += [
-                                    str(r)
-                                    for r in temp_interpreter.ev(temp_lines).values()
-                                ]
+                                results += temp_interpreter.ev(temp_lines).values()
+                                
 
                             self.variables = {
                                 k: v
@@ -156,17 +156,17 @@ class EV:
                             }
                             self._invalidate_pattern()
 
-                            output[pc] = "\n".join(results)
+                            output[pc] = results
 
                             pc += 1
 
                         case "Afstem":
                             if line.count(",") > 1:
-                                raise ValueError(self.help_text["Afstem"])
+                                raise ValueError(self.error_text["Afstem"])
                             if "," in input:
                                 input, medium = input.split(",")
                                 if input == "" or medium == "":
-                                    raise ValueError(self.help_text["Afstem"])
+                                    raise ValueError(self.error_text["Afstem"])
                                 result = chem.balance_reaction(input, medium)
                             else:
                                 result = chem.balance_reaction(input)
@@ -176,10 +176,10 @@ class EV:
 
                         case "pH":
                             if line.count(",") != 1:
-                                raise ValueError(self.help_text["pH"])
+                                raise ValueError(self.error_text["pH"])
                             x, c = (p.strip() for p in input.split(","))
                             if x == "" or c == "":
-                                raise ValueError(self.help_text["pH"])
+                                raise ValueError(self.error_text["pH"])
 
                             result = chem.pH(x, c)
                             result = utils.round_pH(result, [c])
@@ -188,10 +188,10 @@ class EV:
 
                         case "pOH":
                             if line.count(",") != 1:
-                                raise ValueError(self.help_text["pOH"])
+                                raise ValueError(self.error_text["pOH"])
                             x, c = (p.strip() for p in input.split(","))
                             if x == "" or c == "":
-                                raise ValueError(self.help_text["pOH"])
+                                raise ValueError(self.error_text["pOH"])
 
                             result = chem.pOH(x, c)
                             result = utils.round_pH(result, [c])
@@ -200,10 +200,10 @@ class EV:
 
                         case "EnhedKonvertering":
                             if line.count(",") != 1:
-                                raise ValueError(self.help_text["EnhedKonvertering"])
+                                raise ValueError(self.error_text["EnhedKonvertering"])
                             start, unit = input.split(",")
                             if start == "" or unit == "":
-                                raise ValueError(self.help_text["EnhedKonvertering"])
+                                raise ValueError(self.error_text["EnhedKonvertering"])
                             Qstart = (parser.evaluate(self.prep_ev(start)))
                      
                   
@@ -221,9 +221,9 @@ class EV:
 
                         case "Analyse":
                             if line.count(",") != 0:
-                                raise ValueError(self.help_text["Analyse"])
+                                raise ValueError(self.error_text["Analyse"])
                             if input == "":
-                                raise ValueError(self.help_text["Analyse"])
+                                raise ValueError(self.error_text["Analyse"])
                             molecule, emp, mol, count, procent, dbe = (
                                 chem.elemental_analasis(input)
                             )
@@ -235,7 +235,7 @@ class EV:
 
                         case "BjerrumDiagram":
                             if input == "":
-                                raise ValueError(self.help_text["BjerrumDiagram"])
+                                raise ValueError(self.error_text["BjerrumDiagram"])
                             pks_values = input.split(",")
                             for i,part in enumerate(pks_values):
                                 if part in pKa_values:
@@ -259,10 +259,10 @@ class EV:
                             | "MasseProcent" as procent_type
                         ):
                             if line.count(",") != 1:
-                                raise ValueError(self.help_text[procent_type])
+                                raise ValueError(self.error_text[procent_type])
                             top, bottom = input.split(",")
                             if top == "" or bottom == "":
-                                raise ValueError(self.help_text[procent_type])
+                                raise ValueError(self.error_text[procent_type])
 
 
                             top_preped = parser.evaluate(self.prep_ev(top))
@@ -276,37 +276,37 @@ class EV:
 
                         case 'DNATilPeptid':
                             if input.count(",") != 0:
-                                raise ValueError(self.help_text["DNATilPeptid"])
+                                raise ValueError(self.error_text["DNATilPeptid"])
                             if input == "":
-                                raise ValueError(self.help_text["DNATilPeptid"])
+                                raise ValueError(self.error_text["DNATilPeptid"])
 
                             output[pc] = biotek.DNA_to_peptide(input)
                             pc +=1
                                 
                         case 'RNATilPeptid':
                             if input.count(",") != 0:
-                                raise ValueError(self.help_text["RNATilPeptid"])
+                                raise ValueError(self.error_text["RNATilPeptid"])
                             if input == "":
-                                raise ValueError(self.help_text["RNATilPeptid"])
+                                raise ValueError(self.error_text["RNATilPeptid"])
 
                             output[pc] = biotek.RNA_to_peptide(input)
                             pc +=1
 
                         case "MængdeBeregning":
                             if input.count(",") > 5:
-                                raise ValueError(self.help_text["MængdeBeregning"])
+                                raise ValueError(self.error_text["MængdeBeregning"])
 
                             if input == "":   
-                                raise ValueError(self.help_text["MængdeBeregning"])
+                                raise ValueError(self.error_text["MængdeBeregning"])
                            
                             tokens = input.split(",")
 
 
                             if  "" in tokens:
-                                raise ValueError(self.help_text["MængdeBeregning"])
+                                raise ValueError(self.error_text["MængdeBeregning"])
 
                             if len(tokens) == 1:
-                                raise ValueError(self.help_text["MængdeBeregning"])
+                                raise ValueError(self.error_text["MængdeBeregning"])
     
                             tokens = [token.strip() for token in tokens]
 
@@ -332,7 +332,7 @@ class EV:
     
                             for token in tokens:
                                 if "=" not in token:
-                                    raise ValueError(self.help_text["MængdeBeregning"])
+                                    raise ValueError(self.error_text["MængdeBeregning"])
                                 key, val = token.split("=", maxsplit=1)
                                 if key not in key_map:
                                     raise ValueError(f"Ukendt input {key!r}")
@@ -384,7 +384,7 @@ class EV:
                             if input == "":
                                 output[pc] = "\n".join(self.functions)
                             else:
-                                if input not in self.help_text:
+                                if input not in self.error_text:
                                     raise ValueError(
                                         f"Ukendt function {input}, eller ingen hjælpe text til functionen {f} "
                                     )

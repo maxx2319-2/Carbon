@@ -213,20 +213,20 @@ class _MapleBridge(QObject):
                     buf = io.BytesIO()
                     value.savefig(buf, format = "png")
                     rows.append(["image","data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()])
-                continue
-            for res in str(value).splitlines():
-                if res.startswith("Error"):
-                    rows.append(["error", r"\Rightarrow\:" + latex_text(res)])
-                else:
-                    rows.append(
-                        [
-                            "result",
-                            r"\Rightarrow\:"
-                            + calc_to_latex(
-                                res.replace("_", r"\_").replace("%", r"\%")
-                            ),
-                        ]
-                    )
+                    continue
+                for res in str(value).splitlines():
+                    if res.startswith("Error"):
+                        rows.append(["error", r"\Rightarrow\:" + latex_text(res)])
+                    else:
+                        rows.append(
+                            [
+                                "result",
+                                r"\Rightarrow\:"
+                                + calc_to_latex(
+                                    res.replace("_", r"\_").replace("%", r"\%")
+                                ),
+                            ]
+                        )
         return json.dumps(rows)
 
 
