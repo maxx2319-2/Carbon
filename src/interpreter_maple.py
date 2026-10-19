@@ -234,23 +234,34 @@ class EV:
                             pc += 1
 
                         case "BjerrumDiagram":
+                            inline = True
                             if input == "":
                                 raise ValueError(self.error_text["BjerrumDiagram"])
-                            pks_values = input.split(",")
-                            for i,part in enumerate(pks_values):
-                                if part in pKa_values:
-                                    pks_values[i] = pKa_values[part]
-                                else:
-                                    pks_values[i] = (parser.evaluate(self.prep_ev(part))).value
+                            pks_values = []
 
+
+                            for part in input.split(","):
+                                if part in pKa_values:
+                                    pks_values.append(pKa_values[part])
+                                elif "inline" in part.lower():
+                                    try:
+                                        inline = part.split("=")[1]
+                                        if inline.lower().strip() == "false":
+                                            inline = False
+
+                                    except: raise ValueError(f"inline parameter er forkert defineret:  {part}")
+                                else:
+                                    pks_values.append((parser.evaluate(self.prep_ev(part))).value)
+
+                            if len(pks_values) == 0:
+                                raise ValueError(self.error_text["BjerrumDiagram"])
 
                             pks_values = [float(x) for x in pks_values]
-            
 
-                        
-                            
+                            if inline:
+                                output[pc] = chem.bjerrum_figure(pks_values)
 
-                            output[pc] = chem.bjerrum_figure(pks_values)
+                            else: chem.bjerrum(pks_values)
                             pc += 1
 
                         case (

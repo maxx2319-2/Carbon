@@ -490,11 +490,13 @@ def bjerrum(pks):
 
     plt.rcParams.update(
         {
-            "figure.facecolor": "#1e1e1e",
-            "axes.facecolor": "#1e1e1e",
+            "figure.facecolor": "#404040",
+            "axes.facecolor": "#323232",
             "axes.edgecolor": "#555566",
             "axes.grid": True,
-            "grid.color": "#333344",
+            "grid.color": "#1F1F28",
+            "legend.facecolor": "#1e1e1e",
+            "legend.edgecolor": "#555566",
             "grid.alpha": 0.5,
             "font.size": 12,
             "axes.titlesize": 15,
