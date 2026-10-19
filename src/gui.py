@@ -803,7 +803,17 @@ class MainWindow(QMainWindow):
         sidebar.setStyleSheet(f"background-color: {SIDEBAR};")
         sb = QVBoxLayout(sidebar)
         sb.setContentsMargins(10,10,10,10)
-        sb.set
+        sb.setSpacing(10)
+        for key, spec in specs.items():
+            btn = QPushButton(spec.label)
+            btn.setStyleSheet(f"""
+                    QPushButton {{
+                    background-color: {BUTTON}; color: {TEXT};
+                    border: none; border-radius: 6px; padding: 6px; font-size: 12px;
+                }}
+                QPushButton:hover {{ background-color: {HOVER}; }}
+            """)
+            
 
 
     def open_menu(self):
