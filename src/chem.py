@@ -349,28 +349,28 @@ def balance_reaction(reaction, medium=None):
 
 
 
-def pH(x, c):
+def pH(x, con):
     if x[0].isalpha():
         if x not in pKa_values:
             raise ValueError(f'ukendt syre "{x}"')
         k = 10 ** -float(pKa_values[x])
     else:
         k = 10 ** -float(x)
-    con = float(c)
+
     H3O = (2*con)/(1+math.sqrt(1+((4*con)/k)))
     ph = -math.log10(H3O)
 
     return ph
 
 
-def pOH(x, c):
+def pOH(x, con):
     if x[0].isalpha():
         if x not in pKb_values:
                     raise ValueError(f'ukendt base "{x}"')
         k = 10 ** -float(pKb_values[x])
     else:
         k = 10 ** -float(x)
-    con = float(c)
+
     OH = (2*con)/(1+math.sqrt(1+((4*con)/k)))
     poh = -math.log10(OH)
 

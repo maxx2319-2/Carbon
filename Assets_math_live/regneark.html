@@ -57,6 +57,12 @@
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MængdeBeregning"
                 ];
+    const ARGS = {
+        BjerrumDiagram: ["export"],
+        EnhedKonvertering: ["SI"],
+        Help: FUNCTIONS
+    };
+    const wordColor = w => ["Help", "Loop"].includes(w) ? COLORS.control : FUNCTIONS.includes(w) ? COLORS.func : null;
     const COLORS = { control: "#C586C0", func: "#569CD6", number: "#B5CEA8", string: "#CE9178", comment: "#9CDCFE",};
     const color = (c, x) => `\\textcolor{${c}}{${x}}`;
 
@@ -95,7 +101,7 @@
         const m = latex.match(/^((?:[A-Za-zæøåÆØÅ]|\\_)+)(?=\\:|\\left\(|\(|$)/);
         if (m) {
             const word = m[1].replace(/\\_/g, "_");
-            const c = ["Help", "Loop"].includes(word) ? COLORS.control : FUNCTIONS.includes(word) ? COLORS.func : null;
+            const c = wordColor(word);
             if (c) latex = color(c, `\\mathbf{${m[1]}}`) + latex.slice(m[1].length);
         }
         return latex;
@@ -161,7 +167,11 @@
 
     function updateSuggest(mf) {
         const word = currentWord(mf).toLowerCase();
-        matches = word ? [...FUNCTIONS, ...variables()].filter(f => f.toLowerCase().startsWith(word) && f.toLowerCase() !== word) : [];
+        const func = strip(mf.value).match(/^([A-Za-zæøåÆØÅ]+)\\left\(/)?.[1];
+        const args = ARGS[func] ?? [];
+        const opened = strip(mf.getValue(mf.position - 1, mf.position, "latex")) === BOX;
+        matches = word ? [...new Set([...args, ...FUNCTIONS, ...variables()])].filter(f => f.toLowerCase().startsWith(word) && f.toLowerCase() !== word)
+                : opened ? args : [];
         active = 0;
         if (!matches.length) return hideSuggest();
         suggestFor = mf;
@@ -171,9 +181,11 @@
 
     function renderSuggest () {
         suggest.innerHTML = "";
+        const atStart = suggestFor.position === currentWord(suggestFor).length;
         matches.forEach((f,i) => {
             const el = document.createElement("div");
             el.textContent= f;
+            if (atStart) el.style.color = wordColor(f) ?? "";
             if (i === active) el.classList.add("active");
             el.addEventListener("mousedown", e => { e.preventDefault(); active = i; accept(); })
             suggest.append(el);
