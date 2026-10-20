@@ -190,7 +190,6 @@ def test_help_for_function(interpreter):
     assert out[0] == interpreter.help_text["pH"]
 
 
-@pytest.mark.xfail(reason="the message uses {f}, which is the config.json file handle at the top of the module")
 def test_help_unknown_function(interpreter):
     out = interpreter.ev("Help(foo)")
     assert out[0].startswith("Error: Ukendt function foo")
