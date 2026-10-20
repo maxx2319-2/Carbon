@@ -186,8 +186,10 @@ class EV:
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pH"])
 
-                            result = chem.pH(x, c)
-                            result = utils.round_pH(result, [c])
+                            
+
+                            result = chem.pH(x, parser.evaluate(self.prep_ev(c)).value)
+                            result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
 
@@ -198,8 +200,8 @@ class EV:
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pOH"])
 
-                            result = chem.pOH(x, c)
-                            result = utils.round_pH(result, [c])
+                            result = chem.pOH(x, parser.evaluate(self.prep_ev(c)).value)
+                            result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
 
