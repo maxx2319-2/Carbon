@@ -8,8 +8,7 @@ import quantity
 import chem
 import biotek
 import io
-import base64    
-import ctypes
+import base64
 from matplotlib.figure import Figure
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
@@ -60,7 +59,6 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QEasingCurve,
     QPoint,
-    QEvent,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -864,13 +862,6 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key_F11:
             if not self.isFullScreen():
                 self.showFullScreen()
-
-    def event(self, event):
-        if event.type() == QEvent.WinIdChange and sys.platform == "win32":
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
-            )
-        return super().event(event)
 
     def close_app(self):
         self.close()
