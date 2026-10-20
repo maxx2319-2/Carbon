@@ -14,8 +14,8 @@ from matplotlib.figure import Figure
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 
-
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication,
@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QColorDialog,
     QFrame,
+    QTextEdit,
 )
 from PySide6.QtCore import (
     Qt,
@@ -96,7 +97,81 @@ HOVER = "#cccccc"
 TEXT = "#000000"
 SCROLL = "#323232"
 
-HELPTEXT = {"pH" : ""}
+LINE_HEIGHT = 27
+BOX_HEIGHT = 120
+
+SUB_HELP = (
+    "\nFor at skrive sænket skrivt er det Shift+Bindestreg."
+    "\nFor at skrive hævet skrivt er det Shift+^."
+    )
+
+HELPTEXT = {
+    "unit": (
+        "Indtast din originale værdi med dens enhed i det øverste input, brug . for decimaltal.\n"
+        "Husk at skrive dens enhed inde i de firkantede parenteser [] for eksempel 10[km/t].\n"
+        "Derefter indtast den ønskede enhed uden firkantede parenteser."
+    ),
+    "analysis": (
+        "Indtast molekylet i input feltet.\n"
+        "Husk at grundstoffer med navne der er længere end et bogstav kun har det første bogstav stort.\n"
+        "Eksempelvis Fe3O4, Jernoxid.\n"
+        "DBE formel kan kun anvendes til organiske molekyler."
+    ),
+    "bjerrum": (
+        "Indtast pKs værdi for at opstille et bjerrumsdiagram.\n"
+        "Brug . for at skrive decimaler og brug , for at lave endnu et diagram.\n"
+        "For eksempel 5.3, 4.1 laver to bjerrumsdiagrammer."
+    ),
+    "ph": (
+        "Indtast enten en pKs værdi eller en pKb værdi samt dens koncentration.\n"
+        "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
+        "Du kan også bruge syren eller basens navn for nogle syrer og baser (se Indstillinger).\n"
+        "Det øverste output er pH mens det nederste er pOH.\n"
+        "Standard enhed for koncentration er mol/l."
+    ),
+    "balance": (
+        "Indtast din ubalancerede reaktion i input kassen.\n"
+        "Brug pil mellem reaktanter og produkter ->.\n"
+        "For eksempel H2O -> H2 + O2.\n"
+        "Ved redoxreaktioner bruges opløsningsboksen hvor der skrives syre eller base."
+    ),
+    "yield": (
+        "Indtast teoretisk udbytte i det første input og praktisk udbytte i det andet.\n"
+        "Husk . for decimal og enheder inde i firkantet parentes [].\n"
+        "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
+    ),
+    "volpct": (
+        "Indtast samlet volumen i det første input og specifik volumen i det andet.\n"
+        "Eksempelvis 4[l] 300[dl]. Standard enheden er l."
+    ),
+    "masspct": (
+        "Indtast samlet masse i det første input og specifik masse i det andet.\n"
+        "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
+    ),
+    "mass_calc": (
+        "Indtast din tilgængelige data i deres respektive input.\n"
+        "Den beregner alt den mulige data fra det givne input, så du behøver ikke fylde alle inputs.\n"
+        "Standard: masse g, volumen l, stofmængde mol, koncentration mol/l, molarmasse g/mol, densitet kg/l."
+    ),
+    "buffer": (
+        "Input stofmængden eller koncentrationen af syren og af basen samt syrens pKs.\n"
+        "Standard enhed for stofmængde er mol, for koncentration mol/l."
+    ),
+    "h3o": "Input enten pH eller pOH.\nHusk . for decimaler.",
+    "dna_mut": (
+        "Indtast den raske DNA streng øverst og derefter den muterede.\n"
+        "Mellemrum og store/små bogstaver er ligegyldige.\nFor eksempel AAT gcc TTG."
+    ),
+    "rna_mut": (
+        "Indtast den raske RNA streng øverst og derefter den muterede.\n"
+        "Mellemrum og store/små bogstaver er ligegyldige.\nFor eksempel AAU gcc UUG."
+    ),
+    "translation": (
+        "Indtast enten DNA eller RNA streng.\n"
+        "Mellemrum og store/små bogstaver er ligegyldige.\n"
+        "For eksempel AAT gcc TTG eller AAUGCCUUU."
+    ),
+}
 
 def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\_", "\x00")  # a typed underscore, not a subscript
@@ -257,9 +332,9 @@ class _Bridge(QObject):
 class MathInput(QWebEngineView):
     returnPressed = Signal()
 
-    def __init__(self, placeholder="", parent=None, text_mode=False):
+    def __init__(self, placeholder="", parent=None, text_mode=False, height=LINE_HEIGHT):
         super().__init__(parent)
-        self.setFixedHeight(27)
+        self.setFixedHeight(height)
         self._placeholder = placeholder
         self._loaded = False
         self._bridge = _Bridge()
@@ -301,12 +376,8 @@ class MathInput(QWebEngineView):
             return
         self._loaded = True
         self.setPlaceholderText(self._placeholder)
-        # self.setAccent(ACCENT)
         if self._bridge.latex:
             self.page().runJavaScript(f"setValue({json.dumps(self._bridge.latex)})")
-
-    # def setAccent(self, color):
-    #   self.page().runJavaScript(f"setAccent({json.dumps(color)})")
 
 
 class MathOutput(QWebEngineView):
@@ -349,14 +420,31 @@ class MathOutput(QWebEngineView):
         self._placeholder = t
         self.page().runJavaScript(f"setPlaceholder({json.dumps(t)})")
 
-    # def setAccent(self, color):
-    #   self.page().runJavaScript(f"setAccent({json.dumps(color)})")
-
     def setReadOnly(self, _):
         pass
 
     def setStyleSheet(self, _):
         pass
+
+class TextOutput(QTextEdit): 
+    def __init__(self, placeholder="", parent=None, height=BOX_HEIGHT):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setPlaceholderText(placeholder)
+        self.setMinimumHeight(height)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {BUTTON}; color: {TEXT};
+                border: none; border-radius: 4px; padding: 4px; font-size: 12px;
+            }}
+        """)
+
+    def setText(self, s):
+        self.setPlainText(str(s))
+
+    def text(self):
+        return self.toPlainText()
 
 class LicenseWindow(QDialog):
     def __init__(self, parent=None):
@@ -441,7 +529,7 @@ træ = biotek.graph()
 class DraggablePanel(QWidget):
     def __init__(self, title, body_widget, parent=None, help_text=None):
         super().__init__(parent)
-        self.help_text = help_text or "Ingen hjælpetekst endu :("
+        self.help_text = help_text or "Ingen hjælpetekst endnu :("
         self.setStyleSheet(f"""
             DraggablePanel {{
                 background-color: rgba(43, 43, 43, 0);
@@ -469,7 +557,7 @@ class DraggablePanel(QWidget):
         header_layout.setContentsMargins(8, 0, 4, 0)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT}; font-weight: bold; border: none;")
+        title_label.setStyleSheet(f"color: {BUTTON}; font-weight: bold; border: none;")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
@@ -514,7 +602,7 @@ class DraggablePanel(QWidget):
         msg.setIcon(QMessageBox.NoIcon)
         msg.setStyleSheet(f"""
                 QMessageBox {{ background-color: {BG}; }}
-                QLabel {{ color: {TEXT}; }}
+                QLabel {{ color: {BUTTON}; }}
                 QPushButton {{
                     background-color: {BUTTON};
                     color: {TEXT};
