@@ -352,11 +352,10 @@ class MathOutput(QWebEngineView):
     def setStyleSheet(self, _):
         pass
 
-
 class LicenseWindow(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("License Manager")
+    def init(self, parent=None):
+        super().init(parent)
+        self.setWindowTitle("Carbon: Licens manager")
         self.setModal(True)
         self.setFixedSize(360, 160)
         self.setStyleSheet(f"""
@@ -366,22 +365,33 @@ class LicenseWindow(QDialog):
                 background-color: {BUTTON};
                 color: {TEXT};
                 padding: 6px;
+                border: 0px solid {BUTTON};
+            }}
+            QLineEdit:focus {{
+                border: 0px solid {BUTTON};
             }}
             QPushButton {{
                 background-color: {BUTTON};
                 color: {TEXT};
                 padding: 6px 14px;
+                border: 0px solid {BUTTON};
             }}
-            QPushButton:hover {HOVER}
+            QPushButton:hover {{ background-color: {HOVER}; }}
+            QPushButton:default {{ border: 0px solid {BUTTON}; }}
         """)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Indtast licens:"))
-
+ 
         self.key_input = QLineEdit()
+        self.key_input.setPlaceholderText("Indtast licens her...")
         layout.addWidget(self.key_input)
 
         button_row = QHBoxLayout()
+
+        logo = QSvgWidget(str(ASSETS_DIR / "Carbon_Full.svg"))
+        logo.renderer().setAspectRatioMode(Qt.KeepAspectRatio)
+        logo.setFixedSize(150,75)
+        button_row.addWidget(logo)
         button_row.addStretch()
 
         ok_btn = QPushButton("Ok")
@@ -393,7 +403,7 @@ class LicenseWindow(QDialog):
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
-
+    
     def try_accept(self):
         key = self.key_input.text().strip()
 
@@ -805,32 +815,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.maple_view)
         self.stack.addWidget(page)
-
-    def create_category_page(self, cat, specs):
-        """specs: {keys: PanelSpec}; sidebar order = dict order."""
-        self.specs[cat], self.panels[cat] = specs, {}
-
-        page = QWidget()
-        layout = QHBoxLayout(page)
-        layout.setContentsMargins(0,0,0,0)
-        layout.setSpacing(0)
-
-        sidebar = QWidget()
-        sidebar.setFixedWidth(100)
-        sidebar.setStyleSheet(f"background-color: {SIDEBAR};")
-        sb = QVBoxLayout(sidebar)
-        sb.setContentsMargins(10,10,10,10)
-        sb.setSpacing(10)
-        for key, spec in specs.items():
-            btn = QPushButton(spec.label)
-            btn.setStyleSheet(f"""
-                    QPushButton {{
-                    background-color: {BUTTON}; color: {TEXT};
-                    border: none; border-radius: 6px; padding: 6px; font-size: 12px;
-                }}
-                QPushButton:hover {{ background-color: {HOVER}; }}
-            """)
-            
 
 
     def open_menu(self):
