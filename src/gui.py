@@ -583,11 +583,11 @@ class MainWindow(QMainWindow):
         #self.create_settings_page()
         #self.create_formel_page()
 
-    if sys.platform == "win32":
+        if sys.platform == "win32":
 
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
-        )
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
+            )
 
 
     def create_drawer(self):
