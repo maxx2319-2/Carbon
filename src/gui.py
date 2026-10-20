@@ -737,6 +737,11 @@ class MainWindow(QMainWindow):
                         border: none;
                         padding: 6px;
                     }}
+                    QToolTip {{
+                    background-color: {BUTTON};
+                    color: {TEXT};
+                    border: 1px solid {HEADER};
+                    }}
                 """)
             return btn
 
