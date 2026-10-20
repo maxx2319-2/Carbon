@@ -44,7 +44,7 @@
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MængdeBeregning"
                 ];
-    const COLORS = { control: "#C586C0", func: "#569CD6", number: "#B5CEA8", string: "#CE9178", results: "#9CDCFE",};
+    const COLORS = { control: "#C586C0", func: "#569CD6", number: "#B5CEA8", string: "#CE9178", comment: "#9CDCFE",};
     const color = (c, x) => `\\textcolor{${c}}{${x}}`;
 
     // index just after the {...} group that starts at i (handles nested braces)
@@ -75,7 +75,7 @@
     // add syntax colours to one line; only styles are added, so the cursor position stays the same
     function highlight(latex) {
         const hash = latex.indexOf("\\#");
-        if (hash !== -1) return (hash > 0 ? highlight(latex.slice(0, hash)) : "") + color(COLORS.results, latex.slice(hash));
+        if (hash !== -1) return (hash > 0 ? highlight(latex.slice(0, hash)) : "") + color(COLORS.comment, latex.slice(hash));
         latex = latex.replace(/\^\{\\prime\}(.*?)\^\{\\prime\}/g,
             (m, inner) => `^{\\prime}${inner ? color(COLORS.string, inner) : ""}^{\\prime}`);
         latex = latex.replace(/(?:(?<=\\cdot)|(?<![\\\w]))(?<!_\{)\d+(?:\.\d+)?/g, n => color(COLORS.number, n));
