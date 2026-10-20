@@ -164,13 +164,13 @@ class quantity:
                 if power == 1:
                     numerator.append(f"{name}")
                 else:
-                    numerator.append(f"{name}^{power}")
+                    numerator.append(f"{name}^{power:g}")
 
             if not utils.is_positive(power):
                 if power == -1:
                     denominator.append(f"{name}")
                 else:
-                    denominator.append(f"{name}^{-power}")
+                    denominator.append(f"{name}^{-power:g}")
 
         if len(numerator) > 0 and len(denominator) > 0:
             unit = f'{"*".join(numerator)}/{"*".join(denominator)}'

@@ -1,6 +1,12 @@
 import re
 from quantity import quantity
+import math
 
+FUNCTIONS = {
+    "ln":math.log,
+    "log":math.log10,
+    "exp":math.exp,
+}
 
 
 TOKEN_RE = re.compile(
@@ -97,21 +103,33 @@ class _Parser:
             return quantity(-value.value, value.units) if op == "-" else value
         return self.power()
 
+
+    def group(self):
+        self.take()
+        result = self.expr()
+        if self.take() != ("op", ")"):
+            raise ValueError(f'mangler ")" i {self.text}')
+        return result
+
     def atom(self):
+        if self.peek() == ("op","("):
+            return self.group()
         kind, value = self.take()
         if kind == "number":
             return quantity(float(value), {})
+        if kind == "unit" and self.peek() == ("op","("):
+            if value == "sqrt":
+                return self.group() ** 0.5
+            if value in FUNCTIONS:
+                arg = self.group()
+                if arg.units:
+                    raise ValueError(f'{value} kan ikke tage imod enhed')
+                return quantity(FUNCTIONS[value](arg.value),{})
         if kind == "unit":
-            return quantity(1.0, {value: 1})
-        if (kind, value) == ("op", "("):
-            result = self.expr()
-            if self.take() != ("op", ")"):
-                raise ValueError(f"Mangler ')' i '{self.text}'")
-            return result
+            return quantity(1.0,{value: 1})
         if kind is None:
-            raise ValueError(f"Udtrykket slutter for tidligt: '{self.text}'")
-        raise ValueError(f"Uventet '{value}' i '{self.text}'")
-
+            raise ValueError(f'udtrykket sluter for tidligt: "{self.text}"')
+        raise ValueError(f'uventet "{value}" i {self.text}')
 
 def evaluate(equation):
     if re.search(r"\d,\d", equation):

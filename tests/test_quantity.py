@@ -240,7 +240,6 @@ def test_unit_convert_unknown_target():
         Q.unit_convert(Q(1, {"m": 1}), "xyz")
 
 
-@pytest.mark.xfail(reason="quantity_convert stores powers as floats, so s^2 is shown as s^2.0")
 def test_unit_convert_shows_whole_powers():
     assert str(Q.unit_convert(Q(1, {"N": 1}), "kg*m/s^2")) == "1.0 kg*m/s^2"
 
