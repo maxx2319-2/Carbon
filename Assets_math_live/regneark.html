@@ -44,7 +44,7 @@
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MængdeBeregning"
                 ];
-    const COLORS = { control: "#C586C0", func: "#569CD6", number: "#B5CEA8", string: "#CE9178", comment: "#9CDCFE" };
+    const COLORS = { control: "#C586C0", func: "#569CD6", number: "#B5CEA8", string: "#CE9178", comment: "#9CDCFE",};
     const color = (c, x) => `\\textcolor{${c}}{${x}}`;
 
     // index just after the {...} group that starts at i (handles nested braces)
@@ -82,7 +82,7 @@
         const m = latex.match(/^((?:[A-Za-zæøåÆØÅ]|\\_)+)(?=\\:|\\left\(|\(|$)/);
         if (m) {
             const word = m[1].replace(/\\_/g, "_");
-            const c = word === "Help" ? COLORS.control : FUNCTIONS.includes(word) ? COLORS.func : null;
+            const c = ["Help", "Loop"].includes(word) ? COLORS.control : FUNCTIONS.includes(word) ? COLORS.func : null;
             if (c) latex = color(c, `\\mathbf{${m[1]}}`) + latex.slice(m[1].length);
         }
         return latex;
