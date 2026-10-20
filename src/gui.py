@@ -72,6 +72,8 @@ from PySide6.QtGui import (
     QPainter,
     QBrush,
     QPen,
+    QPalette,
+    QColor,
 )
 import re
 import interpreter_maple
@@ -95,8 +97,6 @@ TEXT = "#000000"
 SCROLL = "#323232"
 
 HELPTEXT = {"pH" : ""}
-
-
 
 def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\_", "\x00")  # a typed underscore, not a subscript
@@ -353,8 +353,8 @@ class MathOutput(QWebEngineView):
         pass
 
 class LicenseWindow(QDialog):
-    def init(self, parent=None):
-        super().init(parent)
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("Carbon: Licens manager")
         self.setModal(True)
         self.setFixedSize(360, 160)
@@ -364,20 +364,22 @@ class LicenseWindow(QDialog):
             QLineEdit {{
                 background-color: {BUTTON};
                 color: {TEXT};
-                padding: 6px;
-                border: 0px solid {BUTTON};
+                padding: 6px 10px;
+                border: none;
+                border-radius: 8px;
             }}
             QLineEdit:focus {{
-                border: 0px solid {BUTTON};
+                border: none;
             }}
             QPushButton {{
                 background-color: {BUTTON};
                 color: {TEXT};
                 padding: 6px 14px;
-                border: 0px solid {BUTTON};
+                border: none;
+                border-radius: 8px;
             }}
             QPushButton:hover {{ background-color: {HOVER}; }}
-            QPushButton:default {{ border: 0px solid {BUTTON}; }}
+            QPushButton:default {{ border: none; }}
         """)
 
         layout = QVBoxLayout(self)
@@ -575,7 +577,7 @@ class MainWindow(QMainWindow):
         #self.create_formel_page()
 
     def create_drawer(self):
-        self.drawer_max_width = 260
+        self.drawer_max_width = 270
         self.drawer_open = False
 
         self.drawer = QFrame(self)
@@ -596,7 +598,7 @@ class MainWindow(QMainWindow):
             }}
             QScrollBar::handle:vertical {{
                 background: {SIDEBAR};
-                border-radius: 4px;
+                border-radius: 8px;
                 min-height: 30px;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
@@ -626,7 +628,7 @@ class MainWindow(QMainWindow):
                     text-align: left;
                     padding: 8px;
                     border: none;
-                    border-radius: 6px;
+                    border-radius: 8px;
                     background: transparent;
                 }}
                 QPushButton:hover {{
@@ -762,7 +764,7 @@ class MainWindow(QMainWindow):
                 background-color: {BUTTON};
                 color: {TEXT};
                 border: none;
-                border-radius: 12px;
+                border-radius: 8px;
                 padding: 4px 10px;
             }}
         """)
