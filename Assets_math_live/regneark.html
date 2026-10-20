@@ -305,7 +305,10 @@
 
     const key = navigator.userAgent.includes("Mac") ? "Command" : "ctrl";
     const first = newLine();
-    first.placeholder = `\\textcolor{#858585}{\\text{Skriv din udregning her og tryk ${key}+Enter for at regne}}`;
+    const hint = `\\textcolor{#858585}{\\text{Skriv din udregning her og tryk ${key}+Enter for at regne}}`;
+    const updateHint = () => first.placeholder = lines().every(mf => mf.value === "") ? hint : "";
+    editor.addEventListener("input",updateHint);
+    updateHint();
     focusLine(first);
 
 </script>
