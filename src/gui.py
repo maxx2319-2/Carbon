@@ -99,6 +99,7 @@ SCROLL = "#323232"
 
 LINE_HEIGHT = 27
 BOX_HEIGHT = 120
+SIDEBAR_WIDTH = 120
 
 SUB_HELP = (
     "\nFor at skrive sænket skrivt er det Shift+Bindestreg."
@@ -642,7 +643,73 @@ class DraggablePanel(QWidget):
         y = max(0, min(pos.y(), parent_rect.height() - self.height()))
         return pos.__class__(x, y)
 
+@dataclass
+class Panel:
+    label: str
+    title: str
+    build: callable
+    size: tuple = (280, 280)
 
+PANELS = {
+    "unit": Panel("Enhed","Enheds Omregner", QWidget),
+}
+
+class PanelPage(QWidget):
+    def __init__(self, keys, parent=None):
+        super().__init__(parent)
+        self.panels = {}
+
+        self.canvas = QWidget()
+        self.canvas.setStyleSheet(f"background-color: {BG};")
+
+        content = QWidget()
+        content.setFixedWidth(SIDEBAR_WIDTH)
+        content.setStyleSheet(f"background-color: {SIDEBAR};")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(10,10,10,10)
+        content_layout.setSpacing(10)
+
+        for key in keys:
+            btn = QPushButton(PANELS[key].label)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {BUTTON};
+                    color: {TEXT};
+                    border: none;
+                    border-radius: 8px;
+                    padding: 8px;
+                }}
+                QPushButton:hover {{ background-color: {HOVER}; }}
+            """)
+            btn.clicked.connect(lambda _=False, k=key: self.show_panel(k))
+            content_layout.addWidget(btn)
+        content_layout.addStretch()
+
+        self.sidebar = QWidget()
+        self.sidebar.setMaximumWidth(SIDEBAR_WIDTH)
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(0,0,0,0)
+        sidebar_layout.addWidget(content)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
+        layout.addWidget(self.sidebar)
+        layout.addWidget(self.canvas, stretch=1)
+
+    def show_panel(self, key):
+        panel = self.panels.get(key)
+        if panel is None:
+            spec = PANELS[key]
+            help_text = HELPTEXT[key] + SUB_HELP if key in HELPTEXT else None
+            panel = DraggablePanel(spec.title, spec.build(), self.canvas, help_text)
+            panel.resize(*spec.size)
+            offset = 20 * len(self.panels)
+            panel.move(20 + offset, 20 + offset)
+            self.panels[key] = panel
+
+        panel.show()
+        panel.raise_()
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -665,9 +732,12 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        #self.create_kemi_page()
-        #self.create_fysik_page()
-        #self.create_biotek_page()
+        self.kemi_page = PanelPage(["unit"])
+        self.fysik_page = PanelPage(["unit"])
+        self.biotek_page = PanelPage(["unit"])
+        self.stack.addWidget(self.kemi_page)
+        self.stack.addWidget(self.fysik_page)
+        self.stack.addWidget(self.biotek_page)
         #self.create_settings_page()
         #self.create_formel_page()
 
@@ -941,13 +1011,13 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(2)
 
     def open_kemi(self):
-        self.stack.setCurrentIndex(3)
+        self.stack.setCurrentWidget(self.kemi_page)
 
     def open_fysik(self):
-        self.stack.setCurrentIndex(4)
+        self.stack.setCurrentWidget(self.fysik_page)
 
     def open_biotek(self):
-        self.stack.setCurrentIndex(5)
+        self.stack.setCurrentWidget(self.biotek_page)
 
     def open_settings(self):
         self.stack.setCurrentIndex(6)
