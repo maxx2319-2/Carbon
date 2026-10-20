@@ -31,11 +31,24 @@
     #editor > div.out::before {top: 0; transform: 100%;}
 
     img.out { display: block; max-width: 100%; }
+    
+
+    #suggest {position: fixed; display: none; z-index: 10; background: #323232; font: 14px "Segoe-UI";
+    width: 200px; max-height:  160px; overflow-y: auto; border-radius: 8px; padding: 4px; box-sizing: border-box;}
+    #suggest div {padding: 3px 10px; color: #fff; cursor: pointer; text-align: left; border: 1px solid transparent; border-radius: 4px ;}
+    #suggest div.active {background: #737373;}
+
+    #suggest::-webkit-scrollbar { width: 6px; }
+    #suggest::-webkit-scrollbar-track { background: transparent; }
+    #suggest::-webkit-scrollbar-thumb { background: #737373; border-radius: 3px; }
+    #suggest::-webkit-scrollbar-thumb:hover { background: #8a8a8a; }
+
 </style></head>
 <body>
 <div id="editor"></div>
+<div id="suggest"></div>
 <script>
-    MathfieldElement.fontsDirectory = "./fonts";
+    MathfieldElement.fontsDirectory = "./fonts"; 
     MathfieldElement.soundsDirectory = null;
     const editor = document.getElementById("editor");
     let bridge = null;
@@ -121,6 +134,70 @@
         rebuild(mf, before.slice(0, -4), `\\sqrt{${BOX}}`, after);
     }
 
+    const suggest = document.getElementById("suggest");
+    let matches = [], active=0,suggestFor = null;
+
+    function currentWord(mf) {
+        let word = "", p = mf.position;
+        while (p > 0) {
+            const c = strip(mf.getValue(p - 1, p, "latex"));
+            if (!/^[A-Za-zæøåÆØÅ]$/.test(c)) break;
+            word = c + word;
+            p--;
+        }
+        return word;
+    }
+
+
+    function hideSuggest() {
+        suggestFor = null;
+        suggest.style.display = "none";
+    }
+    function variables() {
+        const names = lines().map(l => strip(l.value).match(/^([A-Za-zæøåÆØÅ]+)(?:\\:|\s)*=/)?.[1]);
+        return [...new Set(names.filter(n => n && !FUNCTIONS.includes(n)))];
+    } 
+
+
+    function updateSuggest(mf) {
+        const word = currentWord(mf).toLowerCase();
+        matches = word ? [...FUNCTIONS, ...variables()].filter(f => f.toLowerCase().startsWith(word) && f.toLowerCase() !== word) : [];
+        active = 0;
+        if (!matches.length) return hideSuggest();
+        suggestFor = mf;
+        renderSuggest();
+
+    }
+
+    function renderSuggest () {
+        suggest.innerHTML = "";
+        matches.forEach((f,i) => {
+            const el = document.createElement("div");
+            el.textContent= f;
+            if (i === active) el.classList.add("active");
+            el.addEventListener("mousedown", e => { e.preventDefault(); active = i; accept(); })
+            suggest.append(el);
+        });
+        suggest.querySelector(".active")?.scrollIntoView({ block: "nearest" });
+        requestAnimationFrame(() =>{
+            const line = suggestFor.getBoundingClientRect();
+            const caret = suggestFor.shadowRoot?.querySelector(".ML__caret")?.getBoundingClientRect();
+            suggest.style.left = (caret ? caret.left : line.left) + "px";
+            suggest.style.top = line.bottom + "px";
+            suggest.style.display = "block";
+        });
+    }
+
+    function accept() {
+        const mf = suggestFor, word = currentWord(mf), name = matches[active], p = mf.position;
+        const inHelp = strip(mf.value).startsWith("Help");
+        hideSuggest();
+        mf.selection = { ranges: [[p - word.length, p]] };
+        mf.executeCommand(["insert", FUNCTIONS.includes(name) && !inHelp ? `${name}\\left(#?\\right)` : name, { selectionMode: "placeholder" }]);
+    }
+
+    editor.addEventListener("scroll",hideSuggest);
+
     function lines() { return [...editor.querySelectorAll("math-field:not(.out)")]; }
 
     const isOut = el => el && el.classList.contains("out");
@@ -191,7 +268,8 @@
         if (after) after.after(mf); else editor.append(mf);
         setupField(mf);
         setLine(mf, raw);
-        mf.addEventListener("input", () => { clearOutput(mf); makeSqrt(mf); recolour(mf); rember(mf); });
+        mf.addEventListener("input", () => { clearOutput(mf); makeSqrt(mf); recolour(mf); rember(mf);  updateSuggest(mf); });
+        mf.addEventListener("blur",hideSuggest);
         return mf;
     }
 
@@ -201,6 +279,19 @@
         const atStart = mf.position === 0 && mf.selectionIsCollapsed;
         const atEnd = mf.position === mf.lastOffset && mf.selectionIsCollapsed;
         const up = prevField(mf), down = nextField(mf);
+
+        if (suggestFor === mf) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                stop();
+                active = (active + (e.key === "ArrowDown" ? 1: -1) + matches.length) % matches.length;
+                renderSuggest();
+                return;
+            }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.ctrlKey && !e.metaKey)) {stop(); accept(); return;}
+            if (e.key === "Escape") {stop(); hideSuggest(); return;}
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") hideSuggest();
+        }
+
 
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { stop(); run(); return; }
         if (e.key === "ArrowUp" && up) { stop(); focusLine(up); return; }
