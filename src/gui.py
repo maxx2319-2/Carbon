@@ -791,17 +791,29 @@ class MainWindow(QMainWindow):
     def run_search(self):
         print(self.search.text().strip())
 
+
+
     def create_mainmenu(self):
         central = QWidget()
 
         layout = QVBoxLayout(central)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setContentsMargins(40,40,40,40)
 
         logo = QSvgWidget(str(ASSETS_DIR / "Carbon_Full.svg"))
         logo.renderer().setAspectRatioMode(Qt.KeepAspectRatio)
-        logo.setFixedSize(1000,500)
-        layout.addWidget(logo, alignment=Qt.AlignCenter)
+        logo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        logo.setMaximumSize(1000,411)
+        logo.setMinimumSize(100,41)
 
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(logo, 100)
+        row.addStretch(1)
+
+        layout.addStretch(1)
+        layout.addLayout(row, 100)
+        layout.addStretch(1)
+        
         self.stack.addWidget(central)
 
     def create_interpreter_page(self):
