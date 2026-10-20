@@ -108,6 +108,8 @@ def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\{", "\x01").replace(r"\}", "\x02")
     s = s.replace(r"\cdot", "*").replace(r"\times", "*")
     s = s.replace(r"\#", "#")
+    
+    s = re.sub(r"\\(ln|log|exp)(?![A-Za-z])", r"\1", s)
     s = re.sub(r"\^\{\\prime\}", "'", s)
     s = re.sub(r"\\[,;:! ]", " ", s)
     s = re.sub(r"\\mu\s*", "µ", s)
@@ -124,6 +126,9 @@ def Latex_to_calc(s: str) -> str:
             r"\\frac\{([^{}]*)\}\s*([^\s{}\\])", r"\\frac{\1}{\2}", s
         )  # \frac{x}2
         s = re.sub(r"\\frac\{([^{}]*)\}\{([^{}]*)\}", r"((\1)/(\2))", s)
+        s = re.sub(r"\\sqrt\s*([^\s{}\\])", r"\\sqrt{\1}", s)
+        s = re.sub(r"\\sqrt\{([^{}]*)\}", r"sqrt(\1)", s)
+
         s = re.sub(r"_\{([^{}]*)\}", r"\1", s)
         s = re.sub(
             r"\^\{([^{}]*)\}",
@@ -162,6 +167,7 @@ def calc_to_latex(s) -> str:
         lambda m: f"{m.group(1)}\\cdot{{10}}^{{{int(m.group(2))}}}",
         s,
     )
+    s = re.sub(r"\^([\d.]+)", r"^{\1}", s)
     s = re.sub(r"([^\s/]+)/([^\s/]+)", r"\\frac{\1}{\2}", s)
 
 

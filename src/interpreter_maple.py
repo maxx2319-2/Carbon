@@ -443,14 +443,14 @@ class EV:
                                         "Man kan ikke både bruge ' og " + '"'
                                     )
                                 elif "'" in b:
-                                    if count("'") != 2:
+                                    if b.count("'") != 2:
                                         raise ValueError(
                                             "Du skal slutte og starte din text med enten: '  eller "
                                             + '"'
                                         )
 
                                 elif '"' in b:
-                                    if count('"') != 2:
+                                    if b.count('"') != 2:
                                         raise ValueError(
                                             "Du skal slutte og starte din text med enten: '  eller "
                                             + '"'
@@ -466,7 +466,7 @@ class EV:
 
                                 b = b.strip("{").strip("}")
                                 b = b.split(",")
-                                self.variables[a] = Variables()
+                                self.variables[a] = Variables(b,"list")
 
 
                             else:
