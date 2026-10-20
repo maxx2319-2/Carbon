@@ -8,7 +8,8 @@ import quantity
 import chem
 import biotek
 import io
-import base64
+import base64    
+import ctypes
 from matplotlib.figure import Figure
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
@@ -581,6 +582,13 @@ class MainWindow(QMainWindow):
         #self.create_biotek_page()
         #self.create_settings_page()
         #self.create_formel_page()
+
+    if sys.platform == "win32":
+
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
+        )
+
 
     def create_drawer(self):
         self.drawer_max_width = 270
