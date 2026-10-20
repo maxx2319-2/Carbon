@@ -60,6 +60,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QEasingCurve,
     QPoint,
+    QEvent,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -583,13 +584,6 @@ class MainWindow(QMainWindow):
         #self.create_settings_page()
         #self.create_formel_page()
 
-        if sys.platform == "win32":
-
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
-            )
-
-
     def create_drawer(self):
         self.drawer_max_width = 270
         self.drawer_open = False
@@ -870,6 +864,13 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key_F11:
             if not self.isFullScreen():
                 self.showFullScreen()
+
+    def event(self, event):
+        if event.type() == QEvent.WinIdChange and sys.platform == "win32":
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                int(self.winId()), 33, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int)
+            )
+        return super().event(event)
 
     def close_app(self):
         self.close()
