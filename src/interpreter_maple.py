@@ -248,13 +248,8 @@ class EV:
                             for part in input.split(","):
                                 if part in pKa_values:
                                     pks_values.append(pKa_values[part])
-                                elif "inline" in part.lower():
-                                    try:
-                                        inline = part.split("=")[1]
-                                        if inline.lower().strip() == "false":
-                                            inline = False
-
-                                    except: raise ValueError(f"inline parameter er forkert defineret:  {part}")
+                                elif "export" in part.lower():
+                                    inline = False
                                 else:
                                     pks_values.append((parser.evaluate(self.prep_ev(part))).value)
 
@@ -402,7 +397,7 @@ class EV:
                             else:
                                 if input not in self.error_text:
                                     raise ValueError(
-                                        f"Ukendt function {input}, eller ingen hjælpe text til functionen {f} "
+                                        f"Ukendt function {input}, eller ingen hjælpe text til functionen"
                                     )
                                 output[pc] = self.help_text[input]
 

@@ -6,6 +6,7 @@ Before implementing:
 
 - Never implemt without being told to.
 - Always tell me how to do it, never edit files without permision.
+- you are hower allowed to edit files in the folder "tests" since those all for you to use on debugging
 
 
 ## 2. Think Before Coding

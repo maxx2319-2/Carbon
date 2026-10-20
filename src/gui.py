@@ -174,6 +174,7 @@ HELPTEXT = {
 }
 
 def Latex_to_calc(s: str) -> str:
+    s = s.replace(r"\placeholder{}", "")
     s = s.replace(r"\_", "\x00")  # a typed underscore, not a subscript
     s = re.sub(r"\\rightleftharpoons(?![A-Za-z])\s*", "<->", s)
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
