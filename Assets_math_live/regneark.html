@@ -13,6 +13,8 @@
         --caret-color: var(--accent);
         --selection-background-color: color-mix(in srgb, var(--accent) 35%, transparent);
         --contains-highlight-background-color: hsl(212, 5%, 34%);
+        --text-highlight-background-color: transparent;
+
     }
     math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { display: none; }
     math-field.result { color: var(--comment); }
@@ -299,6 +301,11 @@
     window.addEventListener("blur",idle);
     idle();
     new MutationObserver(renumberLoops).observe(editor,{ childList: true})
-    focusLine(newLine());
+
+    const key = navigator.userAgent.includes("Mac") ? "Command" : "ctrl";
+    const first = newLine();
+    first.placeholder = `\\textcolor{#858585}{\\text{Skriv din udregning her og tryk ${key}+Enter for at regne}}`;
+    focusLine(first);
+
 </script>
 </body></html>
