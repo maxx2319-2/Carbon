@@ -74,7 +74,8 @@
 
     // add syntax colours to one line; only styles are added, so the cursor position stays the same
     function highlight(latex) {
-        if (latex.startsWith("\\#")) return color(COLORS.comment, latex);
+        const hash = latex.indexOf("\\#");
+        if (hash !== -1) return (hash > 0 ? highlight(latex.slice(0, hash)) : "") + color(COLORS.comment, latex.slice(hash));
         latex = latex.replace(/\^\{\\prime\}(.*?)\^\{\\prime\}/g,
             (m, inner) => `^{\\prime}${inner ? color(COLORS.string, inner) : ""}^{\\prime}`);
         latex = latex.replace(/(?:(?<=\\cdot)|(?<![\\\w]))(?<!_\{)\d+(?:\.\d+)?/g, n => color(COLORS.number, n));

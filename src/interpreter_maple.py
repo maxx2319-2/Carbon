@@ -109,12 +109,17 @@ class EV:
         while pc < len(lines):
             line = lines[pc]
 
+            if "#" in line: line, _ = line.split("#",maxsplit=1)
+                            
+
             if line.strip() == "" or pc in skip:
                 pc += 1
                 continue
 
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
 
+            
+            
             try:
                 call = re.fullmatch(r"\s*(\w+)\((.*)\)\s*", line)
                 if call and call.group(1) in self.functions:
@@ -408,10 +413,7 @@ class EV:
 
                 else:
                     try:
-                        if line.strip().startswith("#"):
-                            pc += 1
-
-                        elif "+=" in line:
+                        if "+=" in line:
                             a, b = (p.strip() for p in line.split("+=", 1))
                             if a not in self.variables:
                                 raise ValueError(f'Ukendt variabel {a}')
