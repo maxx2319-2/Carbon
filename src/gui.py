@@ -905,9 +905,6 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {{
                     background-color: {HEADER};
                 }}
-                QPushButton:pressed {{
-                    background-color: {BUTTON};
-                }}
             """)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(callback)
