@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QColorDialog,
     QFrame,
-    QTextEdit,
+    QTextEdit
 )
 from PySide6.QtCore import (
     Qt,
@@ -75,6 +75,7 @@ from PySide6.QtGui import (
     QPen,
     QPalette,
     QColor,
+    QTransform,
 )
 import re
 import interpreter_maple
@@ -91,7 +92,7 @@ _settings = QSettings("M&B", "Carbon")
 
 HEADER = "#1e1e1e"
 BG = "#404040"
-SIDEBAR = "#737373"
+SIDEBAR = "#575757"
 BUTTON = "#ffffff"
 HOVER = "#cccccc"
 TEXT = "#000000"
@@ -99,7 +100,18 @@ SCROLL = "#323232"
 
 LINE_HEIGHT = 27
 BOX_HEIGHT = 120
-SIDEBAR_WIDTH = 120
+SIDEBAR_WIDTH = 220
+
+button_style =  f"""
+        QPushButton {{
+            background-color: {BUTTON};
+            color: {TEXT};
+            border: none;
+            border-radius: 8px;
+            padding: 6px;
+        }}
+        QPushButton:hover {{ background-color: {HOVER}; }}
+    """
 
 SUB_HELP = (
     "\nFor at skrive sænket skrivt er det Shift+Bindestreg."
@@ -650,8 +662,48 @@ class Panel:
     build: callable
     size: tuple = (280, 280)
 
+def unit_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    value_input = MathInput("Input[Enhed]")
+    layout.addWidget(value_input)
+
+    unit_row = QHBoxLayout()
+    unit_input = MathInput("Ønsket enhed")
+    unit_row.addWidget(unit_input)
+
+    si_btn = QPushButton("SI")
+    si_btn.setFixedSize(28,28)
+    si_btn.setToolTip("Konverter til SI")
+    si_btn.setStyleSheet(button_style)
+    unit_row.addWidget(si_btn)
+    layout.addLayout(unit_row)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"EnhedKonvertering({value_input.text()},{unit_input.text()})")
+        output.setText(result.get(0, ""))
+
+    calc_btn.clicked.connect(calc)
+    value_input.returnPressed.connect(calc)
+    unit_input.returnPressed.connect(calc)
+    si_btn.clicked.connect(lambda: unit_input.setText("SI"))
+
+    return body
+
+
 PANELS = {
-    "unit": Panel("Enhed","Enheds Omregner", QWidget),
+    "unit": Panel("Enhed","Enheds Omregner", unit_panel),
 }
 
 class PanelPage(QWidget):
@@ -663,21 +715,20 @@ class PanelPage(QWidget):
         self.canvas.setStyleSheet(f"background-color: {BG};")
 
         content = QWidget()
-        content.setFixedWidth(SIDEBAR_WIDTH)
         content.setStyleSheet(f"background-color: {SIDEBAR};")
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(10,10,10,10)
-        content_layout.setSpacing(10)
+        content_layout.setSpacing(14)
 
         for key in keys:
             btn = QPushButton(PANELS[key].label)
+            btn.setFixedHeight(26)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {BUTTON};
                     color: {TEXT};
                     border: none;
-                    border-radius: 8px;
-                    padding: 8px;
+                    border-radius: 13px;
                 }}
                 QPushButton:hover {{ background-color: {HOVER}; }}
             """)
@@ -685,16 +736,64 @@ class PanelPage(QWidget):
             content_layout.addWidget(btn)
         content_layout.addStretch()
 
+        scroll = QScrollArea()
+        scroll.setFixedWidth(SIDEBAR_WIDTH)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet(f"""
+            * {{ background-color: {SIDEBAR}; border: none; }}
+            QScrollBar:vertical {{
+                background: {BG};
+                width: 14px;
+                border-radius: 5px;
+                margin: 8px 4px 8px 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {HEADER};
+                border-radius: 5px;
+                min-height: 30px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+        """)
+        scroll.setWidget(content)
+
         self.sidebar = QWidget()
-        self.sidebar.setMaximumWidth(SIDEBAR_WIDTH)
+        self.sidebar.setMaximumWidth(0)
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(0,0,0,0)
-        sidebar_layout.addWidget(content)
+        sidebar_layout.addWidget(scroll)
+
+        arrow = QIcon(str(ASSETS_DIR / "Arrow.svg")).pixmap(64,64)
+        self.arrow_open = QIcon(arrow.transformed(QTransform().rotate(180)))
+        self.arrow_closed = QIcon(arrow)
+
+        self.handle = QPushButton()
+        self.handle.setIcon(self.arrow_closed)
+        self.handle.setIconSize(QSize(20,20))
+        self.handle.setCheckable(True)
+        self.handle.setChecked(True)
+        self.handle.setFixedWidth(24)
+        self.handle.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.handle.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {SIDEBAR};
+                border: none;
+            }}
+        """)
+        self.handle.toggled.connect(self.toggle_sidebar)
+
+        self.anim = QPropertyAnimation(self.sidebar, b"maximumWidth", self)
+        self.anim.setDuration(250)
+        self.anim.setEasingCurve(QEasingCurve.OutCubic)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(0)
         layout.addWidget(self.sidebar)
+        layout.addWidget(self.handle)
         layout.addWidget(self.canvas, stretch=1)
 
     def show_panel(self, key):
@@ -710,6 +809,13 @@ class PanelPage(QWidget):
 
         panel.show()
         panel.raise_()
+
+    def toggle_sidebar(self, collapsed):
+            self.handle.setIcon(self.arrow_closed if collapsed else self.arrow_open)
+            self.anim.stop()
+            self.anim.setStartValue(self.sidebar.maximumWidth())
+            self.anim.setEndValue(0 if collapsed else SIDEBAR_WIDTH)
+            self.anim.start()
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -1008,7 +1114,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(1)
 
     def open_molecule(self):
-        self.stack.setCurrentIndex(2)
+        pass
 
     def open_kemi(self):
         self.stack.setCurrentWidget(self.kemi_page)
