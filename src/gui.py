@@ -618,9 +618,11 @@ class DraggablePanel(QWidget):
                 QMessageBox {{ background-color: {BG}; }}
                 QLabel {{ color: {BUTTON}; }}
                 QPushButton {{
-                    background-color: {BUTTON};
-                    color: {TEXT};
-                    padding: 6px 14px;
+                   background-color: {BUTTON};
+                   color: {TEXT};
+                   padding: 6px 14px;
+                   border: none;
+                   border-radius: 8px;
                 }}
                 QPushButton:hover {{ background-color: {HOVER}}}
             """)
@@ -751,7 +753,7 @@ class PanelPage(QWidget):
                 margin: 8px 4px 8px 0px;
             }}
             QScrollBar::handle:vertical {{
-                background: {HEADER};
+                background: {SCROLL};
                 border-radius: 5px;
                 min-height: 30px;
             }}
