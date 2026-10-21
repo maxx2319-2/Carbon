@@ -86,6 +86,8 @@ import license_manager
 
 from path import resource_path
 
+version = "Bv 2.0"
+
 ASSETS_DIR = resource_path("Assets")
 
 _settings = QSettings("M&B", "Carbon")
@@ -513,6 +515,14 @@ class LicenseWindow(QDialog):
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
+
+        self.version_label = QLabel(version, self)
+        self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
+        self.version_label.adjustSize()
+        self.version_label.move(
+            self.width() - self.version_label.width() - 1,
+            self.height() - self.version_label.height() - 1,
+        )
     
     def try_accept(self):
         key = self.key_input.text().strip()
@@ -849,6 +859,10 @@ class MainWindow(QMainWindow):
         #self.create_settings_page()
         #self.create_formel_page()
 
+        self.version_label = QLabel(version, self)
+        self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
+        self.version_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+
     def create_drawer(self):
         self.drawer_max_width = 270
         self.drawer_open = False
@@ -951,6 +965,11 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self.version_label.adjustSize()
+        self.version_label.move(
+            self.width() - self.version_label.width() - 5,
+            self.height() - self.version_label.height() - 1,
+        )
         if getattr(self, "drawer_open", False):
             top = self.toolbar.height()
             w = min(self.drawer_max_width, self.width())
