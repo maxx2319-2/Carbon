@@ -478,7 +478,21 @@ class TextOutput(QTextEdit):
                 background-color: {BUTTON}; color: {TEXT};
                 border: none; border-radius: 4px; padding: 4px; font-size: 12px;
             }}
+            QScrollBar:vertical {{
+                background: {HOVER};
+                width: 12px;
+                border-radius: 5px;
+                margin: 4px 2px 4px 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {SIDEBAR};
+                border-radius: 5px;
+                min-height: 30px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
         """)
+
 
     def setText(self, s):
         self.setPlainText(str(s))
@@ -800,7 +814,7 @@ def pOH_panel():
     layout.addStretch()
 
     def calc():
-        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
+        result = interpreter_maple.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})").get(0, "")
         output.setText(result)
         if result.startswith("Error"):
             second_output.setText("")
@@ -845,11 +859,38 @@ def afstemning_panel():
     
     return body
 
+def analyse_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    input = MathInput("Molekyle")
+    layout.addWidget(input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = TextOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"Analyse({input.text()})")
+        output.setText(result.get(0, ""))
+
+    calc_btn.clicked.connect(calc)
+    input.returnPressed.connect(calc)
+    
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
     "pOH": Panel("pOH","pOH Beregning", pOH_panel),
-    "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel)
+    "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel),
+    "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
 }
 
 class PanelPage(QWidget):
@@ -984,7 +1025,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)

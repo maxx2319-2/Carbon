@@ -237,7 +237,7 @@ class EV:
                             )
                             indhold = f"Masse procent:\n{'\n'.join(procent)}"
                             output[pc] = (
-                                f"Molekyle: {molecule}\n Empirisk formel: {emp}\n Molar masse: {round(mol,config.rounding_decimals)}\n DBE: {dbe} \n Antal atomer: {count} \n {indhold}"
+                                f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {round(mol,config.rounding_decimals)}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
                             )
                             pc += 1
 
