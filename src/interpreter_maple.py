@@ -68,9 +68,9 @@ class EV:
             "Loop": "Loop(start linje,slut linje,antal gange)",
             "Analyse": "Analyse(molekyle)",
             "BjerrumDiagram": "Bjerrumdiagram(pKs1,pKs2,...)",
-            "UdbytteProcent":"UdbytteProcent(Tæller,Nævner)" ,
-            "VolumenProcent":"VolumenProcent(Tæller,Nævner)",
-            "MasseProcent":"MasseProcent(Tæller,Nævner)",
+            "UdbytteProcent":"UdbytteProcent(Praktisk,Teoretisk)" ,
+            "VolumenProcent":"VolumenProcent(Praktisk,Teoretisk)",
+            "MasseProcent":"MasseProcent(Praktisk,Teoretisk)",
             "DNATilPeptid":"DNATilPeptid(DNA streng)",
             "RNATilPeptid":"RNATilPeptid(DNA streng)",
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)"
