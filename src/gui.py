@@ -623,6 +623,16 @@ class DraggablePanel(QWidget):
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
+        if hasattr(body_widget, "export"):
+            export_btn = QPushButton()
+            export_btn.setIcon(QIcon(str(ASSETS_DIR / "Save.svg")))
+            export_btn.setIconSize(QSize(14,14))
+            export_btn.setFixedSize(20,20)
+            export_btn.setToolTip("Eksporter")
+            export_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+            export_btn.clicked.connect(body_widget.export)
+            header_layout.addWidget(export_btn)
+
         help_btn = QPushButton("?")
         help_btn.setFixedSize(20, 20)
         help_btn.setStyleSheet(f"""
@@ -872,16 +882,84 @@ def analyse_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = TextOutput("Resultat")
-    layout.addWidget(output)
+    molekyle = MathOutput("Molekyle")
+    layout.addWidget(molekyle)
+
+    empirisk = MathOutput("Empirisk formel")
+    layout.addWidget(empirisk)
+
+    molarmasse = MathOutput("Molarmasse")
+    layout.addWidget(molarmasse)
+
+    dbe = MathOutput("DBE")
+    layout.addWidget(dbe)
+
+    antal = MathOutput("Antal atomer")
+    layout.addWidget(antal)
+
+    masseprocent = TextOutput("Masseprocent:")
+    layout.addWidget(masseprocent, stretch=1)
     layout.addStretch()
 
+    outputs = [molekyle, empirisk, molarmasse, dbe, antal]
+
     def calc():
-        result = interpreter_maple.EV().ev(f"Analyse({input.text()})")
-        output.setText(result.get(0, ""))
+        result = interpreter_maple.EV().ev(f"Analyse({input.text()})").get(0,"")
+        lines = result.splitlines()
+        if result.startswith("Error"):
+            for box in outputs:
+                box.setText("")
+            masseprocent.setText(result)
+            return
+        for box, line in zip(outputs, lines):
+            box.setText(line.split(":", 1)[1].strip())
+        masseprocent.setText("\n".join(lines[6:]))
 
     calc_btn.clicked.connect(calc)
     input.returnPressed.connect(calc)
+    
+    return body
+
+def bjerrum_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    input = MathInput("pKs Værdier")
+    layout.addWidget(input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    plot_area = QWidget()
+    plot_area.setMinimumHeight(300)
+    plot_layout = QVBoxLayout(plot_area)
+    plot_layout.setContentsMargins(0,0,0,0)
+    layout.addWidget(plot_area, stretch=1)
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
+        while plot_layout.count():
+            plot_layout.takeAt(0).widget().deleteLater()
+        if isinstance(result, Figure):
+            plot_layout.addWidget(FigureCanvasQTAgg(result))
+        else:
+            error = QLabel(str(result))
+            error.setWordWrap(True)
+            error.setStyleSheet(f"color: {BUTTON}")
+            plot_layout.addWidget(error, alignment=Qt.AlignTop)
+
+    def export():
+        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
+        if result:
+            calc()
+
+    calc_btn.clicked.connect(calc)
+    input.returnPressed.connect(calc)
+
+    body.export = export
     
     return body
 
@@ -891,6 +969,7 @@ PANELS = {
     "pOH": Panel("pOH","pOH Beregning", pOH_panel),
     "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
+    "bjerrum": Panel("Bjerrum","Bjerrumsdiagram",bjerrum_panel, (450,450)),
 }
 
 class PanelPage(QWidget):
@@ -1025,7 +1104,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
