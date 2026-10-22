@@ -79,6 +79,8 @@ class EV:
         # temp fix
         self.help_text = self.error_text
 
+    input_prep = lambda self,x : quantity.si_convert(parser.evaluate(self.prep_ev(x)))
+
     def exclude_loops(self, lines):
         skip = []
 
@@ -189,7 +191,7 @@ class EV:
 
                             
 
-                            result = chem.pH(x, parser.evaluate(self.prep_ev(c)).value)
+                            result = chem.pH(x, self.input_prep(c).value)
                             result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
@@ -201,7 +203,7 @@ class EV:
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pOH"])
 
-                            result = chem.pOH(x, parser.evaluate(self.prep_ev(c)).value)
+                            result = chem.pOH(x, self.input_prep(c).value)
                             result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
@@ -212,7 +214,7 @@ class EV:
                             start, unit = input.split(",")
                             if start == "" or unit == "":
                                 raise ValueError(self.error_text["EnhedKonvertering"])
-                            Qstart = (parser.evaluate(self.prep_ev(start)))
+                            Qstart = self.input_prep(start)
                      
                   
                         
@@ -254,7 +256,7 @@ class EV:
                                 elif "export" in part.lower():
                                     inline = False
                                 else:
-                                    pks_values.append((parser.evaluate(self.prep_ev(part))).value)
+                                    pks_values.append(self.input_prep(part).value)
 
                             if len(pks_values) == 0:
                                 raise ValueError(f"ingen pKs værdier: {self.error_text["BjerrumDiagram"]}")
@@ -279,8 +281,8 @@ class EV:
                                 raise ValueError(self.error_text[procent_type])
 
 
-                            top_preped = parser.evaluate(self.prep_ev(top))
-                            bottom_preped = parser.evaluate(self.prep_ev(bottom))
+                            top_preped = self.input_prep(top)
+                            bottom_preped = self.input_prep(bottom)
 
                             result = chem.procent(top_preped, bottom_preped)
                             

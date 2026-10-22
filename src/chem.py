@@ -586,8 +586,6 @@ def bjerrum_figure(pks):
 
 
 def procent(top,bottom):
-    top = quantity.si_convert(top)
-    bottom = quantity.si_convert(bottom)
     if top.units != bottom.units:
         raise ValueError(f"Tæller og nævner skal have samme type enhed Tæller: {top.units} Nævner: {bottom.units}")
     

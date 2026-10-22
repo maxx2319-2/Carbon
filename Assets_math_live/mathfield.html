@@ -75,7 +75,7 @@ function setValue(latex) { mf.value = latex; scheduleFit(); }
         {key: "ctrl+[Digit6]",ifMode: "math", command: "moveToSuperscript"},
 
     ];
-    mf.inlineShortcuts = {...mf.inlineShortcuts, "*": "\\cdot", "**": "^{#?}","<->": "\\rightleftharpoons"};
+    mf.inlineShortcuts = {"*": "\\cdot", "**": "^{#?}","<->": "\\rightleftharpoons"};
     mf.addEventListener("keydown", e => {
         if (e.shiftKey && e.code === "BracketRight") {
             e.preventDefault();
