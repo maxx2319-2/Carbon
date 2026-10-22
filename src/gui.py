@@ -198,11 +198,16 @@ HELPTEXT = {
         "Indtast den raske RNA streng øverst og derefter den muterede.\n"
         "Mellemrum og store/små bogstaver er ligegyldige.\nFor eksempel AAU gcc UUG."
     ),
-    "translation": (
-        "Indtast enten DNA eller RNA streng.\n"
+    "dna_peptid": (
+        "Indtast DNA streng.\n"
         "Mellemrum og store/små bogstaver er ligegyldige.\n"
-        "For eksempel AAT gcc TTG eller AAUGCCUUU."
+        "For eksempel AAT gcc TTG eller AATGCCTTT."
     ),
+    "rna_peptid": (
+            "Indtast RNA streng.\n"
+            "Mellemrum og store/små bogstaver er ligegyldige.\n"
+            "For eksempel AAU gcc UUG eller AAUGCCUUU."
+        ),
 }
 
 def Latex_to_calc(s: str) -> str:
@@ -1111,17 +1116,71 @@ def mængde_panel():
     
     return body
 
+def dna_peptid_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    DNA_input = MathInput("DNA Streng")
+    layout.addWidget(DNA_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Peptidkæde")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"DNATilPeptid({DNA_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    DNA_input.returnPressed.connect(calc)
+    
+    return body
+
+def rna_peptid_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    RNA_input = MathInput("RNA Streng")
+    layout.addWidget(RNA_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Peptidkæde")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"RNATilPeptid({RNA_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    RNA_input.returnPressed.connect(calc)
+    
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
     "pOH": Panel("pOH","pOH Beregning", pOH_panel),
     "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
-    "bjerrum": Panel("Bjerrum","Bjerrumsdiagram",bjerrum_panel, (450,450)),
-    "udbytteprocent": Panel("Udbytte%","Udbytteprocent",udbytte_panel),
-    "volumenprocent": Panel("Volumen%","Volumenprocent",volumen_panel),
-    "masseprocent": Panel("Masse%", "Masseprocent",masse_panel),
-    "mængdeberegning": Panel("MBeregning","Mændgdeberegning",mængde_panel),
+    "bjerrum": Panel("Bjerrumdiagram","Bjerrumsdiagram",bjerrum_panel, (450,450)),
+    "udbytteprocent": Panel("Udbytteprocent","Udbytteprocent",udbytte_panel),
+    "volumenprocent": Panel("Volumenprocent","Volumenprocent",volumen_panel),
+    "masseprocent": Panel("Masseprocent", "Masseprocent",masse_panel),
+    "mængdeberegning": Panel("Mændgeberegning","Mændgdeberegning",mængde_panel),
+    "dna_peptid": Panel("DNA Translation","DNA Translation",dna_peptid_panel),
+    "rna_peptid": Panel("RNA Translation","RNA Translation",rna_peptid_panel),
 }
 
 class PanelPage(QWidget):
@@ -1257,7 +1316,7 @@ class MainWindow(QMainWindow):
         #self.create_molecule_page()
         self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning"])
         self.fysik_page = PanelPage(["unit"])
-        self.biotek_page = PanelPage(["unit"])
+        self.biotek_page = PanelPage(["unit","dna_peptid","rna_peptid"])
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
