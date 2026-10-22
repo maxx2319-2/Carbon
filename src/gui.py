@@ -167,8 +167,8 @@ HELPTEXT = {
         "For eksempel H2O -> H2 + O2.\n"
         "Ved redoxreaktioner bruges opløsningsboksen hvor der skrives syre eller base."
     ),
-    "yield": (
-        "Indtast teoretisk udbytte i det første input og praktisk udbytte i det andet.\n"
+    "udbytteprocent": (
+        "Indtast praktisk udbytte i det første input og teoretisk udbytte i det andet.\n"
         "Husk . for decimal og enheder inde i firkantet parentes [].\n"
         "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
     ),
@@ -443,7 +443,7 @@ class MathOutput(QWebEngineView):
         self._push()
 
     def _push(self):
-        latex = calc_to_latex(self._raw) if self._raw else ""
+        latex = calc_to_latex(self._raw.replace("%", r"\%")) if self._raw else ""
         self.page().runJavaScript(f"setValue({json.dumps(latex)})")
 
     def setText(self, s):
@@ -963,6 +963,96 @@ def bjerrum_panel():
     
     return body
 
+def udbytte_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    praktisk_input = MathInput("Praktisk[Enhed]")
+    layout.addWidget(praktisk_input)
+
+    teori_input = MathInput("Teoretisk[Enhed]")
+    layout.addWidget(teori_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"UdbytteProcent({praktisk_input.text()},{teori_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    praktisk_input.returnPressed.connect(calc)
+    teori_input.returnPressed.connect(calc)
+    
+    return body
+
+def volumen_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    specifik_input = MathInput("Specifik[Enhed]")
+    layout.addWidget(specifik_input)
+
+    samlet_input = MathInput("Samlet[Enhed]")
+    layout.addWidget(samlet_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"VolumenProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    specifik_input.returnPressed.connect(calc)
+    samlet_input.returnPressed.connect(calc)
+    
+    return body
+
+def masse_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    specifik_input = MathInput("Specifik[Enhed]")
+    layout.addWidget(specifik_input)
+
+    samlet_input = MathInput("Samlet[Enhed]")
+    layout.addWidget(samlet_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"MasseProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    specifik_input.returnPressed.connect(calc)
+    samlet_input.returnPressed.connect(calc)
+    
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
@@ -970,6 +1060,9 @@ PANELS = {
     "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
     "bjerrum": Panel("Bjerrum","Bjerrumsdiagram",bjerrum_panel, (450,450)),
+    "udbytteprocent": Panel("Udbytte%","Udbytteprocent",udbytte_panel),
+    "volumenprocent": Panel("Volumen%","Volumenprocent",volumen_panel),
+    "masseprocent": Panel("Masse%", "Masseprocent",masse_panel),
 }
 
 class PanelPage(QWidget):
@@ -1103,7 +1196,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
