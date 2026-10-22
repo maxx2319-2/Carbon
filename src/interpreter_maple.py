@@ -60,18 +60,19 @@ class EV:
         ]
 
         self.error_text = {
+            "Help" : "Help() or Help(function)",
             "Afstem": "Afstem(reaktion,opløsning(syre,base eller ingenting))",
             "pH": "pH(pKs eller syre/base navn,Koncentration)",
-            "pOH": "pH(pBs eller syre/base navn,Koncentration)",
+            "pOH": "pOH(pBs eller syre/base navn,Koncentration)",
             "EnhedKonvertering": 'EnhedKonvertering(Quantity,ny Enhed eller "SI" for SI enhed)',
             "Loop": "Loop(start linje,slut linje,antal gange)",
-            "Anlyse": "Analyse(molekyle)",
+            "Analyse": "Analyse(molekyle)",
             "BjerrumDiagram": "Bjerrumdiagram(pKs1,pKs2,...)",
             "UdbytteProcent":"UdbytteProcent(Tæller,Nævner)" ,
             "VolumenProcent":"VolumenProcent(Tæller,Nævner)",
             "MasseProcent":"MasseProcent(Tæller,Nævner)",
             "DNATilPeptid":"DNATilPeptid(DNA streng)",
-            "RNATilPeptid":"DNATilPeptid(DNA streng)",
+            "RNATilPeptid":"RNATilPeptid(DNA streng)",
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)"
 
         }

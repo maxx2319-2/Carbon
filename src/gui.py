@@ -290,7 +290,14 @@ def latex_text(s):
     return r"\text{" + "".join(esc.get(c, c) for c in s) + "}"
 
 
+
+
 class _MapleBridge(QObject):
+    @Slot(result=str)
+    def help(self):
+        return json.dumps(interpreter_maple.EV().help_text)
+
+
     @Slot(str, result=str)
     def run(self, data):
         latex_lines = json.loads(data)

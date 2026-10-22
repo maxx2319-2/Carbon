@@ -43,8 +43,13 @@
     #suggest::-webkit-scrollbar-thumb { background: #737373; border-radius: 3px; }
     #suggest::-webkit-scrollbar-thumb:hover { background: #8a8a8a; }
 
+        
+    #tooltip {position: fixed; display: none; z-index: 11; background: #323232; color: #fff; font: 14px "Segoe-UI";
+    max-width: 400px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; pointer-events: none;}
+
+
     #editor::-webkit-scrollbar { width: 10px; }
-    #editor::-webkit-scrollbar-track { background: #737373; border-radius: 5px; margin: 8px 0; }
+    #editor::-webkit-scrollbar-track { background: #737373; border-radius: 5px; margin: 8px 0 20px 0; }
     #editor::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 5px; }
 
 
@@ -52,6 +57,8 @@
 <body>
 <div id="editor"></div>
 <div id="suggest"></div>
+<div id="tooltip"></div>
+
 <script>
     MathfieldElement.fontsDirectory = "./fonts"; 
     MathfieldElement.soundsDirectory = null;
@@ -214,6 +221,38 @@
     }
 
     editor.addEventListener("scroll",hideSuggest);
+    const tooltip = document.getElementById("tooltip");
+    let HELP = {}, helptimer = null, helpfor = null;
+
+    function hideHelp() {
+        clearTimeout(helptimer);
+        helpfor = null;
+        tooltip.style.display = "none";
+    }
+
+    function showHelp(e){
+        const mf = e.target;
+        const name = isField(mf) && !isOut(mf) && strip(mf.value).match(/^[A-Za-zæøåÆØÅ]+/)?.[0]
+        const a = HELP[name] && mf.getElementInfo(1)?.bounds;
+        const b = a && mf.getElementInfo(name.length)?.bounds;
+        if (!b || e.clientX <a.left || e.clientX > b.right || e.clientY < a.top || e.clientY > a.bottom) return hideHelp();
+        if (helpfor === mf) return;
+        hideHelp();
+        helpfor = mf;
+        helptimer = setTimeout(() => {
+            tooltip.textContent = HELP[name];
+            tooltip.style.left = a.left + "px";
+            tooltip.style.top = a.bottom + 4 + "px";
+            tooltip.style.display = "block";
+
+
+        },300);
+    }
+
+    editor.addEventListener("mousemove", showHelp);
+    editor.addEventListener("mouseleave", hideHelp);
+    editor.addEventListener("scroll", hideHelp);
+    editor.addEventListener("keydown", hideHelp, true);
 
     function lines() { return [...editor.querySelectorAll("math-field:not(.out)")]; }
 
@@ -404,8 +443,12 @@
     function setAccent(c) { document.documentElement.style.setProperty("--accent", c); }
 
     if (typeof qt !== "undefined") {
-        new QWebChannel(qt.webChannelTransport, ch => { bridge = ch.objects.bridge; });
+        new QWebChannel(qt.webChannelTransport, ch =>{
+            bridge = ch.objects.bridge;
+            bridge.help(h => HELP = JSON.parse(h))
+        });
     }
+
     const idle = () => document.body.classList.toggle("idle", !document.hasFocus());
     window.addEventListener("focus",idle);
     window.addEventListener("blur",idle);
