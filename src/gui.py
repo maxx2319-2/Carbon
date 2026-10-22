@@ -137,7 +137,7 @@ HELPTEXT = {
         "Brug . for at skrive decimaler og brug , for at lave endnu et diagram.\n"
         "For eksempel 5.3, 4.1 laver to bjerrumsdiagrammer."
     ),
-    "ph": (
+    "pH": (
         "Indtast enten en pKs værdi eller en pKb værdi samt dens koncentration.\n"
         "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
         "Du kan også bruge syren eller basens navn for nogle syrer og baser (se Indstillinger).\n"
@@ -720,9 +720,39 @@ def unit_panel():
 
     return body
 
+def pH_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    pKs_input = MathInput("Pks eller syrenavn")
+    layout.addWidget(pKs_input)
+
+    konc_input = MathInput("Koncentration[Enhed]")
+    layout.addWidget(konc_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})")
+        output.setText(result.get(0, ""))
+
+    calc_btn.clicked.connect(calc)
+    pKs_input.returnPressed.connect(calc)
+    konc_input.returnPressed.connect(calc)
+    
+    return body
+
 
 PANELS = {
-    "unit": Panel("Enhed","Enheds Omregner", unit_panel),
+    "unit": Panel("Enhed","Enheds Omregner", unit_panel), "pH": Panel("pH","pH Beregning", pH_panel),
 }
 
 class PanelPage(QWidget):
@@ -857,7 +887,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit"])
+        self.kemi_page = PanelPage(["unit","pH"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
