@@ -138,11 +138,16 @@ HELPTEXT = {
         "For eksempel 5.3, 4.1 laver to bjerrumsdiagrammer."
     ),
     "pH": (
-        "Indtast enten en pKs værdi eller en pKb værdi samt dens koncentration.\n"
+        "Indtast pKs værdi samt dens koncentration.\n"
         "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
-        "Du kan også bruge syren eller basens navn for nogle syrer og baser (se Indstillinger).\n"
-        "Det øverste output er pH mens det nederste er pOH.\n"
+        "Du kan også bruge syrens navn for nogle syrer (se Indstillinger).\n"
         "Standard enhed for koncentration er mol/l."
+    ),
+    "pOH": (
+            "Indtast pKb værdi samt dens koncentration.\n"
+            "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
+            "Du kan også bruge syrens navn for nogle baser (se Indstillinger).\n"
+            "Standard enhed for koncentration er mol/l."
     ),
     "balance": (
         "Indtast din ubalancerede reaktion i input kassen.\n"
@@ -750,9 +755,41 @@ def pH_panel():
     
     return body
 
+def pOH_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    pKs_input = MathInput("Pkb eller basenavn")
+    layout.addWidget(pKs_input)
+
+    konc_input = MathInput("Koncentration[Enhed]")
+    layout.addWidget(konc_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Resultat")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})")
+        output.setText(result.get(0, ""))
+
+    calc_btn.clicked.connect(calc)
+    pKs_input.returnPressed.connect(calc)
+    konc_input.returnPressed.connect(calc)
+    
+    return body
+
 
 PANELS = {
-    "unit": Panel("Enhed","Enheds Omregner", unit_panel), "pH": Panel("pH","pH Beregning", pH_panel),
+    "unit": Panel("Enhed","Enheds Omregner", unit_panel),
+    "pH": Panel("pH","pH Beregning", pH_panel),
+    "pOH": Panel("pOH","pOH Beregning", pOH_panel),
 }
 
 class PanelPage(QWidget):
@@ -887,7 +924,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH"])
+        self.kemi_page = PanelPage(["unit","pH","pOH"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
