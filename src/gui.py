@@ -108,7 +108,7 @@ button_style =  f"""
         QPushButton {{
             background-color: {BUTTON};
             color: {TEXT};
-            border: none;
+            border: 1px solid {HEADER};
             border-radius: 8px;
             padding: 6px;
         }}
@@ -1199,16 +1199,8 @@ class PanelPage(QWidget):
 
         for key in keys:
             btn = QPushButton(PANELS[key].label)
-            btn.setFixedHeight(26)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {BUTTON};
-                    color: {TEXT};
-                    border: none;
-                    border-radius: 13px;
-                }}
-                QPushButton:hover {{ background-color: {HOVER}; }}
-            """)
+            btn.setFixedHeight(30)
+            btn.setStyleSheet(f"{button_style}")
             btn.clicked.connect(lambda _=False, k=key: self.show_panel(k))
             content_layout.addWidget(btn)
         content_layout.addStretch()
