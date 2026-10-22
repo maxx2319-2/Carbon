@@ -22,7 +22,7 @@ FUNCTIONS = {
     "Abs": math.fabs,
     "Floor": math.floor,
     "Ceil": math.ceil,
-    "Round": round,
+    "Round": lambda x, n=0: round(x, int(n)),
     "Degrees": math.degrees,
     "Radians": math.radians,
     "Gamma": math.gamma,
