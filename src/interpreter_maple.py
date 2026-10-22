@@ -87,7 +87,7 @@ class EV:
         for n, line in enumerate(lines):
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
             call = re.fullmatch(r"\s*(\w+)\((.*)\)\s*", line)
-            if call and call.group(1) in self.functions:
+            if call and call.group(1) == "loop":
                 func, input = call.groups()
                 if func == "Loop":
 
@@ -408,8 +408,7 @@ class EV:
 
                             pc += 1
 
-                        case _:
-                            raise ValueError("Ukendt function")
+                        
 
                 else:
                     try:
