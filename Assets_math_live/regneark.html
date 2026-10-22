@@ -240,7 +240,11 @@
         hideHelp();
         helpfor = mf;
         helptimer = setTimeout(() => {
-            tooltip.textContent = HELP[name];
+            const [, head, rest] = HELP[name].match(/^([^(]*)(.*)$/s);
+            const span = document.createElement("span");
+            span.textContent = head;
+            span.style.color = wordColor(name);
+            tooltip.replaceChildren(span,rest);
             tooltip.style.left = a.left + "px";
             tooltip.style.top = a.bottom + 4 + "px";
             tooltip.style.display = "block";
