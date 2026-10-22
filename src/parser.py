@@ -3,17 +3,39 @@ from quantity import quantity
 import math
 
 FUNCTIONS = {
-    "ln":math.log,
-    "log":math.log10,
-    "exp":math.exp,
+    "Ln": math.log,
+    "Log": math.log10,
+    "Exp": math.exp,
+    "Sin": math.sin,
+    "Cos": math.cos,
+    "Tan": math.tan,
+    "ArcSin": math.asin,
+    "ArcCos": math.acos,
+    "ArcTan": math.atan,
+    "Sinh": math.sinh,
+    "Cosh": math.cosh,
+    "Tanh": math.tanh,
+    "ArcSinh": math.asinh,
+    "ArcCosh": math.acosh,
+    "ArcTanh": math.atanh,
+    "Cbrt": math.cbrt,
+    "Abs": math.fabs,
+    "Floor": math.floor,
+    "Ceil": math.ceil,
+    "Round": round,
+    "Degrees": math.degrees,
+    "Radians": math.radians,
+    "Gamma": math.gamma,
+    "Erf": math.erf,
 }
+
 
 
 TOKEN_RE = re.compile(
     r"\s*(?:"
     r"(?P<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)"
-    r"|(?P<unit>°?[^\W\d_]+)"
-    r"|(?P<op>[-+*/^()])"
+    r"|(?P<unit>°?[^\W\d_][^\W_]*)"
+    r"|(?P<op>[-+*/^(),])"
     r")"
 )
 
@@ -48,6 +70,8 @@ class _Parser:
 
     def expect_end(self):
         kind, value = self.peek()
+        if value == ",":
+            raise ValueError("brug punktum som decimal ikke komma")
         if kind is not None:
             raise ValueError(f"Uventet '{value}' i '{self.text}'")
 
@@ -111,6 +135,16 @@ class _Parser:
             raise ValueError(f'mangler ")" i {self.text}')
         return result
 
+    def args(self):
+        self.take()
+        result = [self.expr()]
+        while self.peek() == ("op",","):
+            self.take()
+            result.append(self.expr())
+        if self.take() != ("op", ")"):
+            raise ValueError(f'magler ")" i {self.text}')
+        return result
+
     def atom(self):
         if self.peek() == ("op","("):
             return self.group()
@@ -121,10 +155,14 @@ class _Parser:
             if value == "sqrt":
                 return self.group() ** 0.5
             if value in FUNCTIONS:
-                arg = self.group()
-                if arg.units:
-                    raise ValueError(f'{value} kan ikke tage imod enhed')
-                return quantity(FUNCTIONS[value](arg.value),{})
+                values = self.args()
+                if any(v.units for v in values):
+                     raise ValueError(f'{value} kan ikke tage imod enhed')
+                return quantity(FUNCTIONS[value](*(v.value for v in values)),{})
+            raise ValueError(f'Ukendt funktion "{value}"')
+
+                   
+
         if kind == "unit":
             return quantity(1.0,{value: 1})
         if kind is None:
