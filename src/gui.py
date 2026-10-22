@@ -1006,7 +1006,6 @@ class PanelPage(QWidget):
         scroll.setFixedWidth(SIDEBAR_WIDTH)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet(f"""
             * {{ background-color: {SIDEBAR}; border: none; }}
