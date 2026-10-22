@@ -115,6 +115,18 @@ button_style =  f"""
         QPushButton:hover {{ background-color: {HOVER}; }}
     """
 
+calc_button_style = f"""
+        QPushButton {{
+            background-color: {SCROLL};
+            color: {BUTTON};
+            border: none;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 6px;
+        }}
+        QPushButton:hover {{ background-color: {SIDEBAR}; }}
+    """
+
 SUB_HELP = (
     "\nFor at skrive sænket skrivt er det Shift+Bindestreg."
     "\nFor at skrive hævet skrivt er det Shift+^."
@@ -702,12 +714,12 @@ def unit_panel():
     si_btn = QPushButton("SI")
     si_btn.setFixedSize(28,28)
     si_btn.setToolTip("Konverter til SI")
-    si_btn.setStyleSheet(button_style)
+    si_btn.setStyleSheet(calc_button_style)
     unit_row.addWidget(si_btn)
     layout.addLayout(unit_row)
 
     calc_btn = QPushButton("Beregn")
-    calc_btn.setStyleSheet(button_style)
+    calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
     output = MathOutput("Resultat")
@@ -738,16 +750,24 @@ def pH_panel():
     layout.addWidget(konc_input)
 
     calc_btn = QPushButton("Beregn")
-    calc_btn.setStyleSheet(button_style)
+    calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Resultat")
+    output = MathOutput("pH")
     layout.addWidget(output)
+
+    second_output = MathOutput("pOH")
+    layout.addWidget(second_output)
     layout.addStretch()
 
     def calc():
-        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})")
-        output.setText(result.get(0, ""))
+        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
+        output.setText(result)
+        if result.startswith("Error"):
+            second_output.setText("")
+        else:
+            decimals = len(result.split(".")[1]) if "." in result else 0
+            second_output.setText(f"{14 - float(result):.{decimals}f}")
 
     calc_btn.clicked.connect(calc)
     pKs_input.returnPressed.connect(calc)
@@ -768,16 +788,24 @@ def pOH_panel():
     layout.addWidget(konc_input)
 
     calc_btn = QPushButton("Beregn")
-    calc_btn.setStyleSheet(button_style)
+    calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Resultat")
+    output = MathOutput("pOH")
     layout.addWidget(output)
+
+    second_output = MathOutput("pH")
+    layout.addWidget(second_output)
     layout.addStretch()
 
     def calc():
-        result = interpreter_maple.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})")
-        output.setText(result.get(0, ""))
+        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
+        output.setText(result)
+        if result.startswith("Error"):
+            second_output.setText("")
+        else:
+            decimals = len(result.split(".")[1]) if "." in result else 0
+            second_output.setText(f"{14 - float(result):.{decimals}f}")
 
     calc_btn.clicked.connect(calc)
     pKs_input.returnPressed.connect(calc)
@@ -785,11 +813,42 @@ def pOH_panel():
     
     return body
 
+def afstemning_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    reaktion_input = MathInput("Reaktant->Produkt")
+    layout.addWidget(reaktion_input)
+
+    solution_input = MathInput("Opløsning (syre/base)")
+    layout.addWidget(solution_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("Afstemt reaktion")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        arg = f"{reaktion_input.text()},{solution_input.text()}" if solution_input.text() else reaktion_input.text()
+        result = interpreter_maple.EV().ev(f"Afstem({arg})")
+        output.setText(result.get(0, ""))
+
+    calc_btn.clicked.connect(calc)
+    reaktion_input.returnPressed.connect(calc)
+    solution_input.returnPressed.connect(calc)
+    
+    return body
 
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
     "pOH": Panel("pOH","pOH Beregning", pOH_panel),
+    "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel)
 }
 
 class PanelPage(QWidget):
@@ -924,7 +983,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
