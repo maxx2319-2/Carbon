@@ -580,7 +580,7 @@ class DraggablePanel(QWidget):
         self.help_text = help_text or "Ingen hjælpetekst endnu :("
         self.setStyleSheet(f"""
             DraggablePanel {{
-                background-color: rgba(43, 43, 43, 0);
+                background-color: transparent;
             }}
         """)
         self.setMinimumSize(240, 160)
@@ -630,6 +630,7 @@ class DraggablePanel(QWidget):
         layout.addWidget(self.header)
 
         self.body = body_widget
+        self.body.setStyleSheet("background-color: transparent")
 
         layout.addWidget(self.body)
 
@@ -947,7 +948,7 @@ class PanelPage(QWidget):
             spec = PANELS[key]
             help_text = HELPTEXT[key] + SUB_HELP if key in HELPTEXT else None
             panel = DraggablePanel(spec.title, spec.build(), self.canvas, help_text)
-            panel.resize(*spec.size)
+            panel.resize(spec.size[0], panel.sizeHint().height())
             offset = 20 * len(self.panels)
             panel.move(20 + offset, 20 + offset)
             self.panels[key] = panel
