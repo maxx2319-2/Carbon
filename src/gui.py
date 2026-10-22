@@ -172,20 +172,20 @@ HELPTEXT = {
         "Husk . for decimal og enheder inde i firkantet parentes [].\n"
         "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
     ),
-    "volpct": (
+    "volumenprocent": (
         "Indtast samlet volumen i det første input og specifik volumen i det andet.\n"
         "Eksempelvis 4[l] 300[dl]. Standard enheden er l."
     ),
-    "masspct": (
+    "masseprocent": (
         "Indtast samlet masse i det første input og specifik masse i det andet.\n"
         "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
     ),
-    "mass_calc": (
+    "mængdeberegning": (
         "Indtast din tilgængelige data i deres respektive input.\n"
         "Den beregner alt den mulige data fra det givne input, så du behøver ikke fylde alle inputs.\n"
         "Standard: masse g, volumen l, stofmængde mol, koncentration mol/l, molarmasse g/mol, densitet kg/l."
     ),
-    "buffer": (
+    "puffer": (
         "Input stofmængden eller koncentrationen af syren og af basen samt syrens pKs.\n"
         "Standard enhed for stofmængde er mol, for koncentration mol/l."
     ),
@@ -1053,6 +1053,64 @@ def masse_panel():
     
     return body
 
+def mængde_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    masse_input = MathInput("Masse[Enhed]")
+    layout.addWidget(masse_input)
+
+    volumen_input = MathInput("Volumen[Enhed]")
+    layout.addWidget(volumen_input)
+
+    stofmængde_input = MathInput("Stofmængde[Enhed]")
+    layout.addWidget(stofmængde_input)
+
+    koncentration_input = MathInput("Koncentration[Enhed]")
+    layout.addWidget(koncentration_input)
+
+    molarmasse_input = MathInput("Molarmasse[Enhed]")
+    layout.addWidget(molarmasse_input)
+
+    densitet_input = MathInput("Densitet[Enhed]")
+    layout.addWidget(densitet_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = TextOutput("Resultat")
+    output.ensurePolished()
+    output.setFixedHeight(output.fontMetrics().lineSpacing() * 6+16)
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        fields = [
+            ("m", masse_input),
+            ("V", volumen_input),
+            ("n", stofmængde_input),
+            ("c", koncentration_input),
+            ("M", molarmasse_input),
+            ("p", densitet_input),
+        ]
+        args = ",".join(f"{key}={field.text()}" for key, field in fields if field.text())
+        result = interpreter_maple.EV().ev(f"MængdeBeregning({args})").get(0, "")
+
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    masse_input.returnPressed.connect(calc)
+    volumen_input.returnPressed.connect(calc)
+    stofmængde_input.returnPressed.connect(calc)
+    koncentration_input.returnPressed.connect(calc)
+    molarmasse_input.returnPressed.connect(calc)
+    densitet_input.returnPressed.connect(calc)
+    
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
@@ -1063,6 +1121,7 @@ PANELS = {
     "udbytteprocent": Panel("Udbytte%","Udbytteprocent",udbytte_panel),
     "volumenprocent": Panel("Volumen%","Volumenprocent",volumen_panel),
     "masseprocent": Panel("Masse%", "Masseprocent",masse_panel),
+    "mængdeberegning": Panel("MBeregning","Mændgdeberegning",mængde_panel),
 }
 
 class PanelPage(QWidget):
@@ -1196,7 +1255,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit"])
         self.stack.addWidget(self.kemi_page)
