@@ -56,6 +56,8 @@ class EV:
             "DNATilPeptid",
             "RNATilPeptid",
             "MængdeBeregning",
+            "Puffer",
+            "pHTilKoncentration",
 
         ]
 
@@ -73,7 +75,9 @@ class EV:
             "MasseProcent":"MasseProcent(Praktisk,Teoretisk)",
             "DNATilPeptid":"DNATilPeptid(DNA streng)",
             "RNATilPeptid":"RNATilPeptid(DNA streng)",
-            "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)"
+            "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)",
+            "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
+            "pHTilKoncentration" : "pHTilKoncentration(pH)",
 
         }
         # temp fix
@@ -392,9 +396,36 @@ class EV:
                                     linjer.append(f"{k}: {quantity(rounded, converted.units)}")
     
                             output[pc] = "\n".join(linjer) if linjer else ""
-                            pc += 1                        
-                        
-                        
+                            pc += 1
+
+
+                        case 'Puffer':   
+                            if input.count(",") != 2:
+                                raise ValueError(self.error_text["Puffer"])
+                            syre, base, pKs = input.split(",") 
+
+                            if syre == "" or base == "" or pKs == "": 
+                                raise ValueError(self.error_text["Puffer"])
+
+                            result = chem.puffer(self.input_prep(syre).value,self.input_prep(base).value,self.input_prep(pKs).value)                   
+                            output[pc] = utils.round_pH(result,[self.prep_ev(syre),self.prep_ev(base)])
+
+                            pc += 1
+
+                        case 'pHTilKoncentration':
+                            if input.count(",") != 0:
+                                raise ValueError(self.error_text["pHTilKoncentration"])
+
+                            if input == "":
+                                raise ValueError(self.error_text["pHTilKoncentration"])
+
+                            h3o, oh = chem.pH_to_concentration(self.input_prep(input).value)
+                            sig = [self.prep_ev(input)]
+                            output[pc] = f"[H3O+]: {utils.significant_figures(h3o, sig)} mol/l\n[OH-]: {utils.significant_figures(oh, sig)} mol/l"
+
+                            pc += 1
+
+                
 
                         case "Help":
                             if input == "":

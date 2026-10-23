@@ -33,7 +33,6 @@ def test_count_sig_figs_without_leading_zero():
     assert utils.count_sig_figs(".5") == 1
 
 
-@pytest.mark.xfail(reason="0 counts as 0 significant figures, so anything rounded against it becomes 0")
 def test_count_sig_figs_zero():
     assert utils.count_sig_figs("0") == 1
 
