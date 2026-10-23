@@ -98,7 +98,7 @@ def count_sig_figs(part):
     if not m:
         raise ValueError(f"Invalid number: {part!r}")
     s = str(Decimal(m.group(0))).replace(".", "").replace("-", "")
-    return len(s.lstrip("0"))
+    return max(len(s.lstrip("0")), 1)
 
 def significant_figures(x, inputs):
     if x == 0:
