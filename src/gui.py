@@ -1184,7 +1184,7 @@ PANELS = {
     "udbytteprocent": Panel("Udbytteprocent","Udbytteprocent",udbytte_panel),
     "volumenprocent": Panel("Volumenprocent","Volumenprocent",volumen_panel),
     "masseprocent": Panel("Masseprocent", "Masseprocent",masse_panel),
-    "mængdeberegning": Panel("Mændgeberegning","Mændgdeberegning",mængde_panel),
+    "mængdeberegning": Panel("Mængdeberegning","Mængdeberegning",mængde_panel),
     "dna_peptid": Panel("DNA Translation","DNA Translation",dna_peptid_panel),
     "rna_peptid": Panel("RNA Translation","RNA Translation",rna_peptid_panel),
 }
