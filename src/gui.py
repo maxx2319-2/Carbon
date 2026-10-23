@@ -90,6 +90,11 @@ version = "Bv 2.0"
 
 ASSETS_DIR = resource_path("Assets")
 
+def hover_icon(file):
+    icon = QIcon(str(ASSETS_DIR / file))
+    icon.addFile(str(ASSETS_DIR / file.replace(".svg", "_Hover.svg")), QSize(), QIcon.Active)
+    return icon
+
 _settings = QSettings("M&B", "Carbon")
 
 HEADER = "#1e1e1e"
@@ -629,8 +634,9 @@ class DraggablePanel(QWidget):
         header_layout.addStretch()
 
         if hasattr(body_widget, "export"):
-            export_btn = QPushButton()
-            export_btn.setIcon(QIcon(str(ASSETS_DIR / "Save.svg")))
+            export_btn = QToolButton()
+            export_btn.setIcon(hover_icon("Save.svg"))
+            export_btn.setAutoRaise(True)
             export_btn.setIconSize(QSize(14,14))
             export_btn.setFixedSize(20,20)
             export_btn.setToolTip("Eksporter")
@@ -1235,18 +1241,24 @@ class PanelPage(QWidget):
         sidebar_layout.addWidget(scroll)
 
         arrow = QIcon(str(ASSETS_DIR / "Arrow.svg")).pixmap(64,64)
-        self.arrow_open = QIcon(arrow.transformed(QTransform().rotate(180)))
-        self.arrow_closed = QIcon(arrow)
+        arrow_hover = QIcon(str(ASSETS_DIR / "Arrow_Hover.svg")).pixmap(64,64)
+        flip = QTransform().rotate(180)
+        arrow_icon = QIcon()
+        arrow_icon.addPixmap(arrow.transformed(flip), QIcon.Normal, QIcon.Off)
+        arrow_icon.addPixmap(arrow_hover.transformed(flip), QIcon.Active, QIcon.Off)
+        arrow_icon.addPixmap(arrow, QIcon.Normal, QIcon.On)
+        arrow_icon.addPixmap(arrow_hover, QIcon.Active, QIcon.On)
 
-        self.handle = QPushButton()
-        self.handle.setIcon(self.arrow_closed)
+        self.handle = QToolButton()
+        self.handle.setIcon(arrow_icon)
+        self.handle.setAutoRaise(True)
         self.handle.setIconSize(QSize(20,20))
         self.handle.setCheckable(True)
         self.handle.setChecked(True)
         self.handle.setFixedWidth(24)
         self.handle.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self.handle.setStyleSheet(f"""
-            QPushButton {{
+            QToolButton {{
                 background-color: {SIDEBAR};
                 border: none;
             }}
@@ -1279,7 +1291,6 @@ class PanelPage(QWidget):
         panel.raise_()
 
     def toggle_sidebar(self, collapsed):
-            self.handle.setIcon(self.arrow_closed if collapsed else self.arrow_open)
             self.anim.stop()
             self.anim.setStartValue(self.sidebar.maximumWidth())
             self.anim.setEndValue(0 if collapsed else SIDEBAR_WIDTH)
@@ -1458,7 +1469,8 @@ class MainWindow(QMainWindow):
 
         def make_button(icon_path, tooltip, callback):
             btn = QToolButton()
-            btn.setIcon(QIcon(str(ASSETS_DIR / icon_path)))
+            btn.setIcon(hover_icon(icon_path))
+            btn.setAutoRaise(True)
             btn.setIconSize(QSize(32, 32))
             btn.setToolTip(tooltip)
             btn.clicked.connect(callback)
