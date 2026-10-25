@@ -336,14 +336,56 @@
         if (after) after.after(mf); else editor.append(mf);
         setupField(mf);
         setLine(mf, raw);
-        mf.addEventListener("input", () => { clearOutput(mf); makeSqrt(mf); recolour(mf); rember(mf);  updateSuggest(mf); });
+        mf.addEventListener("input", () => { clearOutput(mf); makeSqrt(mf); recolour(mf); rember(mf);  updateSuggest(mf); record(); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
 
+    const undoStack = [];
+    let current = null;
+
+    function snapshot () {
+        const all = lines();
+        const mf = document.activeElement;
+        return {raws: all.map(l => strip(l.value)), line: all.indexOf(mf), position: mf?.position ?? 0};
+    }
+
+    function record() {
+        const next = snapshot();
+        if (current && current.raws.join("\n") !== next.raws.join("\n")) undoStack.push(current);
+        current = next;
+    }
+
+    function undo() {
+        const s = undoStack.pop();
+        if (!s) return;
+        hideSuggest();
+        const all = lines();
+        while (all.length > s.raws.length) {
+            const mf = all.pop();
+            clearOutput(mf);
+            mf.remove();
+        }
+        while (all.length < s.raws.length) all.push(newLine());
+        all.forEach((mf,i) =>{
+            if (strip(mf.value) === s.raws[i]) return;
+            clearOutput(mf);
+            setLine(mf,s.raws[i]);
+            rember(mf);
+
+        });
+        const mf = all[s.line] ?? all.at(-1);
+        mf.focus();
+        mf.position = Math.min(s.position,mf.lastOffset);
+        current = snapshot();
+        updateHint();
+    }
+
+
     function onKey(e) {
         const mf = e.currentTarget;
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); undo(); return; }
         const atStart = mf.position === 0 && mf.selectionIsCollapsed;
         const atEnd = mf.position === mf.lastOffset && mf.selectionIsCollapsed;
         const up = prevField(mf), down = nextField(mf);
@@ -374,6 +416,7 @@
                 let last = mf;
                 while (isOut(last.nextElementSibling)) last = last.nextElementSibling;
                 focusLine(newLine(last), "start");
+                record();
             }
             return;
         }
@@ -387,6 +430,7 @@
             const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
             setLine(mf, before);
             focusLine(newLine(mf, after), "start");
+            record();
             return;
         }
         if (e.key === "Backspace" && atStart && prev) {
@@ -399,6 +443,7 @@
             mf.remove();
             prev.focus();
             prev.position = join;
+            record();
             return;
         }
         if (e.key === "Delete" && atEnd && next) {
@@ -408,6 +453,7 @@
             const join = mf.lastOffset;
             setLine(mf, strip(mf.value) + strip(next.value), join);
             next.remove();
+            record();
             return;
         }
         if (e.key === "/") { stop(); mf.executeCommand(["insert", "\\frac{#@}{#?}"]); return; }
@@ -474,6 +520,8 @@
     editor.addEventListener("input",updateHint);
     updateHint();
     focusLine(first);
+    current = snapshot();
+
 
 </script>
 </body></html>
