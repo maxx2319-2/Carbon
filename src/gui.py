@@ -10,6 +10,7 @@ import biotek
 import io
 import base64
 from matplotlib.figure import Figure
+import utils
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
@@ -344,6 +345,10 @@ class _MapleBridge(QObject):
             value = result.get(i, "")
             values = value if isinstance(value, list) else [value]
             for value in values:
+                if isinstance(value, utils.FunctionPlot):
+                    rows.append(["plot", json.dumps({"functions": value.functions, "start": value.start, "end": value.end})])
+                    continue
+
                 if isinstance(value, Figure):
                     buf = io.BytesIO()
                     value.savefig(buf, format = "png")
