@@ -235,9 +235,9 @@ class EV:
                                 else: 
                                     functions.append(self.prep_sympy(part))
                             if start is not None:
-                                 output[pc] = utils.function_figure(functions,start,end)
+                                 output[pc] = utils.FunctionPlot(functions,start,end)
                             else:
-                                output[pc] = utils.function_figure(functions)
+                                output[pc] = utils.FunctionPlot(functions)
                             pc += 1
 
 

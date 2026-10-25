@@ -32,6 +32,14 @@
 
     img.out { display: block; max-width: 100%; }
     
+    div.plot { width: 500px; height: 400px; max-width: 100%; }
+    div.plot canvas { display: block; width: 100%; height: 100%; cursor: default; }
+    div.plot .legend { position: absolute; top: 8px; right: 8px; background: #1e1e1e; border: 1px solid #555566; border-radius: 4px; padding: 2px 8px; font-size: 14px; pointer-events: none; }
+    div.plot .legend div { display: flex; align-items: center; gap: 6px; }
+    div.plot .legend math-field { display: inline-block; width: auto; min-height: 0; padding: 0; font-size: 14px; }
+    div.plot .swatch { width: 18px; height: 3px; }
+    div.plot .coords { position: absolute; left: 8px; bottom: 6px; font: 12px monospace; color: #ccc; pointer-events: none; }
+
 
     #suggest {position: fixed; display: none; z-index: 10; background: #323232; font: 14px "Segoe-UI";
     width: 200px; max-height:  160px; overflow-y: auto; border-radius: 8px; padding: 4px; box-sizing: border-box;}
@@ -472,6 +480,141 @@
         const text = all.map(el => isOut(el) ? "" : strip(el.value));
         bridge.run(JSON.stringify(text),rows => showOutput(JSON.parse(rows),all))
     }
+    const PLOT_COLORS = ["#00d9ff", "#ff6ec7", "#ffd166", "#06ffa5", "#c77dff", "#ff9e6d"];
+    const tidy = (v,digits) => +v.toPrecision(digits) || 0;
+
+    function niceStep(range) {
+        const raw = range / 8;
+        const p = 10**Math.floor(Math.log10(raw));
+        const n = raw / p;
+        return p * (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10);
+    }
+
+    function plotElement(data) {
+        const el = document.createElement("div");
+        el.className = "plot";
+        const canvas = document.createElement("canvas");
+        const legend = document.createElement("div");
+        legend.className = "legend";
+        const coords = document.createElement("div");
+        coords.className = "coords";
+        el.append(canvas, legend, coords);
+
+        const fns = data.functions.map(f => new Function("x",`return ${f.js};`));
+        data.functions.forEach((f,i) => {
+            const row = document.createElement("div");
+            const swatch = document.createElement("span");
+            swatch.className = "swatch";
+            swatch.style.background = PLOT_COLORS[i % PLOT_COLORS.length];
+            const label = new MathfieldElement();
+            label.classList.add("out");
+            label.readOnly = true;
+            label.value = f.label;
+            row.append(swatch, label);
+            legend.append(row);
+
+        });
+
+        const ys = [];
+        for (let i = 0; i <=400; i++) {
+            const x = data.start + (data.end - data.start) * i/400;
+            for (const f of fns) {
+                const y = f(x);
+                if (Number.isFinite(y)) ys.push(y);
+
+            }
+        }
+        let y0 = ys.length ? Math.min(...ys) : -10, y1 = ys.length ? Math.max(...ys) : 10;
+        if (y0 === y1) { y0 -= 1; y1 += 1; }
+        const pad = (y1 - y0) * 0.1;
+        const home = { x0: data.start, x1: data.end, y0: y0 - pad, y1: y1 + pad };
+        let view = { ...home }, drag = null;
+        
+        function at(e) {
+            const r = canvas.getBoundingClientRect();
+            return [view.x0 + (e.clientX - r.left) / r.width * (view.x1 - view.x0),
+                    view.y1 - (e.clientY - r.top) / r.height * (view.y1 - view.y0)];
+
+        }
+
+        function draw() {
+            const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio;
+            canvas.width = w*dpr;
+            canvas.height = h*dpr;
+            const ctx = canvas.getContext("2d");
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const px = x => (x - view.x0) / (view.x1 - view.x0) * w;
+            const py = y => h - (y - view.y0) / (view.y1 - view.y0) * h;
+
+            ctx.fillStyle = "#323232";
+            ctx.fillRect(0, 0, w, h);
+            ctx.lineWidth = 1;
+            ctx.font = "12px sans-serif";
+            ctx.fillStyle = "#ffffff";
+
+            const sx = niceStep(view.x1 - view.x0), sy = niceStep(view.y1 - view.y0);
+            const labelY = Math.min(Math.max(py(0) + 14, 14), h - 4);
+            const labelX = Math.min(Math.max(px(0) + 4, 4), w - 40);
+            for (let i = Math.ceil(view.x0 / sx); i * sx <= view.x1; i++) {
+                const x = i * sx;
+                ctx.strokeStyle = "#28282e";
+                ctx.beginPath(); ctx.moveTo(px(x), 0); ctx.lineTo(px(x), h); ctx.stroke();
+                ctx.fillText(tidy(x, 12), px(x) + 3, labelY);
+            }
+            for (let i = Math.ceil(view.y0 / sy); i * sy <= view.y1; i++) {
+                const y = i * sy;
+                ctx.strokeStyle = "#28282e";
+                ctx.beginPath(); ctx.moveTo(0, py(y)); ctx.lineTo(w, py(y)); ctx.stroke();
+                if (i !== 0) ctx.fillText(tidy(y, 12), labelX, py(y) - 3);
+            }
+            ctx.strokeStyle = "#858585";
+            ctx.beginPath(); ctx.moveTo(px(0), 0); ctx.lineTo(px(0), h); ctx.moveTo(0, py(0)); ctx.lineTo(w, py(0)); ctx.stroke();
+            
+            ctx.lineWidth = 2.2;
+            fns.forEach((f, i) => {
+                ctx.strokeStyle = PLOT_COLORS[i % PLOT_COLORS.length];
+                ctx.beginPath();
+                let pen = false, last = 0;
+                for (let s = 0; s <= w; s++) {
+                    const Y = Math.min(Math.max(py(f(view.x0 + (view.x1 - view.x0) * s / w)), -1e4), h + 1e4);
+                    if (!Number.isFinite(Y)) { pen = false; continue; }
+                    if (pen && Math.abs(Y - last) < h) ctx.lineTo(s, Y); else ctx.moveTo(s, Y);
+                    pen = true;
+                    last = Y;
+                }
+                ctx.stroke();
+            });
+        }
+        canvas.addEventListener("pointerdown", e => {
+            canvas.setPointerCapture(e.pointerId);
+            drag = { x: e.clientX, y: e.clientY, view: { ...view } };
+        });
+        canvas.addEventListener("pointermove", e => {
+            if (drag) {
+                const dx = (e.clientX - drag.x) / canvas.clientWidth * (drag.view.x1 - drag.view.x0);
+                const dy = (e.clientY - drag.y) / canvas.clientHeight * (drag.view.y1 - drag.view.y0);
+                view = { x0: drag.view.x0 - dx, x1: drag.view.x1 - dx, y0: drag.view.y0 + dy, y1: drag.view.y1 + dy };
+                draw();
+            }
+            const [x, y] = at(e);
+            coords.textContent = `x = ${tidy(x, 4)}   y = ${tidy(y, 4)}`;
+        });
+        canvas.addEventListener("pointerup", () => drag = null);
+        canvas.addEventListener("pointerleave", () => coords.textContent = "");
+        canvas.addEventListener("wheel", e => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            const [x, y] = at(e);
+            const f = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+            view = { x0: x + (view.x0 - x) * f, x1: x + (view.x1 - x) * f, y0: y + (view.y0 - y) * f, y1: y + (view.y1 - y) * f };
+            draw();
+        }, { passive: false });
+        canvas.addEventListener("dblclick", () => { view = { ...home }; draw(); });
+
+        requestAnimationFrame(draw);
+        return el;
+    }
+
 
     // rows: [["code" | "result" | "error", latex], ...] in document order
     function showOutput(rows,all) {
@@ -485,6 +628,8 @@
                 const img = document.createElement("img");
                 img.src = latex;
                 el.append(img);
+            } else if (kind === "plot") {
+                el = plotElement(JSON.parse(latex));
             } else {
             
             
@@ -493,7 +638,7 @@
             }
             el.classList.add("out");
             anchor.after(el);
-            if (kind !== "image") { setupField(el); el.value = latex; }
+            if (isField(el)) { setupField(el); el.value = latex; }
             anchor = el;
         }
     }
