@@ -1,11 +1,12 @@
 import re
-import json, base64
-from nacl.signing import VerifyKey
-from nacl.exceptions import BadSignatureError
-from datetime import date
+import json
 from types import SimpleNamespace
 from decimal import Decimal
 import math
+import sympy
+import numpy as np
+from matplotlib.figure import Figure
+
 
 from path import resource_path
 
@@ -125,3 +126,29 @@ def round_pH(x, inputs):
     n = min_sig_figs(inputs) or config.rounding_decimals
     return f"{x:.{n}f}"
 
+
+
+
+def function_figure(exprs, start=-10, end =10):
+    x = sympy.Symbol("x")
+    xs = np.linspace(start, end, 400)
+    colors = ["#00d9ff", "#ff6ec7", "#ffd166", "#06ffa5", "#c77dff", "#ff9e6d"]
+
+    fig = Figure(figsize=(5, 4))
+    fig.patch.set_facecolor("#404040")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("#323232")
+    for i, expr in enumerate(exprs):
+        f = sympy.lambdify(x, expr, "numpy")
+        ax.plot(xs, f(xs) * np.ones_like(xs), color=colors[i % len(colors)], linewidth=2.2, label=f"${sympy.latex(expr)}$")
+    ax.axhline(0, color="#858585", linewidth=0.8)
+    ax.axvline(0, color="#858585", linewidth=0.8)
+    ax.grid(True, color="#1F1F28", alpha=0.5)
+    ax.tick_params(colors="white")
+    for spine in ax.spines.values():
+        spine.set_color("#555566")
+    legend = ax.legend(facecolor="#1e1e1e", edgecolor="#555566")
+    for text in legend.get_texts():
+        text.set_color("white")
+    fig.tight_layout()
+    return fig

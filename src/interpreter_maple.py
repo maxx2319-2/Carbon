@@ -6,6 +6,8 @@ import re
 import biotek
 import json
 import sympy 
+import numpy as np
+from matplotlib.figure import Figure
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor
 
 from types import SimpleNamespace
@@ -62,6 +64,7 @@ class EV:
             "Puffer",
             "pHTilKoncentration",
             "Løs",
+            "PlotFunktion",
 
         ]
 
@@ -83,6 +86,7 @@ class EV:
             "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
             "Løs" : "Løs(ligning)",
+            "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
 
         }
         # temp fix
@@ -207,6 +211,33 @@ class EV:
                                 solutions = [s for s in sympy.solve(self.sympy_expr(args[0]))]
                                 output[pc] = solutions if solutions else "Ingen løsninger"
 
+                            pc += 1
+
+                        case 'PlotFunktion':
+                            start = None
+                            end = None
+                            functions = []
+
+                            for part in args:
+                                if "Interval" in part:
+                                    _,interval = part.split("=")
+                                    if "(" not in interval or ")" not in interval:
+                                        raise ValueError(self.help_text["PlotFunktion"])
+                                    interval = interval.strip("(").strip(")")
+
+                                    if interval.count(",") != 1:
+                                        raise ValueError(self.help_text["PlotFunktion"])
+                                    start,end = interval.split(",")
+                                    if start == "" or end == "":
+                                        raise ValueError(self.help_text["PlotFunktion"])
+                                    start = self.input_prep(start).value
+                                    end = self.input_prep(end).value
+                                else: 
+                                    functions.append(self.prep_sympy(part))
+                            if start is not None:
+                                 output[pc] = utils.function_figure(functions,start,end)
+                            else:
+                                output[pc] = utils.function_figure(functions)
                             pc += 1
 
 
