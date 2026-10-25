@@ -495,12 +495,15 @@ def bjerrum(pks):
             "axes.edgecolor": "#555566",
             "axes.grid": True,
             "grid.color": "#1F1F28",
-            "legend.facecolor": "#1e1e1e",
+            "legend.facecolor": "white",
             "legend.edgecolor": "#555566",
+            "legend.labelcolor": "black",
             "grid.alpha": 0.5,
             "font.size": 12,
             "axes.titlesize": 15,
             "lines.linewidth": 2.2,
+            "savefig.dpi": 300,
+
         }
     )
     x = np.linspace(0, 14, 400)
@@ -519,13 +522,37 @@ def bjerrum(pks):
     plt.ylim(0, 1)
 
     plt.yticks(np.arange(0, 1.1, 0.1))
+    markers = []
     for acid in pks:
-        plt.axvline(
+        markers.append(plt.axvline(
             x=acid, color="white", linestyle=(0, (5, 4)), linewidth=2, alpha=0.5
-        )
-        plt.scatter(
+        ))
+        markers.append(plt.scatter(
             acid, 0.5, s=20, color="white", linewidth=0.5, zorder=5, clip_on=False
-        )
+        ))
+
+    fig = plt.gcf()
+    ax = plt.gca()
+    save = fig.savefig
+
+    def export(*args, **kwargs):
+        ax.set_facecolor("white")
+        ax.tick_params(colors="black")
+        ax.xaxis.label.set_color("black")
+        ax.yaxis.label.set_color("black")
+        for marker in markers:
+            marker.set_color("black")
+        try:
+            save(*args, facecolor="white", **kwargs)
+        finally:
+            ax.set_facecolor("#323232")
+            ax.tick_params(colors="white")
+            ax.xaxis.label.set_color("white")
+            ax.yaxis.label.set_color("white")
+            for marker in markers:
+                marker.set_color("white")
+
+    fig.savefig = export
 
     plt.show()
 

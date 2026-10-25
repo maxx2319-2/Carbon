@@ -100,16 +100,28 @@ def count_sig_figs(part):
     s = str(Decimal(m.group(0))).replace(".", "").replace("-", "")
     return max(len(s.lstrip("0")), 1)
 
+
+def min_sig_figs(inputs):
+    counts = []
+    for p in inputs:
+        try:
+            counts.append(count_sig_figs(p))
+        except ValueError:
+            pass
+    return min(counts) if counts else None
+
+
+
 def significant_figures(x, inputs):
     if x == 0:
         return 0
-    n = min(count_sig_figs(p) for p in inputs)
+    n = min_sig_figs(inputs) or config.rounding_decimals
     decimals = n - 1 - math.floor(math.log10(abs(x)))
     result = round(x, decimals)
     return int(result) if decimals <= 0 else result
 
 
 def round_pH(x, inputs):
-    n = min(count_sig_figs(p) for p in inputs)
+    n = min_sig_figs(inputs) or config.rounding_decimals
     return f"{x:.{n}f}"
 

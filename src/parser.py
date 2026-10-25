@@ -1,17 +1,24 @@
 import re
 from quantity import quantity
 import math
+from path import resource_path
+import json
+from types import SimpleNamespace
+
+with open(resource_path("config.json")) as f:
+    config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
+
 
 FUNCTIONS = {
     "Ln": math.log,
     "Log": math.log10,
     "Exp": math.exp,
-    "Sin": math.sin,
-    "Cos": math.cos,
-    "Tan": math.tan,
-    "ArcSin": math.asin,
-    "ArcCos": math.acos,
-    "ArcTan": math.atan,
+    "Sin": lambda x : math.sin(math.radians(x)),
+    "Cos": lambda x : math.cos(math.radians(x)),
+    "Tan": lambda x : math.tan(math.radians(x)),
+    "ArcSin": lambda x : math.asin(math.radians(x)),
+    "ArcCos": lambda x : math.acos(math.radians(x)),
+    "ArcTan": lambda x : math.atan(math.radians(x)),
     "Sinh": math.sinh,
     "Cosh": math.cosh,
     "Tanh": math.tanh,
@@ -158,7 +165,7 @@ class _Parser:
                 values = self.args()
                 if any(v.units for v in values):
                      raise ValueError(f'{value} kan ikke tage imod enhed')
-                return quantity(FUNCTIONS[value](*(v.value for v in values)),{})
+                return quantity(round(FUNCTIONS[value](*(v.value for v in values)),config.rounding_decimals),{})
             raise ValueError(f'Ukendt funktion "{value}"')
 
                    
