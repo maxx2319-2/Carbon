@@ -13,6 +13,7 @@ from matplotlib.figure import Figure
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
 
 import sys
 from dataclasses import dataclass, field
@@ -393,7 +394,7 @@ class MathInput(QWebEngineView):
         self._channel = QWebChannel(self.page())
         self._channel.registerObject("bridge", self._bridge)
         self.page().setWebChannel(self._channel)
-        self.page().setBackgroundColor(Qt.transparent)
+        self.page().setBackgroundColor(QColor(BG))
 
         self._bridge.entered.connect(self.returnPressed)
         self.loadFinished.connect(self._on_loaded)
@@ -439,7 +440,7 @@ class MathOutput(QWebEngineView):
         self._placeholder = placeholder
         self._raw = ""
         self._loaded = False
-        self.page().setBackgroundColor(Qt.transparent)
+        self.page().setBackgroundColor(QColor(BG))
         self.loadFinished.connect(self._on_loaded)
         url = QUrl.fromLocalFile(str(resource_path("Assets_math_live/mathfield.html")))
         url.setQuery("readonly=1")
@@ -1660,7 +1661,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
 
         self.maple_view = QWebEngineView()
-        self.maple_view.page().setBackgroundColor(Qt.transparent)
+        self.maple_view.page().setBackgroundColor(QColor(BG))
         self.maple_bridge = _MapleBridge()
         self.maple_channel = QWebChannel(self.maple_view.page())
         self.maple_channel.registerObject("bridge", self.maple_bridge)
