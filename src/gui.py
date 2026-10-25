@@ -1266,6 +1266,7 @@ PANELS = {
 class PanelPage(QWidget):
     def __init__(self, keys, parent=None):
         super().__init__(parent)
+        self.keys = keys
         self.panels = {}
 
         self.canvas = QWidget()
@@ -1389,7 +1390,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.stack)
 
         self.create_header()
-        self.create_drawer()
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
@@ -1399,6 +1399,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
+        self.create_drawer()
         #self.create_settings_page()
         #self.create_formel_page()
 
@@ -1440,19 +1441,17 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(content)
 
         items = [
-            ("Hovedmenu", self.open_menu),
-            ("Regneark", self.open_interpreter),
-            ("Kemi", self.open_kemi),
-            ("Fysik", self.open_fysik),
-            ("Biotek", self.open_biotek),
-            ("Formelsamling", self.open_formula),
-            ("Indstillinger", self.open_settings),
-            ("Afslut", self.close_app),
+            ("Hovedmenu", self.open_menu, None),
+            ("Regneark", self.open_interpreter, None),
+            ("Kemi", self.open_kemi, self.kemi_page),
+            ("Fysik", self.open_fysik, self.fysik_page),
+            ("Biotek", self.open_biotek, self.biotek_page),
+            ("Formelsamling", self.open_formula, None),
+            ("Indstillinger", self.open_settings, None),
+            ("Afslut", self.close_app, None),
         ]
 
-        for text, callback in items:
-            btn = QPushButton(text)
-            btn.setStyleSheet(f"""
+        style = f"""
                 QPushButton {{
                     color: white;
                     text-align: left;
@@ -1464,11 +1463,53 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {{
                     background-color: {HEADER};
                 }}
-            """)
+            """
+
+        arrow = QIcon(str(ASSETS_DIR / "Arrow.svg")).pixmap(64,64)
+        arrow_hover = QIcon(str(ASSETS_DIR / "Arrow_Hover.svg")).pixmap(64,64)
+        up = QTransform().rotate(-90)
+        down = QTransform().rotate(90)
+        expand_icon = QIcon()
+        expand_icon.addPixmap(arrow.transformed(up), QIcon.Normal, QIcon.Off)
+        expand_icon.addPixmap(arrow_hover.transformed(up), QIcon.Active, QIcon.Off)
+        expand_icon.addPixmap(arrow.transformed(down), QIcon.Normal, QIcon.On)
+        expand_icon.addPixmap(arrow_hover.transformed(down), QIcon.Active, QIcon.On)
+
+        for text, callback, page in items:
+            btn = QPushButton(text)
+            btn.setStyleSheet(style + "QPushButton { font-weight: bold; }")
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(callback)
             btn.clicked.connect(self.toggle_drawer)
-            layout.addWidget(btn)
+            if page is None:
+                layout.addWidget(btn)
+                continue
+
+            expand = QToolButton()
+            expand.setIcon(expand_icon)
+            expand.setIconSize(QSize(14,14))
+            expand.setCheckable(True)
+            expand.setAutoRaise(True)
+            expand.setCursor(Qt.PointingHandCursor)
+            expand.setStyleSheet("QToolButton { background: transparent; border: none; }")
+
+            row = QHBoxLayout()
+            row.addWidget(btn)
+            row.addWidget(expand)
+            layout.addLayout(row)
+
+            panel_list = QWidget()
+            panel_layout = QVBoxLayout(panel_list)
+            panel_layout.setContentsMargins(20,0,0,0)
+            for key in page.keys:
+                panel_btn = QPushButton(PANELS[key].label)
+                panel_btn.setStyleSheet(style)
+                panel_btn.setCursor(Qt.PointingHandCursor)
+                panel_btn.clicked.connect(lambda _=False, p=page, k=key: self.open_panel(p, k))
+                panel_layout.addWidget(panel_btn)
+            panel_list.hide()
+            expand.toggled.connect(panel_list.setVisible)
+            layout.addWidget(panel_list)
         layout.addStretch()
 
         scroll.setWidget(content)
@@ -1702,6 +1743,11 @@ class MainWindow(QMainWindow):
 
     def slide_finished(self):
         self.stack.setCurrentWidget(self.slide_target)
+
+    def open_panel(self, page, key):
+        self.slide_to(page)
+        page.show_panel(key)
+        self.toggle_drawer()
 
     def open_menu(self):
         self.slide_to(self.stack.widget(0))
