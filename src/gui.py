@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QTextEdit,
     QButtonGroup,
+    QCompleter,
 )
 from PySide6.QtCore import (
     Qt,
@@ -1400,6 +1401,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
         self.create_drawer()
+        self.create_search()
         #self.create_settings_page()
         #self.create_formel_page()
 
@@ -1506,6 +1508,7 @@ class MainWindow(QMainWindow):
                 panel_btn.setStyleSheet(style)
                 panel_btn.setCursor(Qt.PointingHandCursor)
                 panel_btn.clicked.connect(lambda _=False, p=page, k=key: self.open_panel(p, k))
+                panel_btn.clicked.connect(self.toggle_drawer)
                 panel_layout.addWidget(panel_btn)
             panel_list.hide()
             expand.toggled.connect(panel_list.setVisible)
@@ -1519,6 +1522,23 @@ class MainWindow(QMainWindow):
         self.drawer_anim.setDuration(250)
         self.drawer_anim.setEasingCurve(QEasingCurve.OutCubic)
         self.drawer_anim.finished.connect(self.drawer_finished)
+
+    def eventFilter(self, obj, event):
+        if obj is self.search and self.suggest.isVisible():
+            if event.type() == event.Type.KeyPress:
+                if event.key() in (Qt.Key_Up, Qt.Key_Down):
+                    step = 1 if event.key() == Qt.Key_Down else -1
+                    self.suggest.setCurrentRow((self.suggest.currentRow() + step) % self.suggest.count())
+                    return True
+                if event.key() == Qt.Key_Tab:
+                    self.run_search()
+                    return True
+                if event.key() == Qt.Key_Escape:
+                    self.suggest.hide()
+                    return True
+            elif event.type() == event.Type.FocusOut:
+                self.suggest.hide()
+        return super().eventFilter(obj, event)
 
     def toggle_drawer(self):
         top = self.toolbar.height()
@@ -1666,10 +1686,63 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(container)
         self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
 
+    def create_search(self):
+        self.search_targets = {}
+        for name, page in [("Kemi", self.kemi_page), ("Fysik", self.fysik_page), ("Biotek", self.biotek_page)]:
+            for key in page.keys:
+                self.search_targets[f"{PANELS[key].label} ({name})"] = (page, key)
+
+        self.suggest = QListWidget(self)
+        self.suggest.setFocusPolicy(Qt.NoFocus)
+        self.suggest.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.suggest.setCursor(Qt.PointingHandCursor)
+        self.suggest.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {SIDEBAR};
+                border: none;
+                border-radius: 8px;
+                padding: 4px;
+                font: 14px "Segoe UI";
+                outline: none;
+            }}
+            QListWidget::item {{
+                color: {BUTTON};
+                padding: 3px 10px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{ background-color: {BG}; }}
+            QScrollBar:vertical {{ background: transparent; width: 6px; }}
+            QScrollBar::handle:vertical {{ background: {BG}; border-radius: 3px; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+        """)
+        self.suggest.itemClicked.connect(self.run_search)
+        self.suggest.hide()
+
+        self.search.textChanged.connect(self.update_search)
+        self.search.installEventFilter(self)
+
+    def update_search(self, text):
+        text = text.strip().lower()
+        self.suggest.clear()
+        if text:
+            self.suggest.addItems([t for t in self.search_targets if text in t.lower()])
+        if not self.suggest.count():
+            self.suggest.hide()
+            return
+        self.suggest.setCurrentRow(0)
+        rows = min(self.suggest.count(), 7)
+        self.suggest.setFixedSize(self.search.width(), rows * self.suggest.sizeHintForRow(0) + 8)
+        self.suggest.move(self.search.mapTo(self, QPoint(0, self.search.height())))
+        self.suggest.show()
+        self.suggest.raise_()
+
     def run_search(self):
-        print(self.search.text().strip())
-
-
+        item = self.suggest.currentItem()
+        if not self.suggest.isVisible() or item is None:
+            return
+        self.open_panel(*self.search_targets[item.text()])
+        self.search.clear()
 
     def create_mainmenu(self):
         central = QWidget()
@@ -1747,7 +1820,6 @@ class MainWindow(QMainWindow):
     def open_panel(self, page, key):
         self.slide_to(page)
         page.show_panel(key)
-        self.toggle_drawer()
 
     def open_menu(self):
         self.slide_to(self.stack.widget(0))
