@@ -44,7 +44,8 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QColorDialog,
     QFrame,
-    QTextEdit
+    QTextEdit,
+    QButtonGroup,
 )
 from PySide6.QtCore import (
     Qt,
@@ -1470,7 +1471,9 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(5, 0, 5, 0)
         layout.setSpacing(15)
 
-        def make_button(icon_path, tooltip, callback):
+        self.page_buttons = QButtonGroup(self)
+
+        def make_button(icon_path, tooltip, callback, page=None):
             btn = QToolButton()
             btn.setIcon(hover_icon(icon_path))
             btn.setAutoRaise(True)
@@ -1481,7 +1484,11 @@ class MainWindow(QMainWindow):
                     QToolButton {{
                         background-color: {HEADER};
                         border: none;
+                        border-bottom: 3px solid transparent;
                         padding: 6px;
+                    }}
+                    QToolButton:checked {{
+                        border-bottom: 3px solid {BUTTON};
                     }}
                     QToolTip {{
                     background-color: {BUTTON};
@@ -1489,15 +1496,18 @@ class MainWindow(QMainWindow):
                     border: 1px solid {HEADER};
                     }}
                 """)
+            if page is not None:
+                btn.setCheckable(True)
+                self.page_buttons.addButton(btn, page)
             return btn
 
         layout.addWidget(
-            make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu)
+            make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu, 0)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Interpreter_Icon.svg", "Regneark", self.open_interpreter)
+            make_button("Interpreter_Icon.svg", "Regneark", self.open_interpreter, 1)
         )
         layout.addStretch()
 
@@ -1507,17 +1517,17 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Kemi_Icon.svg","Kemi", self.open_kemi)
+            make_button("Kemi_Icon.svg","Kemi", self.open_kemi, 2)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik)
+            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik, 3)
         )
         layout.addStretch()
         
         layout.addWidget(
-            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek)
+            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek, 4)
         )
         layout.addStretch()
 
@@ -1541,6 +1551,7 @@ class MainWindow(QMainWindow):
         )
 
         self.toolbar.addWidget(container)
+        self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
 
     def run_search(self):
         print(self.search.text().strip())
