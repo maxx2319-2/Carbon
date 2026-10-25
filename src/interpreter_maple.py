@@ -5,12 +5,16 @@ from quantity import quantity
 import re
 import biotek
 import json
+import sympy 
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor
+
 from types import SimpleNamespace
 from chem import pKa_values,pKb_values
 
 from path import resource_path
-
 from pathlib import Path
+
+
 
 with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
@@ -22,8 +26,7 @@ def as_expr(q):
 
 
 def round_quantity(quant,inputs):
-    input_values = [float(part.split()[0]) for part in inputs]
-    value = utils.significant_figures(quant.value,input_values)
+    value = utils.significant_figures(quant.value,inputs)
     return quantity(value,quant.units)
 
 
@@ -58,6 +61,7 @@ class EV:
             "MængdeBeregning",
             "Puffer",
             "pHTilKoncentration",
+            "Løs",
 
         ]
 
@@ -78,6 +82,7 @@ class EV:
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)",
             "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
+            "Løs" : "Løs(ligning)",
 
         }
         # temp fix
@@ -105,6 +110,20 @@ class EV:
 
         return skip
 
+    def split_args(self,input):
+        args, depth, start = [], 0 ,0
+        for i, char in enumerate(input):
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+            elif char == "," and depth == 0:
+                args.append(input[start:i])
+                start = i + 1
+        args.append(input[start:])
+
+        return args
+
     def ev(self, s):
         output = {}
 
@@ -131,14 +150,16 @@ class EV:
                 call = re.fullmatch(r"\s*(\w+)\((.*)\)\s*", line)
                 if call and call.group(1) in self.functions:
                     func, input = call.groups()
+                    args = self.split_args(input)
+
 
                     match func:
 
                         case "Loop":
-                            if line.count(",") != 2:
+                            if len(args) != 3:
                                 raise ValueError(self.error_text["Loop"])
 
-                            l1, l2, count = input.split(",")
+                            l1, l2, count = args
 
                             if l1 == "" or l2 == "" or count == "":
                                 raise ValueError(self.error_text["Loop"])
@@ -172,11 +193,29 @@ class EV:
 
                             pc += 1
 
-                        case "Afstem":
-                            if line.count(",") > 1:
+                        case 'Løs':
+                            if len(args) != 1:
+                                raise ValueError(self.error_text["Løs"])
+                            if "[" in args[0]:
+                                raise ValueError("kan ikke tage imod enheder")
+
+                            expr = self.sympy_expr(args[0])
+                            if expr is sympy.true:
+                                output[pc] = "Alle tal er løsninger"
+
+                            else:
+                                solutions = [s for s in sympy.solve(self.sympy_expr(args[0]))]
+                                output[pc] = solutions if solutions else "Ingen løsninger"
+
+                            pc += 1
+
+
+
+                        case 'Afstem':
+                            if len(args) > 2:
                                 raise ValueError(self.error_text["Afstem"])
-                            if "," in input:
-                                input, medium = input.split(",")
+                            if len(args) == 2:
+                                input, medium = args
                                 if input == "" or medium == "":
                                     raise ValueError(self.error_text["Afstem"])
                                 result = chem.balance_reaction(input, medium)
@@ -187,9 +226,9 @@ class EV:
                             pc += 1
 
                         case "pH":
-                            if line.count(",") != 1:
+                            if len(args) != 2:
                                 raise ValueError(self.error_text["pH"])
-                            x, c = (p.strip() for p in input.split(","))
+                            x, c = (p.strip() for p in args)
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pH"])
 
@@ -201,9 +240,9 @@ class EV:
                             pc += 1
 
                         case "pOH":
-                            if line.count(",") != 1:
+                            if len(args) != 2:
                                 raise ValueError(self.error_text["pOH"])
-                            x, c = (p.strip() for p in input.split(","))
+                            x, c = (p.strip() for p in args)
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pOH"])
 
@@ -213,9 +252,9 @@ class EV:
                             pc += 1
 
                         case "EnhedKonvertering":
-                            if line.count(",") != 1:
+                            if len(args) != 2:
                                 raise ValueError(self.error_text["EnhedKonvertering"])
-                            start, unit = input.split(",")
+                            start, unit = args
                             if start == "" or unit == "":
                                 raise ValueError(self.error_text["EnhedKonvertering"])
                             Qstart = self.input_prep(start)
@@ -234,7 +273,7 @@ class EV:
                             pc += 1
 
                         case "Analyse":
-                            if line.count(",") != 0:
+                            if len(args) != 1:
                                 raise ValueError(self.error_text["Analyse"])
                             if input == "":
                                 raise ValueError(self.error_text["Analyse"])
@@ -254,7 +293,7 @@ class EV:
                             pks_values = []
 
 
-                            for part in input.split(","):
+                            for part in args:
                                 if part in pKa_values:
                                     pks_values.append(pKa_values[part])
                                 elif "export" in part.lower():
@@ -278,9 +317,9 @@ class EV:
                             | "VolumenProcent"
                             | "MasseProcent" as procent_type
                         ):
-                            if line.count(",") != 1:
+                            if len(args) != 2:
                                 raise ValueError(self.error_text[procent_type])
-                            top, bottom = input.split(",")
+                            top, bottom = args
                             if top == "" or bottom == "":
                                 raise ValueError(self.error_text[procent_type])
 
@@ -295,7 +334,7 @@ class EV:
                             pc += 1
 
                         case 'DNATilPeptid':
-                            if input.count(",") != 0:
+                            if len(args) != 1:
                                 raise ValueError(self.error_text["DNATilPeptid"])
                             if input == "":
                                 raise ValueError(self.error_text["DNATilPeptid"])
@@ -304,7 +343,7 @@ class EV:
                             pc +=1
                                 
                         case 'RNATilPeptid':
-                            if input.count(",") != 0:
+                            if len(args) != 1:
                                 raise ValueError(self.error_text["RNATilPeptid"])
                             if input == "":
                                 raise ValueError(self.error_text["RNATilPeptid"])
@@ -313,13 +352,13 @@ class EV:
                             pc +=1
 
                         case "MængdeBeregning":
-                            if input.count(",") > 5:
+                            if len(args) > 6:
                                 raise ValueError(self.error_text["MængdeBeregning"])
 
                             if input == "":   
                                 raise ValueError(self.error_text["MængdeBeregning"])
                            
-                            tokens = input.split(",")
+                            tokens = args
 
 
                             if  "" in tokens:
@@ -400,9 +439,9 @@ class EV:
 
 
                         case 'Puffer':   
-                            if input.count(",") != 2:
+                            if len(args) != 3:
                                 raise ValueError(self.error_text["Puffer"])
-                            syre, base, pKs = input.split(",") 
+                            syre, base, pKs = args
 
                             if syre == "" or base == "" or pKs == "": 
                                 raise ValueError(self.error_text["Puffer"])
@@ -413,7 +452,7 @@ class EV:
                             pc += 1
 
                         case 'pHTilKoncentration':
-                            if input.count(",") != 0:
+                            if len(args) != 1:
                                 raise ValueError(self.error_text["pHTilKoncentration"])
 
                             if input == "":
@@ -551,6 +590,13 @@ class EV:
             expr = "".join(parts)
         expr = re.sub(r"\[([^\]]*)\]", r" (\1)", expr)
         return expr
+
+    def prep_sympy(self, expr):
+        transformations = standard_transformations + (implicit_multiplication, convert_xor)
+        if "=" in expr:
+            lhs, rhs = expr.split("=",maxsplit = 1)
+            return sympy.Eq(parse_expr(lhs, transformations=transformations),parse_expr(rhs, transformations=transformations))
+        return parse_expr(expr, transformations=transformations)
 
     def unit_bracket_strip(self, val):
         match = re.match(r"([^\[]+)\[([^\]]+)\]", val)
