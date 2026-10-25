@@ -13,6 +13,7 @@ from matplotlib.figure import Figure
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
 
 import sys
 from dataclasses import dataclass, field
@@ -44,7 +45,8 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QColorDialog,
     QFrame,
-    QTextEdit
+    QTextEdit,
+    QButtonGroup,
 )
 from PySide6.QtCore import (
     Qt,
@@ -392,7 +394,7 @@ class MathInput(QWebEngineView):
         self._channel = QWebChannel(self.page())
         self._channel.registerObject("bridge", self._bridge)
         self.page().setWebChannel(self._channel)
-        self.page().setBackgroundColor(Qt.transparent)
+        self.page().setBackgroundColor(QColor(BG))
 
         self._bridge.entered.connect(self.returnPressed)
         self.loadFinished.connect(self._on_loaded)
@@ -438,7 +440,7 @@ class MathOutput(QWebEngineView):
         self._placeholder = placeholder
         self._raw = ""
         self._loaded = False
-        self.page().setBackgroundColor(Qt.transparent)
+        self.page().setBackgroundColor(QColor(BG))
         self.loadFinished.connect(self._on_loaded)
         url = QUrl.fromLocalFile(str(resource_path("Assets_math_live/mathfield.html")))
         url.setQuery("readonly=1")
@@ -1175,6 +1177,75 @@ def rna_peptid_panel():
     
     return body
 
+def puffer_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    syre_konc_input = MathInput("Koncentration af syre")
+    layout.addWidget(syre_konc_input)
+
+    base_konc_input = MathInput("Koncentration af base")
+    layout.addWidget(base_konc_input)
+
+    pks_input = MathInput("pKs")
+    layout.addWidget(pks_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("pH")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"Puffer({syre_konc_input.text()},{base_konc_input.text()},{pks_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    syre_konc_input.returnPressed.connect(calc)
+    base_konc_input.returnPressed.connect(calc)
+    pks_input.returnPressed.connect(calc)
+
+    return body
+
+def ph_konc_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    ph_input = MathInput("pH")
+    layout.addWidget(ph_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    h3o_output = MathOutput("Oxonium koncentration")
+    layout.addWidget(h3o_output)
+
+    oh_output = MathOutput("Hydroxid koncentration")
+    layout.addWidget(oh_output) 
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"pHTilKoncentration({ph_input.text()})").get(0, "")
+        if result.startswith("Error"):
+            h3o_output.setText(result)
+            oh_output.setText("")
+            return
+        h3o, oh = (line.split(":", 1)[1].strip() for line in result.splitlines())
+        h3o_output.setText(h3o)
+        oh_output.setText(oh)
+
+    calc_btn.clicked.connect(calc)
+    ph_input.returnPressed.connect(calc)
+
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
@@ -1188,11 +1259,14 @@ PANELS = {
     "mængdeberegning": Panel("Mængdeberegning","Mængdeberegning",mængde_panel),
     "dna_peptid": Panel("DNA Translation","DNA Translation",dna_peptid_panel),
     "rna_peptid": Panel("RNA Translation","RNA Translation",rna_peptid_panel),
+    "puffer": Panel("Puffer", "pH i Puffer",puffer_panel),
+    "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
 }
 
 class PanelPage(QWidget):
     def __init__(self, keys, parent=None):
         super().__init__(parent)
+        self.keys = keys
         self.panels = {}
 
         self.canvas = QWidget()
@@ -1316,16 +1390,16 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.stack)
 
         self.create_header()
-        self.create_drawer()
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning","puffer","h3o"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit","dna_peptid","rna_peptid"])
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
+        self.create_drawer()
         #self.create_settings_page()
         #self.create_formel_page()
 
@@ -1367,19 +1441,17 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(content)
 
         items = [
-            ("Hovedmenu", self.open_menu),
-            ("Regneark", self.open_interpreter),
-            ("Kemi", self.open_kemi),
-            ("Fysik", self.open_fysik),
-            ("Biotek", self.open_biotek),
-            ("Formelsamling", self.open_formula),
-            ("Indstillinger", self.open_settings),
-            ("Afslut", self.close_app),
+            ("Hovedmenu", self.open_menu, None),
+            ("Regneark", self.open_interpreter, None),
+            ("Kemi", self.open_kemi, self.kemi_page),
+            ("Fysik", self.open_fysik, self.fysik_page),
+            ("Biotek", self.open_biotek, self.biotek_page),
+            ("Formelsamling", self.open_formula, None),
+            ("Indstillinger", self.open_settings, None),
+            ("Afslut", self.close_app, None),
         ]
 
-        for text, callback in items:
-            btn = QPushButton(text)
-            btn.setStyleSheet(f"""
+        style = f"""
                 QPushButton {{
                     color: white;
                     text-align: left;
@@ -1391,11 +1463,53 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {{
                     background-color: {HEADER};
                 }}
-            """)
+            """
+
+        arrow = QIcon(str(ASSETS_DIR / "Arrow.svg")).pixmap(64,64)
+        arrow_hover = QIcon(str(ASSETS_DIR / "Arrow_Hover.svg")).pixmap(64,64)
+        up = QTransform().rotate(-90)
+        down = QTransform().rotate(90)
+        expand_icon = QIcon()
+        expand_icon.addPixmap(arrow.transformed(up), QIcon.Normal, QIcon.Off)
+        expand_icon.addPixmap(arrow_hover.transformed(up), QIcon.Active, QIcon.Off)
+        expand_icon.addPixmap(arrow.transformed(down), QIcon.Normal, QIcon.On)
+        expand_icon.addPixmap(arrow_hover.transformed(down), QIcon.Active, QIcon.On)
+
+        for text, callback, page in items:
+            btn = QPushButton(text)
+            btn.setStyleSheet(style + "QPushButton { font-weight: bold; }")
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(callback)
             btn.clicked.connect(self.toggle_drawer)
-            layout.addWidget(btn)
+            if page is None:
+                layout.addWidget(btn)
+                continue
+
+            expand = QToolButton()
+            expand.setIcon(expand_icon)
+            expand.setIconSize(QSize(14,14))
+            expand.setCheckable(True)
+            expand.setAutoRaise(True)
+            expand.setCursor(Qt.PointingHandCursor)
+            expand.setStyleSheet("QToolButton { background: transparent; border: none; }")
+
+            row = QHBoxLayout()
+            row.addWidget(btn)
+            row.addWidget(expand)
+            layout.addLayout(row)
+
+            panel_list = QWidget()
+            panel_layout = QVBoxLayout(panel_list)
+            panel_layout.setContentsMargins(20,0,0,0)
+            for key in page.keys:
+                panel_btn = QPushButton(PANELS[key].label)
+                panel_btn.setStyleSheet(style)
+                panel_btn.setCursor(Qt.PointingHandCursor)
+                panel_btn.clicked.connect(lambda _=False, p=page, k=key: self.open_panel(p, k))
+                panel_layout.addWidget(panel_btn)
+            panel_list.hide()
+            expand.toggled.connect(panel_list.setVisible)
+            layout.addWidget(panel_list)
         layout.addStretch()
 
         scroll.setWidget(content)
@@ -1470,7 +1584,9 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(5, 0, 5, 0)
         layout.setSpacing(15)
 
-        def make_button(icon_path, tooltip, callback):
+        self.page_buttons = QButtonGroup(self)
+
+        def make_button(icon_path, tooltip, callback, page=None):
             btn = QToolButton()
             btn.setIcon(hover_icon(icon_path))
             btn.setAutoRaise(True)
@@ -1481,7 +1597,11 @@ class MainWindow(QMainWindow):
                     QToolButton {{
                         background-color: {HEADER};
                         border: none;
+                        border-bottom: 3px solid transparent;
                         padding: 6px;
+                    }}
+                    QToolButton:checked {{
+                        border-bottom: 3px solid {BUTTON};
                     }}
                     QToolTip {{
                     background-color: {BUTTON};
@@ -1489,15 +1609,18 @@ class MainWindow(QMainWindow):
                     border: 1px solid {HEADER};
                     }}
                 """)
+            if page is not None:
+                btn.setCheckable(True)
+                self.page_buttons.addButton(btn, page)
             return btn
 
         layout.addWidget(
-            make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu)
+            make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu, 0)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Interpreter_Icon.svg", "Regneark", self.open_interpreter)
+            make_button("Interpreter_Icon.svg", "Regneark", self.open_interpreter, 1)
         )
         layout.addStretch()
 
@@ -1507,17 +1630,17 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Kemi_Icon.svg","Kemi", self.open_kemi)
+            make_button("Kemi_Icon.svg","Kemi", self.open_kemi, 2)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik)
+            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik, 3)
         )
         layout.addStretch()
         
         layout.addWidget(
-            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek)
+            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek, 4)
         )
         layout.addStretch()
 
@@ -1541,6 +1664,7 @@ class MainWindow(QMainWindow):
         )
 
         self.toolbar.addWidget(container)
+        self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
 
     def run_search(self):
         print(self.search.text().strip())
@@ -1578,7 +1702,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
 
         self.maple_view = QWebEngineView()
-        self.maple_view.page().setBackgroundColor(Qt.transparent)
+        self.maple_view.page().setBackgroundColor(QColor(BG))
         self.maple_bridge = _MapleBridge()
         self.maple_channel = QWebChannel(self.maple_view.page())
         self.maple_channel.registerObject("bridge", self.maple_bridge)
@@ -1619,6 +1743,11 @@ class MainWindow(QMainWindow):
 
     def slide_finished(self):
         self.stack.setCurrentWidget(self.slide_target)
+
+    def open_panel(self, page, key):
+        self.slide_to(page)
+        page.show_panel(key)
+        self.toggle_drawer()
 
     def open_menu(self):
         self.slide_to(self.stack.widget(0))
