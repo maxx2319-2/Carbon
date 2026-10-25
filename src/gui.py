@@ -1176,6 +1176,75 @@ def rna_peptid_panel():
     
     return body
 
+def puffer_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    syre_konc_input = MathInput("Koncentration af syre")
+    layout.addWidget(syre_konc_input)
+
+    base_konc_input = MathInput("Koncentration af base")
+    layout.addWidget(base_konc_input)
+
+    pks_input = MathInput("pKs")
+    layout.addWidget(pks_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = MathOutput("pH")
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"Puffer({syre_konc_input.text()},{base_konc_input.text()},{pks_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    syre_konc_input.returnPressed.connect(calc)
+    base_konc_input.returnPressed.connect(calc)
+    pks_input.returnPressed.connect(calc)
+
+    return body
+
+def ph_konc_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    ph_input = MathInput("pH")
+    layout.addWidget(ph_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    h3o_output = MathOutput("Oxonium koncentration")
+    layout.addWidget(h3o_output)
+
+    oh_output = MathOutput("Hydroxid koncentration")
+    layout.addWidget(oh_output) 
+    layout.addStretch()
+
+    def calc():
+        result = interpreter_maple.EV().ev(f"pHTilKoncentration({ph_input.text()})").get(0, "")
+        if result.startswith("Error"):
+            h3o_output.setText(result)
+            oh_output.setText("")
+            return
+        h3o, oh = (line.split(":", 1)[1].strip() for line in result.splitlines())
+        h3o_output.setText(h3o)
+        oh_output.setText(oh)
+
+    calc_btn.clicked.connect(calc)
+    ph_input.returnPressed.connect(calc)
+
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enheds Omregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
@@ -1189,6 +1258,8 @@ PANELS = {
     "mængdeberegning": Panel("Mængdeberegning","Mængdeberegning",mængde_panel),
     "dna_peptid": Panel("DNA Translation","DNA Translation",dna_peptid_panel),
     "rna_peptid": Panel("RNA Translation","RNA Translation",rna_peptid_panel),
+    "puffer": Panel("Puffer", "pH i Puffer",puffer_panel),
+    "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
 }
 
 class PanelPage(QWidget):
@@ -1321,7 +1392,7 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         #self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning"])
+        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning","puffer","h3o"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit","dna_peptid","rna_peptid"])
         self.stack.addWidget(self.kemi_page)
