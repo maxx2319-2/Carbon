@@ -60,6 +60,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QEasingCurve,
     QPoint,
+    QParallelAnimationGroup,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -1310,6 +1311,8 @@ class MainWindow(QMainWindow):
         self.setMinimumWidth(600)
 
         self.stack = QStackedWidget()
+        self.slide_anim = QParallelAnimationGroup(self)
+        self.slide_anim.finished.connect(self.slide_finished)
         self.setCentralWidget(self.stack)
 
         self.create_header()
@@ -1592,24 +1595,48 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.maple_view)
         self.stack.addWidget(page)
 
+    def slide_to(self, page):
+        current = self.stack.currentWidget()
+        if page is current or self.slide_anim.state() == QParallelAnimationGroup.Running:
+            return
+        w = self.stack.width()
+        d = 1 if self.stack.indexOf(page) > self.stack.currentIndex() else -1
+
+        page.setGeometry(d*w, 0, w, self.stack.height())
+        page.show()
+        page.raise_()
+
+        self.slide_anim.clear()
+        for widget, start, end in [(current, 0, -d*w),(page, d*w,0)]:
+            anim = QPropertyAnimation(widget, b"pos")
+            anim.setDuration(200)
+            anim.setEasingCurve(QEasingCurve.OutCubic)
+            anim.setStartValue(QPoint(start, 0))
+            anim.setEndValue(QPoint(end, 0))
+            self.slide_anim.addAnimation(anim)
+        self.slide_target = page
+        self.slide_anim.start()
+
+    def slide_finished(self):
+        self.stack.setCurrentWidget(self.slide_target)
 
     def open_menu(self):
-        self.stack.setCurrentIndex(0)
+        self.slide_to(self.stack.widget(0))
 
     def open_interpreter(self):
-        self.stack.setCurrentIndex(1)
+        self.slide_to(self.stack.widget(1))
 
     def open_molecule(self):
         pass
 
     def open_kemi(self):
-        self.stack.setCurrentWidget(self.kemi_page)
+        self.slide_to(self.kemi_page)
 
     def open_fysik(self):
-        self.stack.setCurrentWidget(self.fysik_page)
+        self.slide_to(self.fysik_page)
 
     def open_biotek(self):
-        self.stack.setCurrentWidget(self.biotek_page)
+        self.slide_to(self.biotek_page)
 
     def open_settings(self):
         self.stack.setCurrentIndex(6)
