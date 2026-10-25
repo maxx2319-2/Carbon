@@ -32,6 +32,31 @@ def round_quantity(quant,inputs):
     return quantity(value,quant.units)
 
 
+SYMPY_FUNCTIONS = {
+    "Ln": sympy.log,
+    "Log": lambda a: sympy.log(a, 10),
+    "Exp": sympy.exp,
+    "Sin": lambda a: sympy.sin(a * sympy.pi / 180),
+    "Cos": lambda a: sympy.cos(a * sympy.pi / 180),
+    "Tan": lambda a: sympy.tan(a * sympy.pi / 180),
+    "ArcSin": lambda a: sympy.asin(a) * 180 / sympy.pi,
+    "ArcCos": lambda a: sympy.acos(a) * 180 / sympy.pi,
+    "ArcTan": lambda a: sympy.atan(a) * 180 / sympy.pi,
+    "Sinh": sympy.sinh,
+    "Cosh": sympy.cosh,
+    "Tanh": sympy.tanh,
+    "ArcSinh": sympy.asinh,
+    "ArcCosh": sympy.acosh,
+    "ArcTanh": sympy.atanh,
+    "Cbrt": sympy.cbrt,
+    "Abs": sympy.Abs,
+    "Floor": sympy.floor,
+    "Ceil": sympy.ceiling,
+    "Degrees": lambda a: a * 180 / sympy.pi,
+    "Radians": lambda a: a * sympy.pi / 180,
+}
+
+
 class Variables:
     def __init__(self, value, var_type):
         self.value = str(value)
@@ -203,12 +228,12 @@ class EV:
                             if "[" in args[0]:
                                 raise ValueError("kan ikke tage imod enheder")
 
-                            expr = self.sympy_expr(args[0])
+                            expr = self.prep_sympy(args[0])
                             if expr is sympy.true:
                                 output[pc] = "Alle tal er løsninger"
 
                             else:
-                                solutions = [s for s in sympy.solve(self.sympy_expr(args[0]))]
+                                solutions = [s for s in sympy.solve(self.prep_sympy(args[0]))]
                                 output[pc] = solutions if solutions else "Ingen løsninger"
 
                             pc += 1
@@ -626,8 +651,8 @@ class EV:
         transformations = standard_transformations + (implicit_multiplication, convert_xor)
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
-            return sympy.Eq(parse_expr(lhs, transformations=transformations),parse_expr(rhs, transformations=transformations))
-        return parse_expr(expr, transformations=transformations)
+            return sympy.Eq(parse_expr(lhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS),parse_expr(rhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS))
+        return parse_expr(expr, transformations=transformations, local_dict=SYMPY_FUNCTIONS)
 
     def unit_bracket_strip(self, val):
         match = re.match(r"([^\[]+)\[([^\]]+)\]", val)
