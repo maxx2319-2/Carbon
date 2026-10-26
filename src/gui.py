@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QSizePolicy,
     QStackedWidget,
-    QSizeGrip,
     QListWidgetItem,
     QGraphicsView,
     QGraphicsScene,
@@ -816,9 +815,11 @@ class DraggablePanel(QWidget):
     def __init__(self, title, body_widget, parent=None, help_text=None):
         super().__init__(parent)
         self.help_text = help_text or "Ingen hjælpetekst endnu :("
+        self.setAttribute(Qt.WA_StyledBackground)
         self.setStyleSheet(f"""
             DraggablePanel {{
-                background-color: transparent;
+                background-color: {SIDEBAR};
+                border-radius: 8px;
             }}
         """)
         self.setMinimumSize(240, 160)
@@ -882,16 +883,6 @@ class DraggablePanel(QWidget):
         self.body.setStyleSheet("background-color: transparent")
 
         layout.addWidget(self.body)
-
-        grip_row = QHBoxLayout()
-        grip_row.setContentsMargins(0, 0, 0, 0)
-        grip_row.addStretch()
-
-        self.grip = QSizeGrip(self)
-        self.grip.setStyleSheet("background: transparent;")
-        grip_row.addWidget(self.grip)
-
-        layout.addLayout(grip_row)
 
     def show_help(self):
         msg = QMessageBox(self)
@@ -1536,6 +1527,7 @@ class PanelPage(QWidget):
 
         self.canvas = QWidget()
         self.canvas.setStyleSheet(f"background-color: {BG};")
+        self.canvas.installEventFilter(self)
 
         content = QWidget()
         content.setStyleSheet(f"background-color: {SIDEBAR};")
@@ -1629,6 +1621,12 @@ class PanelPage(QWidget):
 
         panel.show()
         panel.raise_()
+
+    def eventFilter(self, obj, event):
+        if obj is self.canvas and event.type() == QEvent.Resize:
+            for panel in self.panels.values():
+                panel.move(panel._clamp_to_parent(panel.pos()))
+        return super().eventFilter(obj, event)
 
     def toggle_sidebar(self, collapsed):
             self.anim.stop()
