@@ -97,7 +97,9 @@ ASSETS_DIR = resource_path("Assets")
 
 def hover_icon(file):
     icon = QIcon(str(ASSETS_DIR / file))
-    icon.addFile(str(ASSETS_DIR / file.replace(".svg", "_Hover.svg")), QSize(), QIcon.Active)
+    hover = ASSETS_DIR / file.replace(".svg", "_Hover.svg")
+    if hover.exists():
+        icon.addFile(str(hover), QSize(), QIcon.Active)
     return icon
 
 _settings = QSettings("M&B", "Carbon")
@@ -735,6 +737,25 @@ class DraggablePanel(QWidget):
         x = max(0, min(pos.x(), parent_rect.width() - self.width()))
         y = max(0, min(pos.y(), parent_rect.height() - self.height()))
         return pos.__class__(x, y)
+
+class ResizeEdge(QWidget):
+    def __init__(self, edges, cursor, parent):
+        super().__init__(parent)
+        self.edges = edges
+        self.setCursor(cursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.window().windowHandle().startSystemResize(self.edges)
+
+    def place(self, m=6):
+        w, h = self.parent().width(), self.parent().height()
+        x = 0 if self.edges & Qt.LeftEdge else w - m if self.edges & Qt.RightEdge else m
+        y = 0 if self.edges & Qt.TopEdge else h - m if self.edges & Qt.BottomEdge else m
+        width = m if self.edges & (Qt.LeftEdge | Qt.RightEdge) else w - 2 * m
+        height = m if self.edges & (Qt.TopEdge | Qt.BottomEdge) else h - 2 * m
+        self.setGeometry(x, y, width, height)
+        self.raise_()
 
 @dataclass
 class Panel:
@@ -1387,6 +1408,7 @@ class MainWindow(QMainWindow):
         self.gen = 1
 
         self.setWindowTitle("Carbon")
+        self.setWindowFlag(Qt.FramelessWindowHint)
         self.setStyleSheet(f"background-color: {BG};")
         self.setMinimumWidth(600)
 
@@ -1413,6 +1435,15 @@ class MainWindow(QMainWindow):
         self.version_label = QLabel(version, self)
         self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
         self.version_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        self.resize_edges = [
+            ResizeEdge(edges, cursor, self) for edges, cursor in [
+                (Qt.LeftEdge, Qt.SizeHorCursor), (Qt.RightEdge, Qt.SizeHorCursor),
+                (Qt.TopEdge, Qt.SizeVerCursor), (Qt.BottomEdge, Qt.SizeVerCursor),
+                (Qt.TopEdge | Qt.LeftEdge, Qt.SizeFDiagCursor), (Qt.BottomEdge | Qt.RightEdge, Qt.SizeFDiagCursor),
+                (Qt.TopEdge | Qt.RightEdge, Qt.SizeBDiagCursor), (Qt.BottomEdge | Qt.LeftEdge, Qt.SizeBDiagCursor),
+            ]
+        ]
 
     def create_drawer(self):
         self.drawer_max_width = 270
@@ -1529,6 +1560,13 @@ class MainWindow(QMainWindow):
         self.drawer_anim.finished.connect(self.drawer_finished)
 
     def eventFilter(self, obj, event):
+        if obj is self.header_container:
+            if event.type() == event.Type.MouseButtonPress and event.button() == Qt.LeftButton:
+                self.windowHandle().startSystemMove()
+                return True
+            if event.type() == event.Type.MouseButtonDblClick:
+                self.toggle_maximized()
+                return True
         if obj is self.search and self.suggest.isVisible():
             if event.type() == event.Type.KeyPress:
                 if event.key() in (Qt.Key_Up, Qt.Key_Down):
@@ -1574,6 +1612,8 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        for edge in self.resize_edges:
+            edge.place()
         self.version_label.adjustSize()
         self.version_label.move(
             self.width() - self.version_label.width() - 5,
@@ -1593,6 +1633,7 @@ class MainWindow(QMainWindow):
         self.toolbar.setStyleSheet(f"""
                 QToolBar {{
                     background-color: {HEADER};
+                    border: none;
                 }}
                 QToolButton {{
                     background-color: {HEADER};
@@ -1600,14 +1641,24 @@ class MainWindow(QMainWindow):
                 }}
             """)
         self.toolbar.setIconSize(QSize(50, 50))
-        self.toolbar.setFixedHeight(50)
+        self.toolbar.setFixedHeight(75)
         self.toolbar.setMovable(False)
 
         container = QWidget()
         container.setStyleSheet(f"background-color: {HEADER};")
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(5, 0, 5, 0)
+        self.header_container = container
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(5,0,0,0)
+        outer.setSpacing(0)
+
+        window_row = QHBoxLayout()
+        window_row.setSpacing(0)
+        window_row.addStretch()
+        outer.addLayout(window_row)
+
+        layout = QHBoxLayout()
         layout.setSpacing(15)
+        outer.addLayout(layout)
 
         self.page_buttons = QButtonGroup(self)
 
@@ -1638,6 +1689,22 @@ class MainWindow(QMainWindow):
                 btn.setCheckable(True)
                 self.page_buttons.addButton(btn, page)
             return btn
+
+        self.max_btn = make_button("Maximize.svg", "Maksimer", self.toggle_maximized)
+        close_btn = make_button("Close.svg", "Luk", self.close)
+        for btn in (make_button("Minimize.svg", "Minimer", self.showMinimized), self.max_btn, close_btn):
+            btn.setIconSize(QSize(10,10))
+            hover = "#da373c" if btn is close_btn else f"{SCROLL}"
+            btn.setStyleSheet(f"""
+                QToolButton {{ background-color: {HEADER}; border: none; padding: 8px 14px; }}
+                QToolButton:hover {{ background-color: {hover}; }}
+                QToolTip {{
+                    background-color: {BUTTON};
+                    color: {TEXT};
+                    border: 1px solid {HEADER};
+                }}
+            """)
+            window_row.addWidget(btn)
 
         layout.addWidget(
             make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu, 0)
@@ -1689,6 +1756,7 @@ class MainWindow(QMainWindow):
         )
 
         self.toolbar.addWidget(container)
+        container.installEventFilter(self)
         self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
 
     def create_search(self):
@@ -1748,6 +1816,21 @@ class MainWindow(QMainWindow):
             return
         self.open_panel(*self.search_targets[item.text()])
         self.search.clear()
+
+    def toggle_maximized(self):
+        if self.isMaximized() or self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == event.Type.WindowStateChange:
+            maximized = self.isMaximized() or self.isFullScreen()
+            self.max_btn.setIcon(hover_icon("Restore.svg" if maximized else "Maximize.svg"))
+            self.max_btn.setToolTip("Gendan" if maximized else "Maksimer")
+            for edge in self.resize_edges:
+                edge.setHidden(maximized)
 
     def create_mainmenu(self):
         central = QWidget()
@@ -1864,6 +1947,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = QApplication(sys.argv)
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
