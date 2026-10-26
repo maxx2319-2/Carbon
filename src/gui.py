@@ -329,7 +329,11 @@ def latex_text(s):
 class _MapleBridge(QObject):
     @Slot(result=str)
     def help(self):
-        return json.dumps(interpreter_maple.EV().help_text)
+        return json.dumps({
+            name: [calc_to_latex(line.replace("_", r"\_").replace("%", r"\%")) for line in text.splitlines()]
+            for name, text in interpreter_maple.EV().help_text.items()
+        })
+
 
 
     @Slot(str, result=str)
