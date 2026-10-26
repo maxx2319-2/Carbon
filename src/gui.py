@@ -117,172 +117,6 @@ LINE_HEIGHT = 27
 BOX_HEIGHT = 120
 SIDEBAR_WIDTH = 220
 
-def load_dict_from_settings(key, target):
-    raw = _settings.value(key)
-    if raw:
-        target.clear()
-        target.update(json.loads(raw))
-
-def category_page(title, categories):
-    content = QWidget()
-    layout = QVBoxLayout(content)
-    layout.setContentsMargins(30,20,30,20)
-    layout.setSpacing(20)
-
-    for heading, rows in categories:
-        category = QVBoxLayout()
-        category.setSpacing(8)
-
-        heading_label = QLabel(heading)
-        heading_label.setStyleSheet(f"color: {BUTTON}; font-size: 28px; background: transparent;")
-        category.addWidget(heading_label)
-
-        card = QFrame()
-        card.setObjectName("card")
-        card.setStyleSheet(f"QFrame#card {{ background-color: {SIDEBAR}; border-radius: 12px; }}")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12,12,12,12)
-        card_layout.setSpacing(12)
-        for text, widget in rows:
-            row = QHBoxLayout()
-            label = QLabel(text)
-            label.setStyleSheet(f"color: {BUTTON}; font-size: 16px; background: transparent;")
-            row.addWidget(label, alignment=Qt.AlignTop)
-            row.addStretch()
-            row.addWidget(widget)
-            card_layout.addLayout(row)
-        category.addWidget(card)
-
-        layout.addLayout(category)
-    layout.addStretch()
-
-    page = QScrollArea()
-    page.setWidgetResizable(True)
-    page.setFrameShape(QFrame.NoFrame)
-    page.setStyleSheet(f"""
-        QScrollBar:vertical {{
-            background: {BG};
-            width: 14px;
-            border-radius: 5px;
-            margin: 8px 4px 8px 0px;
-        }}
-        QScrollBar::handle:vertical {{
-            background: {SCROLL};
-            border-radius: 5px;
-            min-height: 30px;
-        }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
-    """)
-    page.setWidget(content)
-    page.setWindowTitle(title)
-    return page
-
-def toggle_switch(settings_key):
-    btn = QPushButton()
-    btn.setCheckable(True)
-    btn.setFixedSize(70, 26)
-    btn.setStyleSheet(f"""
-        QPushButton {{ background-color: {SCROLL}; color: {BUTTON}; border: none; border-radius: 13px; font-weight: bold; }}
-        QPushButton:checked {{ background-color: {BUTTON}; color: {TEXT}; }}
-    """)
-
-    def update(on):
-        btn.setText("Til" if on else "Fra")
-        _settings.setValue(settings_key, on)
-
-    btn.toggled.connect(update)
-    btn.setChecked(_settings.value(settings_key, True, type=bool))
-    btn.setText("Til" if btn.isChecked() else "Fra")
-    return btn
-
-def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
-    container = QWidget()
-    container.setStyleSheet("background: transparent;")
-    container.setFixedWidth(240)
-    layout = QVBoxLayout(container)
-    layout.setContentsMargins(0,0,0,0)
-    layout.setSpacing(6)
-
-    list_widget = QListWidget()
-    list_widget.setFixedHeight(140)
-    list_widget.setStyleSheet(f"""
-        QListWidget {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 12px; }}
-        QScrollBar:vertical {{ background: {BUTTON}; }}
-    """)
-    layout.addWidget(list_widget)
-
-    line_style = f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 8px; padding: 4px 8px; }}"
-    name_input = QLineEdit()
-    name_input.setPlaceholderText(key_placeholder)
-    name_input.setStyleSheet(line_style)
-    value_input = QLineEdit()
-    value_input.setPlaceholderText(value_placeholder)
-    value_input.setFixedWidth(60)
-    value_input.setStyleSheet(line_style)
-    add_btn = QPushButton("+")
-    add_btn.setFixedSize(28, 28)
-    add_btn.setStyleSheet(button_style)
-
-    def save():
-        _settings.setValue(settings_key, json.dumps(data_dict))
-
-    def refresh():
-        list_widget.clear()
-        for name, value in sorted(data_dict.items(), key=lambda kv: kv[0].lower()):
-            row = QWidget()
-            row.setStyleSheet("background: transparent;")
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(6,2,6,2)
-            label = QLabel(f"{name}: {value}")
-            label.setStyleSheet(f"color: {TEXT}; background: transparent;")
-            row_layout.addWidget(label)
-            row_layout.addStretch()
-            del_btn = QPushButton("x")
-            del_btn.setFixedSize(20,20)
-            del_btn.setStyleSheet(f"""
-                QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
-                QPushButton:hover {{ color: #da373c; }}
-            """)
-            del_btn.clicked.connect(lambda _=False, n=name: remove(n))
-            row_layout.addWidget(del_btn)
-            item = QListWidgetItem()
-            item.setSizeHint(QSize(200, 26))
-            list_widget.addItem(item)
-            list_widget.setItemWidget(item, row)
-
-    def remove(name):
-        del data_dict[name]
-        save()
-        refresh()
-
-    def add():
-        name = name_input.text().strip()
-        try:
-            value = float(value_input.text().strip().replace(",", "."))
-        except ValueError:
-            return
-        if not name:
-            return
-        data_dict[name] = value
-        save()
-        name_input.clear()
-        value_input.clear()
-        refresh()
-
-    add_btn.clicked.connect(add)
-    name_input.returnPressed.connect(add)
-    value_input.returnPressed.connect(add)
-
-    add_row = QHBoxLayout()
-    add_row.addWidget(name_input)
-    add_row.addWidget(value_input)
-    add_row.addWidget(add_btn)
-    layout.addLayout(add_row)
-
-    refresh()
-    return container
-
 button_style =  f"""
         QPushButton {{
             background-color: {BUTTON};
@@ -388,6 +222,195 @@ HELPTEXT = {
             "For eksempel AAU gcc UUG eller AAUGCCUUU."
         ),
 }
+
+def load_dict_from_settings(key, target):
+    raw = _settings.value(key)
+    if raw:
+        target.clear()
+        target.update(json.loads(raw))
+
+def category_page(title, categories):
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    layout.setContentsMargins(30,20,30,20)
+    layout.setSpacing(20)
+
+    for heading, rows in categories:
+        category = QVBoxLayout()
+        category.setSpacing(8)
+
+        heading_label = QLabel(heading)
+        heading_label.setStyleSheet(f"color: {BUTTON}; font-size: 28px; background: transparent;")
+        category.addWidget(heading_label)
+
+        card = QFrame()
+        card.setObjectName("card")
+        card.setStyleSheet(f"QFrame#card {{ background-color: {SIDEBAR}; border-radius: 12px; }}")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12,12,12,12)
+        card_layout.setSpacing(12)
+        for i, (text, widget) in enumerate(rows):
+            if i > 0:
+                line = QFrame()
+                line.setFixedHeight(1)
+                line.setStyleSheet(f"background-color: {BUTTON};")
+                card_layout.addWidget(line)
+            row = QHBoxLayout()
+            label = QLabel(text)
+            label.setStyleSheet(f"color: {BUTTON}; font-size: 16px; background: transparent;")
+            row.addWidget(label, alignment=Qt.AlignTop)
+            row.addStretch()
+            row.addWidget(widget)
+            card_layout.addLayout(row)
+        category.addWidget(card)
+
+        layout.addLayout(category)
+    layout.addStretch()
+
+    page = QScrollArea()
+    page.setWidgetResizable(True)
+    page.setFrameShape(QFrame.NoFrame)
+    page.setStyleSheet(f"""
+        QScrollBar:vertical {{
+            background: {BG};
+            width: 14px;
+            border-radius: 5px;
+            margin: 8px 4px 8px 0px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {SCROLL};
+            border-radius: 5px;
+            min-height: 30px;
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+    """)
+    page.setWidget(content)
+    page.setWindowTitle(title)
+    return page
+
+def toggle_switch(settings_key):
+    btn = QPushButton()
+    btn.setCheckable(True)
+    btn.setFixedSize(90, 26)
+
+    knob = QLabel(btn)
+    knob.setFixedSize(50, 26)
+    knob.setAlignment(Qt.AlignCenter)
+    knob.setAttribute(Qt.WA_Hover)
+
+    anim = QPropertyAnimation(knob, b"pos", btn)
+    anim.setDuration(200)
+    anim.setEasingCurve(QEasingCurve.OutCubic)
+
+    def style(on):
+        knob.setText("Til" if on else "Fra")
+        btn.setStyleSheet(f"QPushButton {{ background-color: {BUTTON if on else SCROLL}; border: none; border-radius: 13px; }}")
+        knob.setStyleSheet(f"""
+            QLabel {{ background-color: {SCROLL if on else BUTTON}; color: {BUTTON if on else TEXT}; border-radius: 13px; font-weight: bold; }}
+            QLabel:hover {{ background-color: {BG if on else HOVER}; }}
+        """)
+
+    def update(on):
+        style(on)
+        _settings.setValue(settings_key, on)
+        anim.stop()
+        anim.setEndValue(QPoint(40 if on else 0, 0))
+        anim.start()
+
+    btn.toggled.connect(update)
+    on = _settings.value(settings_key, True, type=bool)
+    btn.setChecked(on)
+    style(on)
+    knob.move(40 if on else 0, 0)
+    return btn
+
+def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
+    container = QWidget()
+    container.setStyleSheet("background: transparent;")
+    container.setFixedWidth(240)
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0,0,0,0)
+    layout.setSpacing(6)
+
+    list_widget = QListWidget()
+    list_widget.setFixedHeight(140)
+    list_widget.setStyleSheet(f"""
+        QListWidget {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 12px; }}
+        QScrollBar:vertical {{ background: {BUTTON}; }}
+    """)
+    layout.addWidget(list_widget)
+
+    line_style = f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 8px; padding: 4px 8px; }}"
+    name_input = QLineEdit()
+    name_input.setPlaceholderText(key_placeholder)
+    name_input.setStyleSheet(line_style)
+    value_input = QLineEdit()
+    value_input.setPlaceholderText(value_placeholder)
+    value_input.setFixedWidth(60)
+    value_input.setStyleSheet(line_style)
+    add_btn = QPushButton("+")
+    add_btn.setFixedSize(28, 28)
+    add_btn.setStyleSheet(button_style)
+
+    def save():
+        _settings.setValue(settings_key, json.dumps(data_dict))
+
+    def refresh():
+        list_widget.clear()
+        for name, value in sorted(data_dict.items(), key=lambda kv: kv[0].lower()):
+            row = QWidget()
+            row.setStyleSheet("background: transparent;")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(6,2,6,2)
+            label = QLabel(f"{name}: {value}")
+            label.setStyleSheet(f"color: {TEXT}; background: transparent;")
+            row_layout.addWidget(label)
+            row_layout.addStretch()
+            del_btn = QPushButton("x")
+            del_btn.setFixedSize(20,20)
+            del_btn.setStyleSheet(f"""
+                QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
+                QPushButton:hover {{ color: #da373c; }}
+            """)
+            del_btn.clicked.connect(lambda _=False, n=name: remove(n))
+            row_layout.addWidget(del_btn)
+            item = QListWidgetItem()
+            item.setSizeHint(QSize(200, 26))
+            list_widget.addItem(item)
+            list_widget.setItemWidget(item, row)
+
+    def remove(name):
+        del data_dict[name]
+        save()
+        refresh()
+
+    def add():
+        name = name_input.text().strip()
+        try:
+            value = float(value_input.text().strip().replace(",", "."))
+        except ValueError:
+            return
+        if not name:
+            return
+        data_dict[name] = value
+        save()
+        name_input.clear()
+        value_input.clear()
+        refresh()
+
+    add_btn.clicked.connect(add)
+    name_input.returnPressed.connect(add)
+    value_input.returnPressed.connect(add)
+
+    add_row = QHBoxLayout()
+    add_row.addWidget(name_input)
+    add_row.addWidget(value_input)
+    add_row.addWidget(add_btn)
+    layout.addLayout(add_row)
+
+    refresh()
+    return container
 
 def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\placeholder{}", "")
@@ -1646,10 +1669,11 @@ class MainWindow(QMainWindow):
             }}
             QScrollBar::handle:vertical {{
                 background: {SIDEBAR};
-                border-radius: 8px;
+                border-radius: 4px;
                 min-height: 30px;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
         """)
         outer.addWidget(scroll)
 
@@ -2109,8 +2133,10 @@ class MainWindow(QMainWindow):
             QComboBox::drop-down {{ border: none; background: transparent; width: 28px; }}
             QComboBox::down-arrow {{ image: url({(ASSETS_DIR / "Dropdown_Up.svg").as_posix()}); width: 12px; height: 12px; }}
             QComboBox::down-arrow:on {{ image: url({(ASSETS_DIR / "Dropdown.svg").as_posix()}); }}
-            QComboBox QAbstractItemView {{ background-color: {BUTTON}; color: {TEXT}; }}
+            QComboBox QAbstractItemView {{ background-color: {BUTTON}; color: {TEXT}; selection-background-color: {BG}; selection-color: {BUTTON}; accent-color: transparent; border: none; outline: none; }}
+            QComboBox QAbstractItemView::item:hover {{ background-color: {HOVER}; color: {TEXT}; }}
         """)
+        language.view().setFocusPolicy(Qt.NoFocus)
 
         self.settings_page = category_page("Indstillinger", [
             ("Tilpasning", [
