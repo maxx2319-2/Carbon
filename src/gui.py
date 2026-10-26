@@ -959,6 +959,13 @@ class Panel:
     build: callable
     size: tuple = (280, 280)
 
+def clear_if_empty(body):
+    if any(field.text() for field in body.findChildren(MathInput)):
+        return False
+    for output in body.findChildren(MathOutput) + body.findChildren(TextOutput):
+        output.setText("")
+    return True
+
 def unit_panel():
     body = QWidget()
     layout = QVBoxLayout(body)
@@ -988,6 +995,8 @@ def unit_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"EnhedKonvertering({value_input.text()},{unit_input.text()})")
         output.setText(result.get(0, ""))
 
@@ -1022,6 +1031,8 @@ def pH_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
         output.setText(result)
         if result.startswith("Error"):
@@ -1060,6 +1071,8 @@ def pOH_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})").get(0, "")
         output.setText(result)
         if result.startswith("Error"):
@@ -1095,6 +1108,8 @@ def afstemning_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         arg = f"{reaktion_input.text()},{solution_input.text()}" if solution_input.text() else reaktion_input.text()
         result = interpreter_maple.EV().ev(f"Afstem({arg})")
         output.setText(result.get(0, ""))
@@ -1140,6 +1155,8 @@ def analyse_panel():
     outputs = [molekyle, empirisk, molarmasse, dbe, antal]
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"Analyse({input.text()})").get(0,"")
         lines = result.splitlines()
         if result.startswith("Error"):
@@ -1176,9 +1193,11 @@ def bjerrum_panel():
     layout.addWidget(plot_area, stretch=1)
 
     def calc():
-        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
         while plot_layout.count():
             plot_layout.takeAt(0).widget().deleteLater()
+        if not input.text():
+            return
+        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
         if isinstance(result, Figure):
             plot_layout.addWidget(FigureCanvasQTAgg(result))
         else:
@@ -1220,6 +1239,8 @@ def udbytte_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"UdbytteProcent({praktisk_input.text()},{teori_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1250,6 +1271,8 @@ def volumen_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"VolumenProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1280,6 +1303,8 @@ def masse_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"MasseProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1324,6 +1349,8 @@ def mængde_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         fields = [
             ("m", masse_input),
             ("V", volumen_input),
@@ -1365,6 +1392,8 @@ def dna_peptid_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"DNATilPeptid({DNA_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1391,6 +1420,8 @@ def rna_peptid_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"RNATilPeptid({RNA_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1423,6 +1454,8 @@ def puffer_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"Puffer({syre_konc_input.text()},{base_konc_input.text()},{pks_input.text()})").get(0, "")
         output.setText(result)
 
@@ -1454,6 +1487,8 @@ def ph_konc_panel():
     layout.addStretch()
 
     def calc():
+        if clear_if_empty(body):
+            return
         result = interpreter_maple.EV().ev(f"pHTilKoncentration({ph_input.text()})").get(0, "")
         if result.startswith("Error"):
             h3o_output.setText(result)
