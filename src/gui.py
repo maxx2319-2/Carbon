@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCompleter,
     QComboBox,
+    QAbstractButton,
 )
 from PySide6.QtCore import (
     Qt,
@@ -66,6 +67,7 @@ from PySide6.QtCore import (
     QEasingCurve,
     QPoint,
     QParallelAnimationGroup,
+    QEvent,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -102,6 +104,12 @@ def hover_icon(file):
     if hover.exists():
         icon.addFile(str(hover), QSize(), QIcon.Active)
     return icon
+
+class CursorFilter(QObject):
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Polish and isinstance(obj, (QAbstractButton, QComboBox)) and not obj.testAttribute(Qt.WA_SetCursor):
+            obj.setCursor(Qt.PointingHandCursor)
+        return False
 
 _settings = QSettings("M&B", "Carbon")
 
@@ -1754,7 +1762,6 @@ class MainWindow(QMainWindow):
         for text, callback, page in items:
             btn = QPushButton(text)
             btn.setStyleSheet(style + "QPushButton { font-weight: bold; }")
-            btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(callback)
             btn.clicked.connect(self.toggle_drawer)
             if page is None:
@@ -1766,7 +1773,6 @@ class MainWindow(QMainWindow):
             expand.setIconSize(QSize(14,14))
             expand.setCheckable(True)
             expand.setAutoRaise(True)
-            expand.setCursor(Qt.PointingHandCursor)
             expand.setStyleSheet("QToolButton { background: transparent; border: none; }")
 
             row = QHBoxLayout()
@@ -1780,7 +1786,6 @@ class MainWindow(QMainWindow):
             for key in page.keys:
                 panel_btn = QPushButton(PANELS[key].label)
                 panel_btn.setStyleSheet(style)
-                panel_btn.setCursor(Qt.PointingHandCursor)
                 panel_btn.clicked.connect(lambda _=False, p=page, k=key: self.open_panel(p, k))
                 panel_btn.clicked.connect(self.toggle_drawer)
                 panel_layout.addWidget(panel_btn)
@@ -1947,6 +1952,7 @@ class MainWindow(QMainWindow):
         close_btn = make_button("Close.svg", "Luk", self.close)
         for btn in (self.back_btn, self.forward_btn, make_button("Minimize.svg", "Minimer", self.showMinimized), self.max_btn, close_btn):
             btn.setIconSize(QSize(10,10))
+            btn.setCursor(Qt.ArrowCursor)
             hover = "#da373c" if btn is close_btn else f"{SCROLL}"
             btn.setStyleSheet(f"""
                 QToolButton {{ background-color: {HEADER}; border: none; padding: 8px 14px; }}
@@ -2274,6 +2280,8 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = QApplication(sys.argv)
+    cursor_filter = CursorFilter()
+    app.installEventFilter(cursor_filter)
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
