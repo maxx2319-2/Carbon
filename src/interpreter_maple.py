@@ -90,6 +90,7 @@ class EV:
             "pHTilKoncentration",
             "Løs",
             "PlotFunktion",
+            "NumeriskLøs"
 
         ]
 
@@ -112,10 +113,31 @@ class EV:
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
             "Løs" : "Løs(ligning)",
             "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
+            "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)"
 
         }
-        # temp fix
-        self.help_text = self.error_text
+
+        self.help_text = {
+            "Help": "Help() eller Help(funktion)\nViser alle funktioner, eller hjælp til én funktion.\nEks: Help(pH)",
+            "Afstem": "Afstem(reaktion, opløsning)\nAfstemmer en reaktion. Opløsning er syre, base eller udeladt.\nEks: Afstem(H2 + O2 -> H2O)",
+            "pH": "pH(pKs eller syre navn, koncentration)\nBeregner pH for en syre.\nEks: pH(4.76, 0.10)",
+            "pOH": "pOH(pKb eller base navn, koncentration)\nBeregner pOH for en base.\nEks: pOH(4.75, 0.10)",
+            "EnhedKonvertering": 'EnhedKonvertering(størrelse, ny enhed eller "SI")\nKonverterer en størrelse til en ny enhed eller til SI enhed.\nEks: EnhedKonvertering(4[km],SI)',
+            "Loop": "Loop(start linje, slut linje, antal gange)\nKører linjerne fra start til slut flere gange. Variablen i tæller fra 0.\nEks: Loop(1, 3, 5)",
+            "Analyse": "Analyse(molekyle)\nViser empirisk formel, molar masse, DBE, antal atomer og masseprocent.\nEks: Analyse(C6H12O6)",
+            "BjerrumDiagram": "BjerrumDiagram(pKs1, pKs2, ..., export)\nTegner et Bjerrumdiagram ud fra pKs værdier eller syre navne. Skriv export for at åbne det i et nyt vindue.\nEks: BjerrumDiagram(2.15, 7.20, 12.35)",
+            "UdbytteProcent": "UdbytteProcent(praktisk, teoretisk)\nBeregner udbyttet i procent.\nEks: UdbytteProcent(4.5[g], 5[g])",
+            "VolumenProcent": "VolumenProcent(praktisk, teoretisk)\nBeregner volumenprocent.\nEks: VolumenProcent(40[ml], 100[ml])",
+            "MasseProcent": "MasseProcent(praktisk, teoretisk)\nBeregner masseprocent.\nEks: MasseProcent(12[g], 50[g])",
+            "DNATilPeptid": "DNATilPeptid(DNA streng)\nOversætter en DNA streng til et peptid.\nEks: DNATilPeptid(ATGGCCTAA)",
+            "RNATilPeptid": "RNATilPeptid(RNA streng)\nOversætter en RNA streng til et peptid.\nEks: RNATilPeptid(AUGGCCUAA)",
+            "MængdeBeregning": "MængdeBeregning(m=.., n=.., ...)\nBeregner de manglende størrelser ud fra m, n, M, c, V og p (densitet).\nEks: MængdeBeregning(m=10[g], M=58.44[g/mol], V=0.5[l])",
+            "Puffer": "Puffer(syre koncentration, base koncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76)",
+            "pHTilKoncentration": "pHTilKoncentration(pH)\nBeregner [H3O+] og [OH-] ud fra pH.\nEks: pHTilKoncentration(3.5)",
+            "Løs": "Løs(ligning)\nLøser en ligning. Kan ikke tage imod enheder.\nEks: Løs(x^2 = 4)",
+            "PlotFunktion": "PlotFunktion(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5))",
+            "NumeriskLøs": "NumeriskLøs(funktion, Variabel = x, StartGæt = 1)\nLøser en ligning numerisk ud fra et startgæt. StartGæt er valgfrit.\nEks: NLøs(Cos(x) = x, Variabel = x, StartGæt = 1)",
+        }
 
     input_prep = lambda self,x : quantity.si_convert(parser.evaluate(self.prep_ev(x)))
 
@@ -238,6 +260,36 @@ class EV:
 
                             pc += 1
 
+                        case 'NumeriskLøs':
+                            #Does not include system of equations
+                            if len(args) < 2:
+                                raise ValueError(self.error_text["NLøs"])
+                            guess = 1
+                            function = []
+                            variabel = []
+                            if any(part.strip() == "" for part in args):
+                                raise ValueError(self.error_text["NLøs"])
+
+                            
+
+                            for part in args:
+                                if "Variabel" in part:
+                                    _,v = part.split("=")
+                                    variabel.append(sympy.Symbol(v.strip()))
+                    
+                                elif "StartGæt" in part:
+                                    _,g = part.split("=")
+                                    guess = float(g)
+
+                                else: function.append(self.prep_sympy(part))
+
+                            if len(variabel) != 1 or len(function) != 1:
+                                raise ValueError(self.error_text["NLøs"])
+                            
+                            output[pc] = sympy.nsolve(function[0],variabel[0],guess)
+                            pc += 1
+
+
                         case 'PlotFunktion':
                             start = None
                             end = None
@@ -247,14 +299,14 @@ class EV:
                                 if "Interval" in part:
                                     _,interval = part.split("=")
                                     if "(" not in interval or ")" not in interval:
-                                        raise ValueError(self.help_text["PlotFunktion"])
-                                    interval = interval.strip("(").strip(")")
+                                        raise ValueError(self.error_text["PlotFunktion"])
+                                    interval = interval.strip().strip("(").strip(")")
 
                                     if interval.count(",") != 1:
-                                        raise ValueError(self.help_text["PlotFunktion"])
+                                        raise ValueError(self.error_text["PlotFunktion"])
                                     start,end = interval.split(",")
                                     if start == "" or end == "":
-                                        raise ValueError(self.help_text["PlotFunktion"])
+                                        raise ValueError(self.error_text["PlotFunktion"])
                                     start = self.input_prep(start).value
                                     end = self.input_prep(end).value
                                 else: 
@@ -317,7 +369,7 @@ class EV:
                      
                   
                         
-
+                            unit = unit.strip()
                             if unit.lower() == "si":
                                 result = quantity.si_convert(Qstart)
                             else:

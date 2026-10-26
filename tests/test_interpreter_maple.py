@@ -154,7 +154,6 @@ def test_function_names_are_case_sensitive(interpreter):
 
 FUNCTIONS = interpreter_maple.EV().functions
 HELP_TEXT = interpreter_maple.EV().help_text
-KNOWN_BAD_HELP = {"pOH": "the help text for pOH starts with pH("}
 
 
 def test_functions_registered(interpreter):
@@ -166,10 +165,7 @@ def test_every_function_has_help_text(name):
     assert name in HELP_TEXT
 
 
-@pytest.mark.parametrize("name", [
-    pytest.param(f, marks=pytest.mark.xfail(reason=KNOWN_BAD_HELP[f])) if f in KNOWN_BAD_HELP else f
-    for f in HELP_TEXT
-])
+@pytest.mark.parametrize("name", HELP_TEXT)
 def test_help_text_shows_how_to_call_the_function(name):
     assert HELP_TEXT[name].startswith(name + "(")
 
@@ -223,7 +219,7 @@ def test_afstem_space_after_comma(interpreter):
 ])
 def test_afstem_bad_input(interpreter, line):
     out = interpreter.ev(line)
-    assert out[0] == "Error: " + interpreter.help_text["Afstem"]
+    assert out[0] == "Error: " + interpreter.error_text["Afstem"]
 
 
 @pytest.mark.parametrize("line, message", [
@@ -257,7 +253,7 @@ def test_pH_and_pOH(interpreter, line, expected):
 ])
 def test_pH_bad_input(interpreter, line):
     out = interpreter.ev(line)
-    assert out[0] == "Error: " + interpreter.help_text["pH"]
+    assert out[0] == "Error: " + interpreter.error_text["pH"]
 
 
 @pytest.mark.parametrize("line", [
@@ -267,7 +263,7 @@ def test_pH_bad_input(interpreter, line):
 ])
 def test_pOH_bad_input(interpreter, line):
     out = interpreter.ev(line)
-    assert out[0] == "Error: " + interpreter.help_text["pOH"]
+    assert out[0] == "Error: " + interpreter.error_text["pOH"]
 
 
 def test_pH_unknown_acid(interpreter):
@@ -309,7 +305,7 @@ def test_EnhedKonvertering_bad_input(interpreter,line):
 def test_loop_over_its_own_line_is_an_error(interpreter):
     out = interpreter.ev("1+1\nLoop(1,2,2)")
     assert str(out[0]) == "2.0"
-    assert out[1] == "Error: " + interpreter.help_text["Loop"]
+    assert out[1] == "Error: " + interpreter.error_text["Loop"]
 
 
 def test_loop_with_non_number_does_not_stop_other_lines(interpreter):
