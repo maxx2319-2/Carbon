@@ -51,9 +51,9 @@
     #suggest::-webkit-scrollbar-thumb { background: #737373; border-radius: 3px; }
     #suggest::-webkit-scrollbar-thumb:hover { background: #8a8a8a; }
 
-        
+    #tooltip math-field { font-size: 14px; padding: 0; }
     #tooltip {position: fixed; display: none; z-index: 11; background: #323232; color: #fff; font: 14px "Segoe-UI";
-    max-width: 400px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; pointer-events: none;}
+    padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; pointer-events: none;}
 
 
     #editor::-webkit-scrollbar { width: 10px; }
@@ -258,17 +258,16 @@
         hideHelp();
         helpfor = mf;
         helptimer = setTimeout(() => {
-            const [, head, rest] = HELP[name].match(/^([^(]*)(.*)$/s);
-            const span = document.createElement("span");
-            span.textContent = head;
-            span.style.color = wordColor(name);
-            tooltip.replaceChildren(span,rest);
-            tooltip.style.left = a.left + "px";
-            tooltip.style.top = a.bottom + 4 + "px";
-            tooltip.style.display = "block";
-
-
-        },300);
+    tooltip.replaceChildren(...HELP[name].map(latex => {
+        const mf = new MathfieldElement();
+        mf.readOnly = true;
+        mf.value = highlight(latex).replaceAll(name + "(", color(wordColor(name), name) + "(");
+        return mf;
+    }));
+    tooltip.style.left = a.left + "px";
+    tooltip.style.top = a.bottom + 4 + "px";
+    tooltip.style.display = "block";
+},300);
     }
 
     editor.addEventListener("mousemove", showHelp);
