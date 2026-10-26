@@ -2043,7 +2043,7 @@ class MainWindow(QMainWindow):
 
     def update_page_title(self, i):
         btn = self.page_buttons.button(i)
-        self.page_title.setIcon(btn.icon() if btn else QIcon())
+        self.page_title.setIcon(btn.icon() if btn else self.stack.widget(i).windowIcon())
         self.page_title.setText(btn.toolTip() if btn else self.stack.widget(i).windowTitle())
         self.page_title.adjustSize()
         self.place_page_title()
@@ -2148,6 +2148,7 @@ class MainWindow(QMainWindow):
                 ("pKb tabel:", pk_table(pKb_values, "Navn", "pKb", "pKb_values"))
             ]),
         ])
+        self.settings_page.setWindowIcon(QIcon(str(ASSETS_DIR / "Settings_Icon.svg")))
         self.stack.addWidget(self.settings_page)
 
     def slide_to(self, page):
