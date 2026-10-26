@@ -825,7 +825,7 @@ class DraggablePanel(QWidget):
                 border-radius: 8px;
             }}
         """)
-        self.setMinimumSize(240, 160)
+        self.setMinimumWidth(240)
         self.resize(280, 280)
 
         self._drag_offset = None
@@ -1522,15 +1522,11 @@ PANELS = {
     "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
 }
 
-class PanelPage(QWidget):
-    def __init__(self, keys, parent=None):
+class Sidebar(QWidget):
+    def __init__(self, buttons, parent=None):
         super().__init__(parent)
-        self.keys = keys
-        self.panels = {}
-
-        self.canvas = QWidget()
-        self.canvas.setStyleSheet(f"background-color: {BG};")
-        self.canvas.installEventFilter(self)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setStyleSheet(f"Sidebar {{ background-color: {SIDEBAR}; }}")
 
         content = QWidget()
         content.setStyleSheet(f"background-color: {SIDEBAR};")
@@ -1538,11 +1534,11 @@ class PanelPage(QWidget):
         content_layout.setContentsMargins(10,10,10,10)
         content_layout.setSpacing(14)
 
-        for key in keys:
-            btn = QPushButton(PANELS[key].label)
+        for label, callback in buttons:
+            btn = QPushButton(label)
             btn.setFixedHeight(30)
             btn.setStyleSheet(f"{button_style}")
-            btn.clicked.connect(lambda _=False, k=key: self.show_panel(k))
+            btn.clicked.connect(callback)
             content_layout.addWidget(btn)
         content_layout.addStretch()
 
@@ -1569,9 +1565,9 @@ class PanelPage(QWidget):
         """)
         scroll.setWidget(content)
 
-        self.sidebar = QWidget()
-        self.sidebar.setMaximumWidth(0)
-        sidebar_layout = QVBoxLayout(self.sidebar)
+        self.panel = QWidget()
+        self.panel.setMaximumWidth(0)
+        sidebar_layout = QVBoxLayout(self.panel)
         sidebar_layout.setContentsMargins(0,0,0,0)
         sidebar_layout.addWidget(scroll)
 
@@ -1600,15 +1596,43 @@ class PanelPage(QWidget):
         """)
         self.handle.toggled.connect(self.toggle_sidebar)
 
-        self.anim = QPropertyAnimation(self.sidebar, b"maximumWidth", self)
+        self.anim = QPropertyAnimation(self.panel, b"maximumWidth", self)
         self.anim.setDuration(250)
         self.anim.setEasingCurve(QEasingCurve.OutCubic)
+        self.anim.valueChanged.connect(self.relayout)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(0)
-        layout.addWidget(self.sidebar)
+        layout.addWidget(self.panel)
         layout.addWidget(self.handle)
+
+    def relayout(self):
+        self.layout().activate()
+        self.parentWidget().layout().activate()
+
+    def toggle_sidebar(self, collapsed):
+        self.anim.stop()
+        self.anim.setStartValue(self.panel.maximumWidth())
+        self.anim.setEndValue(0 if collapsed else SIDEBAR_WIDTH)
+        self.anim.start()
+
+class PanelPage(QWidget):
+    def __init__(self, keys, parent=None):
+        super().__init__(parent)
+        self.keys = keys
+        self.panels = {}
+
+        self.canvas = QWidget()
+        self.canvas.setStyleSheet(f"background-color: {BG};")
+        self.canvas.installEventFilter(self)
+
+        sidebar = Sidebar([(PANELS[key].label, lambda _=False, k=key: self.show_panel(k)) for key in keys])
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
+        layout.addWidget(sidebar)
         layout.addWidget(self.canvas, stretch=1)
 
     def show_panel(self, key):
@@ -1630,12 +1654,6 @@ class PanelPage(QWidget):
             for panel in self.panels.values():
                 panel.move(panel._clamp_to_parent(panel.pos()))
         return super().eventFilter(obj, event)
-
-    def toggle_sidebar(self, collapsed):
-            self.anim.stop()
-            self.anim.setStartValue(self.sidebar.maximumWidth())
-            self.anim.setEndValue(0 if collapsed else SIDEBAR_WIDTH)
-            self.anim.start()
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -2235,7 +2253,8 @@ class MainWindow(QMainWindow):
             QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html")))
         )
 
-        layout.addWidget(self.maple_view)
+        layout.addWidget(Sidebar([]))
+        layout.addWidget(self.maple_view, stretch=1)
         self.stack.addWidget(page)
 
     def create_settings_page(self):
