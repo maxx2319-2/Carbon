@@ -71,6 +71,7 @@ from PySide6.QtCore import (
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 from PySide6.QtGui import (
     QIcon,
@@ -94,6 +95,8 @@ import license_manager
 from path import resource_path
 
 version = "Bv 2.0"
+
+CHANGELOG_URL = "https://raw.githubusercontent.com/MaxCortes1507/Carbon-change-logs/main/Change-log-BV2.md"
 
 ASSETS_DIR = resource_path("Assets")
 
@@ -1688,6 +1691,75 @@ class MainWindow(QMainWindow):
             ]
         ]
 
+        self.create_changelog()
+        if _settings.value("changelog_seen") != version:
+            self.open_changelog()
+
+    def create_changelog(self):
+        self.changelog = QWidget(self)
+        self.changelog.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
+        self.changelog.setAttribute(Qt.WA_NoMousePropagation)
+        self.changelog.hide()
+        overlay = QVBoxLayout(self.changelog)
+
+        card = QFrame()
+        card.setObjectName("card")
+        card.setStyleSheet(f"QFrame#card {{ background-color: {BG}; border-radius: 8px; }}")
+        card.setFixedSize(420, 360)
+        overlay.addWidget(card, alignment=Qt.AlignCenter)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
+
+        header = QWidget()
+        header.setFixedHeight(28)
+        header.setStyleSheet(f"""
+            background-color: {HEADER};
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        """)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(8, 0, 4, 0)
+        title = QLabel(f"Nyheder i {version}")
+        title.setStyleSheet(f"color: {BUTTON}; font-weight: bold; border: none;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        close_btn = QPushButton("x")
+        close_btn.setFixedSize(20, 20)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; border: none; color: {BUTTON}; font-weight: bold; font-size: 14px; }}
+            QPushButton:hover {{ color: {HOVER}; }}
+        """)
+        close_btn.clicked.connect(self.close_changelog)
+        header_layout.addWidget(close_btn)
+        layout.addWidget(header)
+
+        body = QVBoxLayout()
+        body.setContentsMargins(6,6,6,6)
+        self.changelog_text = TextOutput()
+        body.addWidget(self.changelog_text)
+        layout.addLayout(body)
+
+        self.network = QNetworkAccessManager(self)
+
+    def open_changelog(self):
+        reply = self.network.get(QNetworkRequest(QUrl(CHANGELOG_URL)))
+        reply.finished.connect(lambda: self.show_changelog(reply))
+
+    def show_changelog(self, reply):
+        if reply.error() == QNetworkReply.NoError:
+            self.changelog_text.setMarkdown(bytes(reply.readAll()).decode("utf-8"))
+            self.changelog.setGeometry(self.rect())
+            self.changelog.show()
+            self.changelog.raise_()
+            self.changelog.grabKeyboard()
+        reply.deleteLater()
+
+    def close_changelog(self):
+        self.changelog.releaseKeyboard()
+        self.changelog.hide()
+        _settings.setValue("changelog_seen", version)
+
     def create_drawer(self):
         self.drawer_max_width = 270
         self.drawer_open = False
@@ -1730,6 +1802,7 @@ class MainWindow(QMainWindow):
             ("Biotek", self.open_biotek, self.biotek_page),
             ("Formelsamling", self.open_formula, None),
             ("Indstillinger", self.open_settings, None),
+            ("Nyheder", self.open_changelog, None),
             ("Afslut", self.close_app, None),
         ]
 
@@ -1869,6 +1942,8 @@ class MainWindow(QMainWindow):
             h = self.height() - top
             self.drawer.setFixedSize(w, h)
             self.drawer.move(self.width() - w, top)
+        if hasattr(self, "changelog"):
+            self.changelog.setGeometry(self.rect())
 
 
     def create_header(self):
