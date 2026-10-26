@@ -529,6 +529,7 @@ class LicenseWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Carbon: Licens manager")
+        self.setWindowIcon(QIcon(str(ASSETS_DIR / "Carbon_Round.svg")))
         self.setModal(True)
         self.setFixedSize(360, 160)
         self.setStyleSheet(f"""
@@ -1412,6 +1413,7 @@ class MainWindow(QMainWindow):
         self.gen = 1
 
         self.setWindowTitle("Carbon")
+        self.setWindowIcon(QIcon(str(ASSETS_DIR / "Carbon_Round.svg")))
         self.setWindowFlag(Qt.FramelessWindowHint)
         self.setStyleSheet(f"background-color: {BG};")
         self.setMinimumWidth(600)
