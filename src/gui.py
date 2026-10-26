@@ -1438,6 +1438,12 @@ class MainWindow(QMainWindow):
         #self.create_settings_page()
         #self.create_formel_page()
 
+        self.history = [self.stack.currentWidget()]
+        self.history_index = 0
+        self.update_nav()
+
+        self.update_page_title(self.stack.currentIndex())
+
         self.version_label = QLabel(version, self)
         self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
         self.version_label.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -1573,6 +1579,9 @@ class MainWindow(QMainWindow):
             if event.type() == event.Type.MouseButtonDblClick:
                 self.toggle_maximized()
                 return True
+            if event.type() == event.Type.Resize:
+                self.place_page_title()
+
         if obj is self.search and self.suggest.isVisible():
             if event.type() == event.Type.KeyPress:
                 if event.key() in (Qt.Key_Up, Qt.Key_Down):
@@ -1659,7 +1668,6 @@ class MainWindow(QMainWindow):
 
         window_row = QHBoxLayout()
         window_row.setSpacing(0)
-        window_row.addStretch()
         outer.addLayout(window_row)
 
         layout = QHBoxLayout()
@@ -1696,9 +1704,22 @@ class MainWindow(QMainWindow):
                 self.page_buttons.addButton(btn, page)
             return btn
 
+        def nav_icon(mirror):
+            icon = QIcon()
+            for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Hover.svg", QIcon.Disabled)):
+                pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(64,64)
+                if mirror:
+                    pixmap = pixmap.transformed(QTransform().scale(-1,1))
+                icon.addPixmap(pixmap, mode)
+            return icon
+        
+        self.back_btn = make_button("Pointer.svg", "Tilbage", lambda: self.go_history(-1))
+        self.forward_btn = make_button("Pointer.svg", "Frem", lambda: self.go_history(1))
+        self.back_btn.setIcon(nav_icon(False))
+        self.forward_btn.setIcon(nav_icon(True))
         self.max_btn = make_button("Maximize.svg", "Maksimer", self.toggle_maximized)
         close_btn = make_button("Close.svg", "Luk", self.close)
-        for btn in (make_button("Minimize.svg", "Minimer", self.showMinimized), self.max_btn, close_btn):
+        for btn in (self.back_btn, self.forward_btn, make_button("Minimize.svg", "Minimer", self.showMinimized), self.max_btn, close_btn):
             btn.setIconSize(QSize(10,10))
             hover = "#da373c" if btn is close_btn else f"{SCROLL}"
             btn.setStyleSheet(f"""
@@ -1711,6 +1732,13 @@ class MainWindow(QMainWindow):
                 }}
             """)
             window_row.addWidget(btn)
+            if btn is self.forward_btn:
+                window_row.addStretch()
+        self.page_title = QToolButton(container)
+        self.page_title.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.page_title.setIconSize(QSize(16,16))
+        self.page_title.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.page_title.setStyleSheet(f"QToolButton {{ background: transparent; border: none; color: {BUTTON}; font-weight: bold; }}")
 
         layout.addWidget(
             make_button("Carbon_Borderless_transparent.svg", "Hovedmenu", self.open_menu, 0)
@@ -1764,7 +1792,6 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(container)
         container.installEventFilter(self)
         self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
-
     def create_search(self):
         self.search_targets = {}
         for name, page in [("Kemi", self.kemi_page), ("Fysik", self.fysik_page), ("Biotek", self.biotek_page)]:
@@ -1822,6 +1849,20 @@ class MainWindow(QMainWindow):
             return
         self.open_panel(*self.search_targets[item.text()])
         self.search.clear()
+
+    def update_page_title(self, i):
+        btn = self.page_buttons.button(i)
+        self.page_title.setIcon(btn.icon())
+        self.page_title.setText(btn.toolTip())
+        self.page_title.adjustSize()
+        self.place_page_title()
+
+    def place_page_title(self):
+        self.page_title.move(
+            (self.header_container.width() - self.page_title.width()) // 2,
+            (self.max_btn.sizeHint().height() - self.page_title.height()) // 2,
+        )
+
 
     def toggle_maximized(self):
         if self.isMaximized() or self.isFullScreen():
@@ -1906,10 +1947,26 @@ class MainWindow(QMainWindow):
             anim.setEndValue(QPoint(end, 0))
             self.slide_anim.addAnimation(anim)
         self.slide_target = page
+        self.update_page_title(self.stack.indexOf(page))
         self.slide_anim.start()
 
     def slide_finished(self):
         self.stack.setCurrentWidget(self.slide_target)
+        if self.slide_target is not self.history[self.history_index]:
+            del self.history[self.history_index + 1:]
+            self.history.append(self.slide_target)
+            self.history_index += 1
+        self.update_nav()
+
+    def go_history(self, step):
+        i = self.history_index + step
+        if 0 <= i < len(self.history) and self.slide_anim.state() != QParallelAnimationGroup.Running:
+            self.history_index = i
+            self.slide_to(self.history[i])
+
+    def update_nav(self):
+        self.back_btn.setEnabled(self.history_index > 0)
+        self.forward_btn.setEnabled(self.history_index < len(self.history) - 1)
 
     def open_panel(self, page, key):
         self.slide_to(page)
