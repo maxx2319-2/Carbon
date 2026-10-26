@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QButtonGroup,
     QCompleter,
+    QComboBox,
 )
 from PySide6.QtCore import (
     Qt,
@@ -115,6 +116,172 @@ SCROLL = "#323232"
 LINE_HEIGHT = 27
 BOX_HEIGHT = 120
 SIDEBAR_WIDTH = 220
+
+def load_dict_from_settings(key, target):
+    raw = _settings.value(key)
+    if raw:
+        target.clear()
+        target.update(json.loads(raw))
+
+def category_page(title, categories):
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    layout.setContentsMargins(30,20,30,20)
+    layout.setSpacing(20)
+
+    for heading, rows in categories:
+        category = QVBoxLayout()
+        category.setSpacing(8)
+
+        heading_label = QLabel(heading)
+        heading_label.setStyleSheet(f"color: {BUTTON}; font-size: 28px; background: transparent;")
+        category.addWidget(heading_label)
+
+        card = QFrame()
+        card.setObjectName("card")
+        card.setStyleSheet(f"QFrame#card {{ background-color: {SIDEBAR}; border-radius: 12px; }}")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12,12,12,12)
+        card_layout.setSpacing(12)
+        for text, widget in rows:
+            row = QHBoxLayout()
+            label = QLabel(text)
+            label.setStyleSheet(f"color: {BUTTON}; font-size: 16px; background: transparent;")
+            row.addWidget(label, alignment=Qt.AlignTop)
+            row.addStretch()
+            row.addWidget(widget)
+            card_layout.addLayout(row)
+        category.addWidget(card)
+
+        layout.addLayout(category)
+    layout.addStretch()
+
+    page = QScrollArea()
+    page.setWidgetResizable(True)
+    page.setFrameShape(QFrame.NoFrame)
+    page.setStyleSheet(f"""
+        QScrollBar:vertical {{
+            background: {BG};
+            width: 14px;
+            border-radius: 5px;
+            margin: 8px 4px 8px 0px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {SCROLL};
+            border-radius: 5px;
+            min-height: 30px;
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+    """)
+    page.setWidget(content)
+    page.setWindowTitle(title)
+    return page
+
+def toggle_switch(settings_key):
+    btn = QPushButton()
+    btn.setCheckable(True)
+    btn.setFixedSize(70, 26)
+    btn.setStyleSheet(f"""
+        QPushButton {{ background-color: {SCROLL}; color: {BUTTON}; border: none; border-radius: 13px; font-weight: bold; }}
+        QPushButton:checked {{ background-color: {BUTTON}; color: {TEXT}; }}
+    """)
+
+    def update(on):
+        btn.setText("Til" if on else "Fra")
+        _settings.setValue(settings_key, on)
+
+    btn.toggled.connect(update)
+    btn.setChecked(_settings.value(settings_key, True, type=bool))
+    btn.setText("Til" if btn.isChecked() else "Fra")
+    return btn
+
+def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
+    container = QWidget()
+    container.setStyleSheet("background: transparent;")
+    container.setFixedWidth(240)
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0,0,0,0)
+    layout.setSpacing(6)
+
+    list_widget = QListWidget()
+    list_widget.setFixedHeight(140)
+    list_widget.setStyleSheet(f"""
+        QListWidget {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 12px; }}
+        QScrollBar:vertical {{ background: {BUTTON}; }}
+    """)
+    layout.addWidget(list_widget)
+
+    line_style = f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 8px; padding: 4px 8px; }}"
+    name_input = QLineEdit()
+    name_input.setPlaceholderText(key_placeholder)
+    name_input.setStyleSheet(line_style)
+    value_input = QLineEdit()
+    value_input.setPlaceholderText(value_placeholder)
+    value_input.setFixedWidth(60)
+    value_input.setStyleSheet(line_style)
+    add_btn = QPushButton("+")
+    add_btn.setFixedSize(28, 28)
+    add_btn.setStyleSheet(button_style)
+
+    def save():
+        _settings.setValue(settings_key, json.dumps(data_dict))
+
+    def refresh():
+        list_widget.clear()
+        for name, value in sorted(data_dict.items(), key=lambda kv: kv[0].lower()):
+            row = QWidget()
+            row.setStyleSheet("background: transparent;")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(6,2,6,2)
+            label = QLabel(f"{name}: {value}")
+            label.setStyleSheet(f"color: {TEXT}; background: transparent;")
+            row_layout.addWidget(label)
+            row_layout.addStretch()
+            del_btn = QPushButton("x")
+            del_btn.setFixedSize(20,20)
+            del_btn.setStyleSheet(f"""
+                QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
+                QPushButton:hover {{ color: #da373c; }}
+            """)
+            del_btn.clicked.connect(lambda _=False, n=name: remove(n))
+            row_layout.addWidget(del_btn)
+            item = QListWidgetItem()
+            item.setSizeHint(QSize(200, 26))
+            list_widget.addItem(item)
+            list_widget.setItemWidget(item, row)
+
+    def remove(name):
+        del data_dict[name]
+        save()
+        refresh()
+
+    def add():
+        name = name_input.text().strip()
+        try:
+            value = float(value_input.text().strip().replace(",", "."))
+        except ValueError:
+            return
+        if not name:
+            return
+        data_dict[name] = value
+        save()
+        name_input.clear()
+        value_input.clear()
+        refresh()
+
+    add_btn.clicked.connect(add)
+    name_input.returnPressed.connect(add)
+    value_input.returnPressed.connect(add)
+
+    add_row = QHBoxLayout()
+    add_row.addWidget(name_input)
+    add_row.addWidget(value_input)
+    add_row.addWidget(add_btn)
+    layout.addLayout(add_row)
+
+    refresh()
+    return container
 
 button_style =  f"""
         QPushButton {{
@@ -1407,8 +1574,8 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        #self._load_dict_from_settings("pKa_values", pKa_values)
-        #self._load_dict_from_settings("pKb_values", pKb_values)
+        load_dict_from_settings("pKa_values", pKa_values)
+        load_dict_from_settings("pKb_values", pKb_values)
 
         self.gen = 1
 
@@ -1435,7 +1602,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.biotek_page)
         self.create_drawer()
         self.create_search()
-        #self.create_settings_page()
+        self.create_settings_page()
         #self.create_formel_page()
 
         self.history = [self.stack.currentWidget()]
@@ -1791,7 +1958,7 @@ class MainWindow(QMainWindow):
 
         self.toolbar.addWidget(container)
         container.installEventFilter(self)
-        self.stack.currentChanged.connect(lambda i: self.page_buttons.button(i).setChecked(True))
+        self.stack.currentChanged.connect(self.update_page_button)
     def create_search(self):
         self.search_targets = {}
         for name, page in [("Kemi", self.kemi_page), ("Fysik", self.fysik_page), ("Biotek", self.biotek_page)]:
@@ -1852,10 +2019,16 @@ class MainWindow(QMainWindow):
 
     def update_page_title(self, i):
         btn = self.page_buttons.button(i)
-        self.page_title.setIcon(btn.icon())
-        self.page_title.setText(btn.toolTip())
+        self.page_title.setIcon(btn.icon() if btn else QIcon())
+        self.page_title.setText(btn.toolTip() if btn else self.stack.widget(i).windowTitle())
         self.page_title.adjustSize()
         self.place_page_title()
+
+    def update_page_button(self, i):
+        self.page_buttons.setExclusive(False)
+        for btn in self.page_buttons.buttons():
+            btn.setChecked(btn is self.page_buttons.button(i))
+        self.page_buttons.setExclusive(True)
 
     def place_page_title(self):
         self.page_title.move(
@@ -1927,9 +2100,38 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.maple_view)
         self.stack.addWidget(page)
 
+    def create_settings_page(self):
+        language = QComboBox()
+        language.addItem("Dansk")
+        language.setFixedWidth(160)
+        language.setStyleSheet(f"""
+            QComboBox {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 13px; padding: 4px 12px; }}
+            QComboBox::drop-down {{ border: none; background: transparent; width: 28px; }}
+            QComboBox::down-arrow {{ image: url({(ASSETS_DIR / "Dropdown_Up.svg").as_posix()}); width: 12px; height: 12px; }}
+            QComboBox::down-arrow:on {{ image: url({(ASSETS_DIR / "Dropdown.svg").as_posix()}); }}
+            QComboBox QAbstractItemView {{ background-color: {BUTTON}; color: {TEXT}; }}
+        """)
+
+        self.settings_page = category_page("Indstillinger", [
+            ("Tilpasning", [
+                ("Animation mellem sider:", toggle_switch("slide_animation")),
+                ("Sprog:", language)
+            ]),
+            ("Data", [
+                ("pKs tabel:", pk_table(pKa_values, "Navn", "pKs", "pKa_values")),
+                ("pKb tabel:", pk_table(pKb_values, "Navn", "pKb", "pKb_values"))
+            ]),
+        ])
+        self.stack.addWidget(self.settings_page)
+
     def slide_to(self, page):
         current = self.stack.currentWidget()
         if page is current or self.slide_anim.state() == QParallelAnimationGroup.Running:
+            return
+        self.slide_target = page
+        self.update_page_title(self.stack.indexOf(page))
+        if not _settings.value("slide_animation", True, type=bool):
+            self.slide_finished()
             return
         w = self.stack.width()
         d = 1 if self.stack.indexOf(page) > self.stack.currentIndex() else -1
@@ -1946,8 +2148,6 @@ class MainWindow(QMainWindow):
             anim.setStartValue(QPoint(start, 0))
             anim.setEndValue(QPoint(end, 0))
             self.slide_anim.addAnimation(anim)
-        self.slide_target = page
-        self.update_page_title(self.stack.indexOf(page))
         self.slide_anim.start()
 
     def slide_finished(self):
@@ -1991,7 +2191,7 @@ class MainWindow(QMainWindow):
         self.slide_to(self.biotek_page)
 
     def open_settings(self):
-        self.stack.setCurrentIndex(6)
+        self.slide_to(self.settings_page)
 
     def open_formula(self):
         self.stack.setCurrentIndex(7)
