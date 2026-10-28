@@ -86,7 +86,7 @@ from PySide6.QtGui import (
     QTransform,
 )
 import re
-import interpreter_maple
+import interpreter
 import chem
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import biotek
@@ -527,12 +527,12 @@ def latex_text(s):
 
 
 
-class _MapleBridge(QObject):
+class _InterpreterBridge(QObject):
     @Slot(result=str)
     def help(self):
         return json.dumps({
             name: [calc_to_latex(line.replace("_", r"\_").replace("%", r"\%")) for line in text.splitlines()]
-            for name, text in interpreter_maple.EV().help_text.items()
+            for name, text in interpreter.EV().help_text.items()
         })
 
 
@@ -540,7 +540,7 @@ class _MapleBridge(QObject):
     @Slot(str, result=str)
     def run(self, data):
         latex_lines = json.loads(data)
-        ev = interpreter_maple.EV()
+        ev = interpreter.EV()
         try:
             result = ev.ev("\n".join(Latex_to_calc(l) for l in latex_lines))
         except Exception as e:
@@ -1009,7 +1009,7 @@ def unit_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"EnhedKonvertering({value_input.text()},{unit_input.text()})")
+        result = interpreter.EV().ev(f"EnhedKonvertering({value_input.text()},{unit_input.text()})")
         output.setText(result.get(0, ""))
 
     calc_btn.clicked.connect(calc)
@@ -1045,7 +1045,7 @@ def pH_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
         output.setText(result)
         if result.startswith("Error"):
             second_output.setText("")
@@ -1085,7 +1085,7 @@ def pOH_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})").get(0, "")
         output.setText(result)
         if result.startswith("Error"):
             second_output.setText("")
@@ -1123,7 +1123,7 @@ def afstemning_panel():
         if clear_if_empty(body):
             return
         arg = f"{reaktion_input.text()},{solution_input.text()}" if solution_input.text() else reaktion_input.text()
-        result = interpreter_maple.EV().ev(f"Afstem({arg})")
+        result = interpreter.EV().ev(f"Afstem({arg})")
         output.setText(result.get(0, ""))
 
     calc_btn.clicked.connect(calc)
@@ -1169,7 +1169,7 @@ def analyse_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"Analyse({input.text()})").get(0,"")
+        result = interpreter.EV().ev(f"Analyse({input.text()})").get(0,"")
         lines = result.splitlines()
         if result.startswith("Error"):
             for box in outputs:
@@ -1209,7 +1209,7 @@ def bjerrum_panel():
             plot_layout.takeAt(0).widget().deleteLater()
         if not input.text():
             return
-        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
+        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
         if isinstance(result, Figure):
             plot_layout.addWidget(FigureCanvasQTAgg(result))
         else:
@@ -1219,7 +1219,7 @@ def bjerrum_panel():
             plot_layout.addWidget(error, alignment=Qt.AlignTop)
 
     def export():
-        result = interpreter_maple.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
+        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
         if result:
             calc()
 
@@ -1253,7 +1253,7 @@ def udbytte_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"UdbytteProcent({praktisk_input.text()},{teori_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"UdbytteProcent({praktisk_input.text()},{teori_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1285,7 +1285,7 @@ def volumen_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"VolumenProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"VolumenProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1317,7 +1317,7 @@ def masse_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"MasseProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"MasseProcent({specifik_input.text()},{samlet_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1372,7 +1372,7 @@ def mængde_panel():
             ("p", densitet_input),
         ]
         args = ",".join(f"{key}={field.text()}" for key, field in fields if field.text())
-        result = interpreter_maple.EV().ev(f"MængdeBeregning({args})").get(0, "")
+        result = interpreter.EV().ev(f"MængdeBeregning({args})").get(0, "")
 
         output.setText(result)
 
@@ -1406,7 +1406,7 @@ def dna_peptid_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"DNATilPeptid({DNA_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"DNATilPeptid({DNA_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1434,7 +1434,7 @@ def rna_peptid_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"RNATilPeptid({RNA_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"RNATilPeptid({RNA_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1468,7 +1468,7 @@ def puffer_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"Puffer({syre_konc_input.text()},{base_konc_input.text()},{pks_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"Puffer({syre_konc_input.text()},{base_konc_input.text()},{pks_input.text()})").get(0, "")
         output.setText(result)
 
     calc_btn.clicked.connect(calc)
@@ -1501,7 +1501,7 @@ def ph_konc_panel():
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter_maple.EV().ev(f"pHTilKoncentration({ph_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"pHTilKoncentration({ph_input.text()})").get(0, "")
         if result.startswith("Error"):
             h3o_output.setText(result)
             oh_output.setText("")
@@ -2250,23 +2250,23 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.maple_view = QWebEngineView()
-        self.maple_view.page().setBackgroundColor(QColor(BG))
-        self.maple_bridge = _MapleBridge()
-        self.maple_channel = QWebChannel(self.maple_view.page())
-        self.maple_channel.registerObject("bridge", self.maple_bridge)
-        self.maple_view.page().setWebChannel(self.maple_channel)
-        self.maple_view.loadFinished.connect(
-            lambda ok: self.maple_view.page().runJavaScript(
+        self.interpreter_view = QWebEngineView()
+        self.interpreter_view.page().setBackgroundColor(QColor(BG))
+        self.interpreter_bridge = _InterpreterBridge()
+        self.interpreter_channel = QWebChannel(self.interpreter_view.page())
+        self.interpreter_channel.registerObject("bridge", self.interpreter_bridge)
+        self.interpreter_view.page().setWebChannel(self.interpreter_channel)
+        self.interpreter_view.loadFinished.connect(
+            lambda ok: self.interpreter_view.page().runJavaScript(
                 f"setAccent({json.dumps(BUTTON)})"
             )
         )
-        self.maple_view.load(
+        self.interpreter_view.load(
             QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html")))
         )
 
         layout.addWidget(Sidebar([]))
-        layout.addWidget(self.maple_view, stretch=1)
+        layout.addWidget(self.interpreter_view, stretch=1)
         self.stack.addWidget(page)
 
     def create_settings_page(self):

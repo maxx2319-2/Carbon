@@ -1,230 +1,322 @@
-# The old line-based interpreter. Every Kemi/Fysik/Biotek panel in the GUI builds one of these commands.
+import re
+from pathlib import Path
+
 import pytest
-import chem
 import interpreter
-from quantity import quantity as Q
-
-HEALTHY = "ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGA"
+from quantity import quantity
 
 
-def run(text):
-    return interpreter.EV().ev(text)
+
+@pytest.fixture(name="interpreter")
+def make_interpreter():
+    inte = interpreter.EV()
+    return inte
 
 
-def result(line):
-    return run(line)[0]
+# --- variables ---
+
+@pytest.mark.parametrize("line, name, expected", [
+    ("x = 1",       "x", "1.0 Quantity"),
+    ("x= 1",        "x", "1.0 Quantity"),
+    ("x =1",        "x", "1.0 Quantity"),
+    ("x = 1[m]",    "x", "1.0 m Quantity"),
+    ("x = 1+1",     "x", "2.0 Quantity"),
+    ("x = 2[m]/1[s]", "x", "2.0 m/s Quantity"),
+    ("y = slop",  "y", "slop str"),
+    ('z = slop2', "z", "slop2 str"),
+    ("z=slop2",   "z", "slop2 str"),
+    ('s = a b',   "s", "a b str"),
+    ("s = it\'s", "s", "it's str"),
+    ])
+def test_variable_save(interpreter, line, name, expected):
+    interpreter.ev(line)
+    assert str(interpreter.variables[name]) == expected
 
 
-# --- general ---
-
-def test_help_lists_every_function():
-    assert result("help").splitlines() == interpreter.EV().functions
+def test_assignment_gives_no_output(interpreter):
+    assert interpreter.ev("x = 1") == {}
 
 
-@pytest.mark.parametrize("name", interpreter.EV().functions)
-def test_every_listed_function_is_handled(name):
-    # with no arguments every command fails, but it must not be "ukendt function"
-    assert "ukendt function" not in str(run(name).get(0, ""))
+def test_reassigning_overwrites(interpreter):
+    out = interpreter.ev("x = 1\nx = 2\nx")
+    assert str(out[2]) == "2.0"
 
 
-def test_unknown_command():
-    assert "ukendt function" in result("ukendt 1")
+def test_variables_used_in_calculation(interpreter):
+    out = interpreter.ev("v = 1[m]/2[s]\nt = 4[s]\nv*t")
+    assert str(out[2]) == "2.0 m"
 
 
-@pytest.mark.parametrize("text", ["# kommentar", "#"])
-def test_comment_gives_no_output(text):
-    assert run(text) == {}
+def test_variable_after_first_calc(interpreter):
+    out = interpreter.ev("x = 2\nx+1\ny = 3\ny+1")
+    assert str(out[1]) == "3.0"
+    assert str(out[3]) == "4.0"
 
 
-def test_output_is_keyed_by_line_number():
-    out = run("\n\nDNA_til_peptid ATG")
-    assert out == {2: "Met, "}
+def test_longer_name_is_not_replaced_by_shorter(interpreter):
+    out = interpreter.ev("x = 5\nxx = 2\nxx+x")
+    assert str(out[2]) == "7.0"
 
 
-def test_error_does_not_stop_next_line():
-    out = run("ukendt\nDNA_til_peptid ATG")
-    assert out[0].startswith("Error")
-    assert out[1] == "Met, "
+def test_variable_not_replaced_inside_unit_brackets(interpreter):
+    out = interpreter.ev("m = 5\n2[m]\nm*2")
+    assert str(out[1]) == "2.0 m"
+    assert str(out[2]) == "10.0"
 
 
-# --- chemistry ---
+def test_variables_are_kept_between_runs(interpreter):
+    interpreter.ev("x = 1")
+    assert str(interpreter.ev("x+1")[0]) == "2.0"
+
+
+@pytest.mark.xfail(reason="the variable's text is pasted in without parentheses, so x^2 only squares the "
+                          "unit or the minus sign is applied last; as_expr() in interpreter.py wraps it")
+@pytest.mark.parametrize("text, expected", [
+    ("x = 2[m]\nx^2", "4.0 m^2"),
+    ("x = -2\nx^2", "4.0"),
+    ("y = 2[m]/1[s]\n1/y", "0.5 s/m"),
+])
+def test_variable_keeps_its_value_together(interpreter, text, expected):
+    assert str(interpreter.ev(text)[1]) == expected
+
+
+
+def test_comment_with_equals_sign_is_ignored(interpreter):
+    assert interpreter.ev("# a = 5") == {}
+    assert interpreter.variables == {}
+
+
+
+def test_assignment_without_name_is_an_error(interpreter):
+    assert str(interpreter.ev("= 5")[0]).startswith("Error")
+
+
+# --- plain calculations ---
 
 @pytest.mark.parametrize("line, expected", [
-    ("balance_reaction None H2+O2->H2O", "2H2 + O2 -> 2H2O"),
-    ("balance_reaction syre MnO4^- + Fe^2+ -> Mn^2+ + Fe^3+",
+    ("1 + 1", "2.0"),
+    ("  1 + 1  ", "2.0"),
+    ("(2 + 3)*4", "20.0"),
+    ("2^3", "8.0"),
+    ("1[m]/2[s]", "0.5 m/s"),
+    ("2 [m]", "2.0 m"),
+    ("((1[m])/(2[s]))", "0.5 m/s"),     # how Latex_to_calc writes a fraction
+])
+def test_parser(interpreter, line, expected):
+    x = interpreter.ev(line)
+    assert str(x[0]) == expected
+
+
+def test_calculation_returns_a_quantity(interpreter):
+    assert isinstance(interpreter.ev("1[m]")[0], quantity)
+
+
+@pytest.mark.parametrize("text", ["# kommentar", "   # indrykket"])
+def test_comment_gives_no_output(interpreter, text):
+    assert interpreter.ev(text) == {}
+
+
+def test_blank_lines_keep_line_numbers(interpreter):
+    out = interpreter.ev("1 + 1\n\n\n2 + 2")
+    assert list(out) == [0, 3]
+    assert str(out[3]) == "4.0"
+
+
+# --- errors ---
+
+@pytest.mark.parametrize("line", ["1 +", "(2 + 3", "1/0", "x == 5", "x = ", "pH (4.76,0.10)"])
+def test_bad_line_gives_error(interpreter, line):
+    assert str(interpreter.ev(line)[0]).startswith("Error")
+
+
+def test_error_does_not_stop_next_line(interpreter):
+    out = interpreter.ev("1 +\n1 + 1")
+    assert str(out[0]).startswith("Error")
+    assert str(out[1]) == "2.0"
+
+
+@pytest.mark.xfail(reason="the inner `except: raise ValueError(\"interpreter\")` hides the real message")
+def test_error_shows_real_message(interpreter):
+    out = interpreter.ev("(2 + 3")
+    assert "Mangler ')'" in out[0]
+
+
+@pytest.mark.xfail(reason="a name that isn't a function is read as a unit: ukendt(1) gives 1.0 ukendt")
+def test_unknown_function(interpreter):
+    assert str(interpreter.ev("ukendt(1)")[0]).startswith("Error")
+
+
+def test_function_names_are_case_sensitive(interpreter):
+    assert str(interpreter.ev("help()")[0]).startswith("Error")
+
+
+# --- function list and help ---
+
+FUNCTIONS = interpreter.EV().functions
+HELP_TEXT = interpreter.EV().help_text
+
+
+def test_functions_registered(interpreter):
+    assert {"Help", "Afstem", "pH", "pOH","EnhedKonvertering"} <= set(interpreter.functions)
+
+
+@pytest.mark.parametrize("name", [f for f in FUNCTIONS if f != "Help"])
+def test_every_function_has_help_text(name):
+    assert name in HELP_TEXT
+
+
+@pytest.mark.parametrize("name", HELP_TEXT)
+def test_help_text_shows_how_to_call_the_function(name):
+    assert HELP_TEXT[name].startswith(name + "(")
+
+
+def test_editor_colours_the_same_functions():
+    html = (Path(interpreter.__file__).parent.parent / "Assets_math_live" / "regneark.html").read_text(encoding="utf-8")
+    listed = re.search(r"const FUNCTIONS = \[(.*?)\]", html).group(1)
+    assert set(re.findall(r'"([^"]+)"', listed)) == set(FUNCTIONS)
+
+
+def test_help_lists_functions(interpreter):
+    out = interpreter.ev("Help()")
+    assert out[0].splitlines() == interpreter.functions
+
+
+def test_help_for_function(interpreter):
+    out = interpreter.ev("Help(pH)")
+    assert out[0] == interpreter.help_text["pH"]
+
+
+def test_help_unknown_function(interpreter):
+    out = interpreter.ev("Help(foo)")
+    assert out[0].startswith("Error: Ukendt function foo")
+    assert "config.json" not in out[0]
+
+
+# --- Afstem ---
+
+@pytest.mark.parametrize("line, expected", [
+    ("Afstem(H2+O2->H2O)", "2H2 + O2 -> 2H2O"),
+    ("Afstem(H2 + O2 -> H2O)", "2H2 + O2 -> 2H2O"),
+    ("Afstem(MnO4^- + Fe^2+ -> Mn^2+ + Fe^3+,syre)",
      "MnO4^- + 5Fe^2+ + 8H3O^+ -> 12H2O + Mn^2+ + 5Fe^3+"),
+    ("Afstem(MnO4^- + I^- -> MnO2 + I2,base)",
+     "2MnO4^- + 6I^- + 4H2O -> 8OH^- + 2MnO2 + 3I2"),
 ])
-def test_balance_reaction(line, expected):
-    assert result(line) == expected
+def test_afstem(interpreter, line, expected):
+    assert interpreter.ev(line)[0] == expected
 
 
-def test_balance_reaction_error():
-    assert result("balance_reaction None H2+O2").startswith("Error")
+@pytest.mark.xfail(reason="the medium isn't stripped, so ' syre' is not recognised")
+def test_afstem_space_after_comma(interpreter):
+    out = interpreter.ev("Afstem(MnO4^- + Fe^2+ -> Mn^2+ + Fe^3+, syre)")
+    assert out[0] == "MnO4^- + 5Fe^2+ + 8H3O^+ -> 12H2O + Mn^2+ + 5Fe^3+"
 
 
-@pytest.mark.parametrize("line, expected", [
-    ("pH 4.76 0.10", 2.9),          # rounded to the significant figures of the concentration
-    ("pH 4.76 0.100", 2.88),
-    ("pH ethansyre 0.10", 2.9),
-    ("pOH 4.75 0.10", 2.9),
+@pytest.mark.parametrize("line", [
+    "Afstem(a,b,c)",
+    "Afstem(,syre)",
+    "Afstem(H2+O2->H2O,)",
 ])
-def test_pH(line, expected):
-    assert result(line) == expected
-
-
-def test_pH_converts_concentration_units():
-    assert result("pH 4.76 100[mmol/l]") == result("pH 4.76 0.100")
-
-
-def test_pH_unknown_acid():
-    assert result("pH findesikke 0.1") == 'Error: ukendt syre "findesikke"'
-
-
-def test_analysis():
-    assert result("analysis C6H12O6") == (
-        "Molekyle: C6H12O6\n Empirisk formel: CH2O\n Molar masse: 180.16\n DBE: 1.0 \n"
-        " Antal atomer: 24 \n Procent indehold:\nC: 25.0%\nH: 50.0%\nO: 25.0%"
-    )
-
-
-# whole first, then part: that's the order the GUI panels send them in
-@pytest.mark.parametrize("line, expected", [
-    ("udbytteprocent 10 8", "80%"),
-    ("masseprocent 8.0[g] 2.0[g]", "25%"),
-    ("volumenprocent 1.00[l] 250[ml]", "25.0%"),
-])
-def test_percent(line, expected):
-    assert result(line) == expected
-
-
-@pytest.mark.parametrize("line, expected", [
-    ("mængdeberegning n=2.0 M=18.0", "Masse: 36 g\nStofmængde: 2 mol\nMolarmasse: 18 g/mol"),
-    ("mængdeberegning m=36[g] M=18[g/mol]", "Masse: 36 g\nStofmængde: 2.0 mol\nMolarmasse: 18 g/mol"),
-    ("mængdeberegning c=0.5 V=2", "Volumen: 2 l\nStofmængde: 1 mol\nKoncentration: 0.5 mol/l"),
-    ("mængdeberegning m=2.5[kg] M=18", "Masse: 2500 g\nStofmængde: 140 mol\nMolarmasse: 18 g/mol"),
-])
-def test_mængdeberegning(line, expected):
-    assert result(line) == expected
-
-
-def test_mængdeberegning_unknown_input():
-    assert result("mængdeberegning x=2") == "Error: Ukendt input 'x'"
-
-
-def test_puffer():
-    assert result("puffer 0.10 1.0 4.76") == 5.8
-
-
-def test_puffer_converts_units():
-    assert result("puffer 100[mmol/l] 1.0 4.76") == result("puffer 0.100 1.0 4.76")
-
-
-def test_pH_to_concentration():
-    assert result("pH_to_concentration 3") == "[H3O+]: 1.000000e-03 mol/l \n [OH-]: 1.000000e-11 mol/l"
-
-
-def test_pOH_to_concentration():
-    assert result("pOH_to_concentration 3") == "[OH-]: 1.000000e-03 mol/l \n [H3O+]: 1.000000e-11 mol/l"
-
-
-def test_empirisk_analyse():
-    assert result("empirisk_analyse Fe 69.9 O 30.1") == "Fe2O3"
-
-
-def test_bjerrumdiagram(monkeypatch):
-    drawn = []
-    monkeypatch.setattr(chem, "bjerrum", drawn.append)
-    assert run("bjerrumdiagram 2.12,7.21,12.67") == {}
-    assert drawn == [[2.12, 7.21, 12.67]]
-
-
-# --- units ---
-
-@pytest.mark.parametrize("line, expected", [
-    ("SI 5[km]", Q(5000, {"m": 1})),
-    ("SI 36[km/timer]", Q(10, {"m": 1, "s": -1})),
-    ("unit_convert 5[km] m", Q(5000, {"m": 1})),
-    ("unit_convert 36[km/timer] m/s", Q(10, {"m": 1, "s": -1})),
-    ("unit_convert 1[m^3] l", Q(1000, {"l": 1})),
-])
-def test_unit_commands(line, expected):
-    out = result(line)
-    assert out.value == pytest.approx(expected.value)
-    assert out.units == expected.units
+def test_afstem_bad_input(interpreter, line):
+    out = interpreter.ev(line)
+    assert out[0] == "Error: " + interpreter.error_text["Afstem"]
 
 
 @pytest.mark.parametrize("line, message", [
-    ("SI 5[foo]", "Error: Ukendt enhed: foo"),
-    ("unit_convert 5,0[km] m", "Error: Brug punktum"),
-    ("unit_convert 5km m", "Error: could not parse value/unit"),
-    ("unit_convert 1[m] s", "Error: cannot convert"),
+    ("Afstem(H2+O2->Xx)", "Error: Xx is not a valid atom"),
+    ("Afstem(H2->O2)", "Error: Reaction cannot be balanced uniquely"),
 ])
-def test_unit_command_errors(line, message):
-    assert result(line).startswith(message)
+def test_afstem_chemistry_errors(interpreter, line, message):
+    assert interpreter.ev(line)[0] == message
 
 
-# --- biology ---
+# --- pH and pOH ---
 
-def test_DNA_til_peptid():
-    assert result("DNA_til_peptid ATG AAA") == "Met, Lys, "
-
-
-def test_RNA_til_peptid():
-    assert result("RNA_til_peptid AUGUUU") == "Met, Phe, "
-
-
-def test_mutations_analyse_DNA():
-    mutated = HEALTHY[:6] + "C" + HEALTHY[7:]
-    assert result(f"mutations_analyse_DNA {HEALTHY}, {mutated}") == "mutationer:\nMissense mutation ved base nr 7"
-
-
-def test_mutations_analyse_RNA():
-    assert result("mutations_analyse_RNA AUGGCC, AUGGCC") == "mutationer:\nIngen mutation begge strenge er det samme"
-
-
-def test_mutations_analyse_needs_two_strands():
-    assert result("mutations_analyse_DNA ATG").startswith("Error")
-
-
-# --- helpers ---
-
-def with_variable(name, value):
-    e = interpreter.EV()
-    e.variables[name] = interpreter.Variables(value, "float")
-    e._invalidate_pattern()
-    return e
-
-
-def test_prep_ev_turns_unit_brackets_into_parentheses():
-    assert interpreter.EV().prep_ev("2[m]*3[mol/l]") == "2 (m)*3 (mol/l)"
-
-
-def test_prep_ev_replaces_variables_outside_brackets_only():
-    assert with_variable("m", "5").prep_ev("m*2[m]") == "5*2 (m)"
-
-
-def test_prep_ev_replaces_whole_names_only():
-    assert with_variable("x", "5").prep_ev("xx+x") == "xx+5"
-
-
-@pytest.mark.parametrize("text, expected", [
-    ("5[km]", (5.0, "km")),
-    ("2.5[m/s]", (2.5, "m/s")),
-    (" 3 [g]", (3.0, "g")),
+@pytest.mark.parametrize("line, expected", [
+    ("pH(4.76,0.10)", "2.88"),
+    ("pH(4.76, 0.10)", "2.88"),
+    ("pH(ethansyre,0.10)", "2.88"),
+    ("pH(4.76,0.100)", "2.883"),       # rounded to the significant figures of the concentration
+    ("pH(4.76,0.1)", "2.9"),
+    ("  pH(4.76,0.10)  ", "2.88"),
+    ("pOH(4.75,0.10)", "2.88"),
 ])
-def test_unit_bracket_strip(text, expected):
-    assert interpreter.EV().unit_bracket_strip(text) == expected
+def test_pH_and_pOH(interpreter, line, expected):
+    assert interpreter.ev(line)[0] == expected
 
 
-@pytest.mark.parametrize("text, message", [
-    ("5km", "could not parse"),
-    ("[km]", "could not parse"),
-    ("5,0[km]", "punktum"),
+@pytest.mark.parametrize("line", [
+    "pH(4)",
+    "pH(4,1,2)",
+    "pH(,0.1)",
+    "pH(4,)",
 ])
-def test_unit_bracket_strip_errors(text, message):
-    with pytest.raises(ValueError, match=message):
-        interpreter.EV().unit_bracket_strip(text)
+def test_pH_bad_input(interpreter, line):
+    out = interpreter.ev(line)
+    assert out[0] == "Error: " + interpreter.error_text["pH"]
 
 
-def test_as_expr():
-    assert interpreter.as_expr(Q(2.0, {"m": 1, "s": -2})) == "(2.0*m^(1)*s^(-2))"
+@pytest.mark.parametrize("line", [
+    "pOH(4)", 
+    "pOH(4,1,2)", 
+    "pOH(,0.1)"
+])
+def test_pOH_bad_input(interpreter, line):
+    out = interpreter.ev(line)
+    assert out[0] == "Error: " + interpreter.error_text["pOH"]
+
+
+def test_pH_unknown_acid(interpreter):
+    assert interpreter.ev("pH(findesikke,0.1)")[0] == 'Error: ukendt syre "findesikke"'
+
+
+def test_pOH_unknown_base(interpreter):
+    assert interpreter.ev("pOH(findesikke,0.1)")[0] == 'Error: ukendt base "findesikke"'
+
+
+def test_pH_zero_concentration(interpreter):
+    assert interpreter.ev("pH(4.76,0)")[0].startswith("Error")
+
+
+
+@pytest.mark.parametrize("line,expected",[
+    ("EnhedKonvertering(4[km],SI)","4000 m"),
+    ("EnhedKonvertering(4[l],dl)","40 dl"),
+    ("EnhedKonvertering(4[mol],SI)","4 mol")
+
+])
+
+def test_EnhedKonvertering(interpreter,line,expected):
+    assert str(interpreter.ev(line)[0]) == expected
+
+@pytest.mark.parametrize("line",[
+    "EnhedKonvertering()",
+    "EnhedKonvertering(4[mol],)",
+    "EnhedKonvertering(,mol)",
+    "EnhedKonvertering(4[mol],SI,1)",
+    
+])
+
+def test_EnhedKonvertering_bad_input(interpreter,line):
+    assert interpreter.ev(line)[0] == 'Error: EnhedKonvertering(Quantity,ny Enhed eller "SI" for SI enhed)'
+
+
+
+def test_loop_over_its_own_line_is_an_error(interpreter):
+    out = interpreter.ev("1+1\nLoop(1,2,2)")
+    assert str(out[0]) == "2.0"
+    assert out[1] == "Error: " + interpreter.error_text["Loop"]
+
+
+def test_loop_with_non_number_does_not_stop_other_lines(interpreter):
+    out = interpreter.ev("1+1\nLoop(a,1,2)\n2+2")
+    assert str(out[0]) == "2.0"
+    assert out[1].startswith("Error")
+    assert str(out[2]) == "4.0"
+
+
+def test_each_line_gets_its_own_result(interpreter):
+    out = interpreter.ev("pH(4.76,0.10)\nHelp(pH)\n1+1")
+    assert out[0] == "2.88"
+    assert out[1] == interpreter.help_text["pH"]
+    assert str(out[2]) == "2.0"
