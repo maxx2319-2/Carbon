@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude</title>
+<style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1e1e1e; }
+    canvas { display: block; }
+</style>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.js"
+    }
+}
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+document.body.append(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1e1e1e);
+const light = new THREE.DirectionalLight(0xffffff, Math.PI);
+light.position.set(1, 1, 1).normalize();
+scene.add(light, new THREE.AmbientLight(0xffffff, 0.4));
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+const gaze = new THREE.Object3D();
+scene.add(gaze);
+
+function resize() {
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+
+const ARMS_DOWN = {
+    leftUpperArm: [0, 0, -1.2], rightUpperArm: [0, 0, 1.2],
+    leftLowerArm: [0, -0.15, 0], rightLowerArm: [0, 0.15, 0],
+};
+
+const POSES = {
+    idle: { bones: ARMS_DOWN, face: {}, look: [0, 0] },
+    listening: { bones: { ...ARMS_DOWN, head: [-0.1, 0, 0] }, face: { surprised: 1 }, look: [0, 0.1] },
+    thinking: { bones: { ...ARMS_DOWN, head: [-0.1, 0.15, 0.15] }, face: { ou: 0.3 }, look: [0.5, 0.5] },
+    typing: {
+        bones: {
+            leftUpperArm: [-0.22, 0, -1.45], rightUpperArm: [-0.22, 0, 1.45],
+            leftLowerArm: [0, -1.21, -0.19], rightLowerArm: [0, 1.21, 0.19], head: [0.25, 0, 0],
+        },
+        face: { angry: 0.15 },
+        look: [0, -0.6],
+        move: t => ({ leftHand: [0, 0, Math.sin(t * 20) * 0.25], rightHand: [0, 0, Math.sin(t * 20) * 0.25] }),
+    },
+    reading: { bones: { ...ARMS_DOWN, neck: [0.15, 0, 0], head: [0.3, 0, 0] }, face: {}, look: [0, -0.8] },
+    waiting: {
+        bones: {
+            leftUpperArm: [0, 0, -0.8], rightUpperArm: [0, 0, 0.8],
+            leftLowerArm: [0, 0, -1.6], rightLowerArm: [0, 0, 1.6], spine: [0.1, 0, 0],
+        },
+        face: { angry: 0.8 },
+        look: [0, 0],
+        move: t => ({ head: [0, 0, Math.sin(t * 4) * 0.05] }),
+    },
+    done: {
+        bones: {
+            leftUpperArm: [-0.44, 0, -1.42], rightUpperArm: [-0.44, 0, 1.42],
+            leftLowerArm: [0, -1.89, -1.08], rightLowerArm: [0, 1.89, 1.08],
+            neck: [0, 0.4, 0], head: [-0.15, 0.2, 0.05],
+        },
+        face: { blink: 0.9, angry: 0.35 },
+        look: [1.5, 0.1],
+    },
+};
+const BONES = [...new Set(Object.values(POSES).flatMap(p => Object.keys(p.bones)).concat("spine", "head", "leftHand", "rightHand"))];
+
+let vrm = null, flip = 1, names = {}, face = {};
+new GLTFLoader().register(parser => new VRMLoaderPlugin(parser)).load("/model.vrm", gltf => {
+    vrm = gltf.userData.vrm;
+    VRMUtils.rotateVRM0(vrm);
+    flip = vrm.meta.metaVersion === "0" ? -1 : 1;
+    scene.add(vrm.scene);
+    vrm.scene.updateMatrixWorld(true);
+    for (const e of vrm.expressionManager.expressions) names[e.expressionName.toLowerCase()] = e.expressionName;
+    const head = vrm.humanoid.getRawBoneNode("head").getWorldPosition(new THREE.Vector3());
+    camera.position.set(0, head.y - 0.05, 1.6);
+    camera.lookAt(0, head.y - 0.2, 0);
+    vrm.lookAt.target = gaze;
+});
+
+let state = "idle", timer = null;
+function setState(next, after, then) {
+    state = next;
+    clearTimeout(timer);
+    if (after) timer = setTimeout(() => setState(then), after);
+}
+
+const TYPING = ["Edit", "Write", "NotebookEdit", "Bash"];
+const READING = ["Read", "Grep", "Glob", "WebFetch", "WebSearch"];
+new EventSource("/events").onmessage = ({ data }) => {
+    const { event, tool } = JSON.parse(data);
+    if (event === "UserPromptSubmit") setState("listening", 1500, "thinking");
+    else if (event === "PreToolUse") setState(TYPING.includes(tool) ? "typing" : READING.includes(tool) ? "reading" : "thinking");
+    else if (event === "Notification") setState("waiting");
+    else if (event === "Stop") setState("done", 8000, "idle");
+};
+
+const clock = new THREE.Clock();
+const q = new THREE.Quaternion(), euler = new THREE.Euler();
+let t = 0, nextBlink = 3;
+renderer.setAnimationLoop(() => {
+    const dt = Math.min(clock.getDelta(), 0.1);
+    t += dt;
+    if (vrm) {
+        const pose = POSES[state];
+        const k = 1 - Math.exp(-dt * 6);
+        const extra = pose.move?.(t) ?? {};
+        extra.spine = [Math.sin(t * 2) * 0.02, 0, 0];
+        for (const name of BONES) {
+            const node = vrm.humanoid.getNormalizedBoneNode(name);
+            if (!node) continue;
+            const [x, y, z] = pose.bones[name] ?? [0, 0, 0];
+            const [dx, dy, dz] = extra[name] ?? [0, 0, 0];
+            node.quaternion.slerp(q.setFromEuler(euler.set(flip * (x + dx), y + dy, flip * (z + dz))), k);
+        }
+
+        if (t > nextBlink + 0.15) nextBlink = t + 2 + Math.random() * 3;
+        const target = { blink: t > nextBlink ? 1 : 0, ...pose.face };
+        for (const key of new Set([...Object.keys(face), ...Object.keys(target)])) {
+            face[key] = THREE.MathUtils.lerp(face[key] ?? 0, target[key] ?? 0, key === "blink" && !pose.face.blink ? 0.5 : k);
+            if (names[key]) vrm.expressionManager.setValue(names[key], face[key]);
+        }
+
+        gaze.position.set(camera.position.x + pose.look[0], camera.position.y + pose.look[1], camera.position.z);
+        vrm.update(dt);
+    }
+    renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

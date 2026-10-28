@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null --data-binary @- http://127.0.0.1:8765/event || true", "async": true }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null --data-binary @- http://127.0.0.1:8765/event || true", "async": true }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null --data-binary @- http://127.0.0.1:8765/event || true", "async": true }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null --data-binary @- http://127.0.0.1:8765/event || true", "async": true }
+        ]
+      }
+    ]
+  }
+}
