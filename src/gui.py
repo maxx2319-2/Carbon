@@ -107,11 +107,11 @@ def hover_icon(file):
         icon.addFile(str(hover), QSize(), QIcon.Active)
     return icon
 
-class CursorFilter(QObject):
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Polish and isinstance(obj, (QAbstractButton, QComboBox)) and not obj.testAttribute(Qt.WA_SetCursor):
-            obj.setCursor(Qt.PointingHandCursor)
-        return False
+def point_cursor(root):
+    for widget in root.findChildren(QAbstractButton) + root.findChildren(QComboBox):
+        if not widget.testAttribute(Qt.WA_SetCursor):
+            widget.setCursor(Qt.PointingHandCursor)
+
 
 _settings = QSettings("M&B", "Carbon")
 
@@ -886,6 +886,7 @@ class DraggablePanel(QWidget):
         self.body.setStyleSheet("background-color: transparent")
 
         layout.addWidget(self.body)
+        point_cursor(self)
 
     def show_help(self):
         msg = QMessageBox(self)
@@ -1713,6 +1714,8 @@ class MainWindow(QMainWindow):
         if _settings.value("changelog_seen") != version:
             self.open_changelog()
 
+        point_cursor(self)
+
     def create_changelog(self):
         self.changelog = QWidget(self)
         self.changelog.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
@@ -2372,8 +2375,6 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = QApplication(sys.argv)
-    cursor_filter = CursorFilter()
-    app.installEventFilter(cursor_filter)
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 

@@ -10,9 +10,6 @@ from PySide6.QtCore import Qt
 app = QApplication.instance() or QApplication([])
 import gui
 
-cursor_filter = gui.CursorFilter()
-app.installEventFilter(cursor_filter)
-
 
 @pytest.fixture(scope="module")
 def window():
