@@ -91,6 +91,7 @@ import chem
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import biotek
 import license_manager
+import sympy
 
 from path import resource_path
 
@@ -551,6 +552,14 @@ class _MapleBridge(QObject):
             value = result.get(i, "")
             values = value if isinstance(value, list) else [value]
             for value in values:
+                if isinstance(value, dict):
+                    rows.append(["result", r"\Rightarrow\:" + r",\ ".join(f"{sympy.latex(k)} = {sympy.latex(v)}" for k, v in value.items())])
+                    continue
+
+                if isinstance(value, sympy.Basic) and not isinstance(value, sympy.Float):
+                    rows.append(["result", r"\Rightarrow\:" + sympy.latex(value)])
+                    continue
+
                 if isinstance(value, utils.FunctionPlot):
                     rows.append(["plot", json.dumps({"functions": value.functions, "start": value.start, "end": value.end})])
                     continue

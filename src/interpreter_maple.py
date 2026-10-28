@@ -308,7 +308,7 @@ class EV:
                                 else: functions.append(self.prep_sympy(part))
 
                             result = sympy.solve(functions,*variables,dict = True)
-                            output[pc] = [", ".join(f"{k} = {v}" for k, v in s.items()) for s in result] or "Ingen løsninger"
+                            output[pc] = result or "Ingen løsninger"
 
                             pc+=1
                             
