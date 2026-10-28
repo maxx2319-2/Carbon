@@ -6,6 +6,7 @@ import re
 import biotek
 import json
 import sympy 
+from sympy import symbols, simplify,sin, cos
 import numpy as np
 from matplotlib.figure import Figure
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor, split_symbols
@@ -91,7 +92,8 @@ class EV:
             "Løs",
             "PlotFunktion",
             "NumeriskLøs",
-            "SystemLøs"
+            "SystemLøs",
+            "Simplificer",
 
         ]
 
@@ -115,8 +117,8 @@ class EV:
             "Løs" : "Løs(ligning)",
             "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
             "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)",
-            "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...'}')"
-
+            "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...})",
+            "Simplificer" : "Simplificer(x)",
         }
 
         self.help_text = {
@@ -139,6 +141,8 @@ class EV:
             "Løs": "Løs(ligning)\nLøser en ligning. Kan ikke tage imod enheder.\nEks: Løs(x^2 = 4) ",
             "PlotFunktion": "PlotFunktion(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5)) ",
             "NumeriskLøs": "NumeriskLøs(funktion, Variabel = x, StartGæt = 1)\nLøser en ligning numerisk ud fra et startgæt. StartGæt er valgfrit.\nEks: NumeriskLøs(Cos(x) = x, Variabel = x, StartGæt = 10) ",
+            "SystemLøs": "SystemLøs(ligning 1, ligning 2, ..., Variabler = {x, y, ...})\nLøser et ligningssystem med flere ubekendte.\nEks: SystemLøs(x + y = 10, x - y = 2, Variabler = {x, y}) ",
+            "Simplificer": "Simplificer(udtryk)\nUdregner et udtryk med kvadratrødder, brøker osv. til et decimaltal.\nEks: Simplificer(sqrt(12) + sqrt(27)) ",
         }
 
     input_prep = lambda self,x : quantity.si_convert(parser.evaluate(self.prep_ev(x)))
@@ -177,6 +181,8 @@ class EV:
         args.append(input[start:])
 
         return args
+
+    equation_simlify = lambda x: simplify(parse_expr(x))
 
     def ev(self, s):
         output = {}
@@ -266,12 +272,12 @@ class EV:
                         case 'NumeriskLøs':
                             #Does not include system of equations
                             if len(args) < 2:
-                                raise ValueError(self.error_text["NLøs"])
+                                raise ValueError(self.error_text["NumeriskLøs"])
                             guess = 1
                             function = []
                             variabel = []
                             if any(part.strip() == "" for part in args):
-                                raise ValueError(self.error_text["NLøs"])
+                                raise ValueError(self.error_text["NumeriskLøs"])
 
                             
 
@@ -287,7 +293,7 @@ class EV:
                                 else: function.append(self.prep_sympy(part))
 
                             if len(variabel) != 1 or len(function) != 1:
-                                raise ValueError(self.error_text["NLøs"])
+                                raise ValueError(self.error_text["NumeriskLøs"])
                             
                             output[pc] = sympy.nsolve(function[0],variabel[0],guess)
                             pc += 1
@@ -311,7 +317,12 @@ class EV:
                             output[pc] = result or "Ingen løsninger"
 
                             pc+=1
-                            
+
+                        case 'Simplificer':
+                            if len(args) != 1:
+                                raise ValueError(self.error_text["Simplificer"])
+                            output[pc] = sympy.N(simplify(self.prep_sympy(args[0])))
+                            pc +=1
 
                         case 'PlotFunktion':
                             start = None

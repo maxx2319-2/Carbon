@@ -486,6 +486,7 @@ def Latex_to_calc(s: str) -> str:
 
 def calc_to_latex(s) -> str:
     s = str(s)
+    s = re.sub(r"sqrt\(([^()]*)\)", r"\\sqrt{\1}", s)
 
     s = re.sub(r"\d+\.\d{7,}(?:e[+-]?\d+)?", lambda m: f"{float(m.group()):.6g}", s)
     s = re.sub(

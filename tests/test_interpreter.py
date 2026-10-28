@@ -172,7 +172,7 @@ def test_help_text_shows_how_to_call_the_function(name):
 
 def test_editor_colours_the_same_functions():
     html = (Path(interpreter.__file__).parent.parent / "Assets_math_live" / "regneark.html").read_text(encoding="utf-8")
-    listed = re.search(r"const FUNCTIONS = \[(.*?)\]", html).group(1)
+    listed = re.search(r"const FUNCTIONS = \[(.*?)\]", html, re.S).group(1)
     assert set(re.findall(r'"([^"]+)"', listed)) == set(FUNCTIONS)
 
 

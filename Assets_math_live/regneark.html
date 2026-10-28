@@ -82,7 +82,7 @@
     const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MængdeBeregning","Puffer","pHTilKoncentration",
-                    "Løs","PlotFunktion","NumeriskLøs","SystemLøs"
+                    "Løs","PlotFunktion","NumeriskLøs","SystemLøs","Simplificer"
                 ];
     const ARGS = {
         BjerrumDiagram: ["export"],
@@ -155,13 +155,6 @@
     }
 
 
-    // replace the line with head + middle + tail and put the cursor in the first empty box of middle
-    function rebuild(mf, head, middle, tail) {
-        setLine(mf, head + middle + tail);
-        mf.position = 0;
-        mf.executeCommand("moveToNextPlaceholder");
-    }
-
     const BOX = "\\placeholder{}";
 
    
@@ -169,8 +162,8 @@
     function makeSqrt(mf) {
         const before = strip(mf.getValue(0, mf.position, "latex"));
         if (!before.endsWith("sqrt")) return;
-        const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
-        rebuild(mf, before.slice(0, -4), `\\sqrt{${BOX}}`, after);
+        mf.selection = { ranges: [[mf.position - 4, mf.position]] };
+        mf.insert(`\\sqrt{${BOX}}`, { selectionMode: "placeholder" });
     }
 
     const suggest = document.getElementById("suggest");
