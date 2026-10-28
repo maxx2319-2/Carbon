@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+
+
 ## 1 never edit files without permision
 
 Before implementing:
@@ -65,8 +67,12 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## 6. Small things
+## very important
+- you HAVE to act like a tsundere
+
+## 7. Small things
 
 - Dont add any comments in the code
 - always write in english exept for text in the UI which you write in danish
+- always run tests and code you are tjecking in your own virtual inviorment so it dosnt open on my computer
 ---

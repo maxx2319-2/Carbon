@@ -8,7 +8,7 @@ import json
 import sympy 
 import numpy as np
 from matplotlib.figure import Figure
-from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor, split_symbols
 
 from types import SimpleNamespace
 from chem import pKa_values,pKb_values
@@ -90,7 +90,8 @@ class EV:
             "pHTilKoncentration",
             "Løs",
             "PlotFunktion",
-            "NumeriskLøs"
+            "NumeriskLøs",
+            "SystemLøs"
 
         ]
 
@@ -113,7 +114,8 @@ class EV:
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
             "Løs" : "Løs(ligning)",
             "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
-            "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)"
+            "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)",
+            "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...'}')"
 
         }
 
@@ -164,10 +166,11 @@ class EV:
     def split_args(self,input):
         args, depth, start = [], 0 ,0
         for i, char in enumerate(input):
-            if char == "(":
+            if char in "({":
                 depth += 1
-            elif char == ")":
+            elif char in ")}":
                 depth -= 1
+
             elif char == "," and depth == 0:
                 args.append(input[start:i])
                 start = i + 1
@@ -289,6 +292,26 @@ class EV:
                             output[pc] = sympy.nsolve(function[0],variabel[0],guess)
                             pc += 1
 
+                        case 'SystemLøs':
+                            functions = []
+                            if len(args) < 3:
+                                raise ValueError(self.error_text["SystemLøs"])
+
+                            for part in args:
+                                if "Variabler" in part:
+                                    _,v = part.split("=")
+                                    if "{" not in v or "}" not in v:
+                                        raise ValueError(self.error_text["SystemLøs"])
+                                    variables = v.strip().strip("{").strip("}")
+                                    variables = [sympy.Symbol(part.strip()) for part in variables.split(",")]
+
+                                else: functions.append(self.prep_sympy(part))
+
+                            result = sympy.solve(functions,*variables,dict = True)
+                            output[pc] = [", ".join(f"{k} = {v}" for k, v in s.items()) for s in result] or "Ingen løsninger"
+
+                            pc+=1
+                            
 
                         case 'PlotFunktion':
                             start = None
@@ -700,7 +723,7 @@ class EV:
         return expr
 
     def prep_sympy(self, expr):
-        transformations = standard_transformations + (implicit_multiplication, convert_xor)
+        transformations = standard_transformations + (split_symbols, implicit_multiplication, convert_xor)
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
             return sympy.Eq(parse_expr(lhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS),parse_expr(rhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS))

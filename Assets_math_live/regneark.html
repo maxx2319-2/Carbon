@@ -81,14 +81,17 @@
 
     const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
-                    "DNATilPeptid","RNATilPeptid","MængdeBeregning","Puffer","pHTilKoncentration","Løs","PlotFunktion","NumeriskLøs"
+                    "DNATilPeptid","RNATilPeptid","MængdeBeregning","Puffer","pHTilKoncentration",
+                    "Løs","PlotFunktion","NumeriskLøs","SystemLøs"
                 ];
     const ARGS = {
         BjerrumDiagram: ["export"],
         EnhedKonvertering: ["SI"],
         Help: FUNCTIONS,
         PlotFunktion: ["Interval = (xstart, xslut)"],
-        NLøs: ["Variabel = ","StartGæt = "],
+        NumeriskLøs: ["Variabel = ","StartGæt = "],
+        SystemLøs : ["Variabler = "]
+
     };
     const wordColor = w => ["Help", "Loop"].includes(w) ? COLORS.control : FUNCTIONS.includes(w) ? COLORS.func : MATH.includes(w) ? COLORS.math : null;
     const COLORS = { control: "#C586C0", func: "#569CD6",math: "#c0dcaa", number: "#B5CEA8", string: "#CE9178", comment: "#9CDCFE",};
