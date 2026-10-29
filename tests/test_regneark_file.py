@@ -35,8 +35,14 @@ class FakeView:
 
 
 class FakeWindow:
+    load_regneark = gui.MainWindow.load_regneark
+
     def __init__(self, page):
         self.interpreter_view = FakeView(page)
+        self.opened = False
+
+    def open_interpreter(self):
+        self.opened = True
 
 
 def fake_dialog(monkeypatch, path):
@@ -62,7 +68,9 @@ def test_open_sends_rows_to_set_sheet(tmp_path, monkeypatch):
     path.write_text(json.dumps({"rows": ROWS}), encoding="utf-8")
     fake_dialog(monkeypatch, path)
     page = FakePage()
-    gui.MainWindow.open_regneark(FakeWindow(page))
+    window = FakeWindow(page)
+    gui.MainWindow.open_regneark(window)
+    assert window.opened
     assert len(page.calls) == 1
     call = page.calls[0]
     assert call.startswith("setSheet(") and call.endswith(")")

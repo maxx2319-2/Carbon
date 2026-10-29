@@ -11,6 +11,8 @@ import io
 import base64
 from matplotlib.figure import Figure
 import utils
+import ctypes
+import winreg
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
@@ -2394,6 +2396,16 @@ class MainWindow(QMainWindow):
     def open_formula(self):
         self.stack.setCurrentIndex(7)
 
+    def open_regneark(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Åbn regneark", "", "Regneark (*.crbn)")
+        if path:
+            self.load_regneark(path)
+
+    def load_regneark(self, path):
+        rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
+        self.interpreter_view.page().runJavaScript(f"setSheet({json.dumps(rows)})")
+        self.open_interpreter()
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             if self.isFullScreen():
@@ -2406,10 +2418,24 @@ class MainWindow(QMainWindow):
     def close_app(self):
         self.close()
 
+def register_crbn():
+    exe = sys.executable
+    for key, value in [
+        (r"Software\Classes\.crbn", "Carbon.Regneark"),
+        (r"Software\Classes\Carbon.Regneark", "Carbon regneark"),
+        (r"Software\Classes\Carbon.Regneark\DefaultIcon", f'"{exe}",0'),
+        (r"Software\Classes\Carbon.Regneark\shell\open\command", f'"{exe}" "%1"'),
+    ]:
+        winreg.SetValue(winreg.HKEY_CURRENT_USER, key, winreg.REG_SZ, value)
+    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+
 
 if __name__ == "__main__":
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = QApplication(sys.argv)
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        register_crbn()
+
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
@@ -2419,5 +2445,8 @@ if __name__ == "__main__":
             sys.exit(0)
 
     window = MainWindow()
+    if len(sys.argv) > 1:
+        window.interpreter_view.loadFinished.connect(lambda ok: window.load_regneark(sys.argv[1]))
+
     window.showFullScreen()
     app.exec()
