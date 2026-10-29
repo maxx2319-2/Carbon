@@ -26,9 +26,15 @@ class FakePage:
             callback(self.result)
 
 
+class FakeSignal:
+    def connect(self, callback):
+        callback(True)
+
+
 class FakeView:
     def __init__(self, page):
         self._page = page
+        self.loadFinished = FakeSignal()
 
     def page(self):
         return self._page
@@ -40,6 +46,15 @@ class FakeWindow:
     def __init__(self, page):
         self.interpreter_view = FakeView(page)
         self.opened = False
+        self.new_tabs = 0
+        self.tab_names = []
+
+    def new_interpreter_tab(self):
+        self.new_tabs += 1
+        return self.interpreter_view
+
+    def set_tab_name(self, view, name):
+        self.tab_names.append(name)
 
     def open_interpreter(self):
         self.opened = True
@@ -56,7 +71,9 @@ def test_save_writes_rows_as_json(tmp_path, monkeypatch):
     path = tmp_path / "ark.crbn"
     fake_dialog(monkeypatch, path)
     page = FakePage(json.dumps(ROWS))
-    gui.MainWindow.save_regneark(FakeWindow(page))
+    window = FakeWindow(page)
+    gui.MainWindow.save_regneark(window)
+    assert window.tab_names == ["ark"]
     assert page.calls == ["JSON.stringify(getSheet())"]
     text = path.read_text(encoding="utf-8")
     assert json.loads(text) == {"rows": ROWS}
@@ -71,6 +88,8 @@ def test_open_sends_rows_to_set_sheet(tmp_path, monkeypatch):
     window = FakeWindow(page)
     gui.MainWindow.open_regneark(window)
     assert window.opened
+    assert window.new_tabs == 1
+    assert window.tab_names == ["ark"]
     assert len(page.calls) == 1
     call = page.calls[0]
     assert call.startswith("setSheet(") and call.endswith(")")

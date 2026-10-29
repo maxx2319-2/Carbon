@@ -53,6 +53,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QAbstractButton,
     QFileDialog,
+    QTabBar,
 )
 from PySide6.QtCore import (
     Qt,
@@ -2336,21 +2337,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.interpreter_view = QWebEngineView()
-        self.interpreter_view.page().setBackgroundColor(QColor(BG))
-        self.interpreter_bridge = _InterpreterBridge()
-        self.interpreter_channel = QWebChannel(self.interpreter_view.page())
-        self.interpreter_channel.registerObject("bridge", self.interpreter_bridge)
-        self.interpreter_view.page().setWebChannel(self.interpreter_channel)
-        self.interpreter_view.loadFinished.connect(
-            lambda ok: self.interpreter_view.page().runJavaScript(
-                f"setAccent({json.dumps(BUTTON)})"
-            )
-        )
-        self.interpreter_view.load(
-            QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html")))
-        )
-
         def insert(latex):
             self.interpreter_view.page().runJavaScript(f"insertLatex({json.dumps(latex)})")
 
@@ -2359,8 +2345,161 @@ class MainWindow(QMainWindow):
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
         ]))
 
-        layout.addWidget(self.interpreter_view, stretch=1)
+        bar = QWidget()
+        bar.setStyleSheet(f"background-color: {SCROLL};")
+        bar_layout = QHBoxLayout(bar)
+        bar_layout.setContentsMargins(10,4,10,4)
+        bar_layout.addStretch()
+
+        file_btn = QToolButton()
+        file_menu = QMenu(file_btn)
+        file_menu.setStyleSheet(f"""
+            QMenu {{ background-color: {BUTTON}; color: {TEXT}; border: none; }}
+            QMenu::item {{ padding: 6px 20px; }}
+            QMenu::item:selected {{ background-color: {HOVER}; }}
+        """)
+        file_menu.addAction("Åbn", self.open_regneark)
+        file_menu.addAction("Gem", self.save_regneark)
+        file_btn.setIcon(hover_icon("Save.svg"))
+        file_btn.setIconSize(QSize(24,24))
+        file_btn.setToolTip("Fil")
+        file_btn.setFocusPolicy(Qt.NoFocus)
+        file_btn.setPopupMode(QToolButton.InstantPopup)
+        file_btn.setMenu(file_menu)
+        file_btn.setStyleSheet(f"""
+            QToolButton {{ border: none; }}
+            QToolButton::menu-indicator {{ image: none; }}
+            QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+        """)
+        bar_layout.addWidget(file_btn)
+
+        self.interpreter_tabs = QTabBar()
+        self.interpreter_tabs.setTabsClosable(True)
+        self.interpreter_tabs.setExpanding(False)
+        self.interpreter_tabs.setDrawBase(False)
+        self.interpreter_tabs.setFocusPolicy(Qt.NoFocus)
+        self.interpreter_tabs.setStyleSheet(f"""
+            QTabBar::tab {{ background: {SIDEBAR}; border-top-left-radius: 6px; border-top-right-radius: 6px; padding: 4px 6px 4px 10px; margin: 3px 2px 0 0; }}
+            QTabBar::tab:selected {{ background: {BG}; margin-top: 0; padding-top: 7px; }}
+            QTabBar::close-button {{ image: url({(ASSETS_DIR / "Close.svg").as_posix()}); padding: 4px; }}
+            QTabBar::close-button:hover {{ background: {SCROLL}; border-radius: 3px; }}
+        """)
+        self.interpreter_tabs.currentChanged.connect(self.show_interpreter_tab)
+        self.interpreter_tabs.tabCloseRequested.connect(self.close_interpreter_tab)
+
+        new_tab = QToolButton()
+        new_tab.setText("+")
+        new_tab.setToolTip("Ny side")
+        new_tab.setFocusPolicy(Qt.NoFocus)
+        new_tab.setStyleSheet(f"""
+            QToolButton {{ color: {BUTTON}; border: none; font-size: 18px; font-weight: bold; padding: 0 8px; }}
+            QToolButton:hover {{ color: {HOVER}; }}
+            QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+        """)
+        new_tab.clicked.connect(self.new_interpreter_tab)
+
+        tab_strip = QWidget()
+        tab_strip.setStyleSheet(f"background-color: {SCROLL};")
+        tab_row = QHBoxLayout(tab_strip)
+        tab_row.setContentsMargins(4,0,0,0)
+        tab_row.setSpacing(0)
+        tab_row.addWidget(self.interpreter_tabs)
+        tab_row.addWidget(new_tab)
+        tab_row.addStretch()
+
+        self.interpreter_stack = QStackedWidget()
+
+        column = QVBoxLayout()
+        column.setSpacing(0)
+        column.addWidget(bar)
+        column.addWidget(tab_strip)
+        column.addWidget(self.interpreter_stack, stretch=1)
+        layout.addLayout(column, stretch=1)
+
+        self.new_interpreter_tab()
         self.stack.addWidget(page)
+
+    @property
+    def interpreter_view(self):
+        return self.interpreter_stack.currentWidget()
+
+    def new_interpreter_tab(self):
+        name = self.new_file_name()
+        view = QWebEngineView()
+        view.page().setBackgroundColor(QColor(BG))
+        channel = QWebChannel(view.page())
+        channel.registerObject("bridge", _InterpreterBridge(view))
+        view.page().setWebChannel(channel)
+        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)})"))
+        view.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
+        self.interpreter_stack.addWidget(view)
+        index = self.interpreter_tabs.addTab("")
+        self.set_tab_name(view, name)
+        self.interpreter_tabs.setCurrentIndex(index)
+        return view
+
+    def new_file_name(self):
+        names = [self.tab_name(i) for i in range(self.interpreter_tabs.count())]
+        name, n = "Ny Fil", 1
+        while name in names:
+            n += 1
+            name = f"Ny Fil {n}"
+        return name
+
+    def tab_name(self, index):
+        return self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).text()
+
+    def set_tab_name(self, view, name):
+        pill = QLabel(name)
+        pill.setAlignment(Qt.AlignCenter)
+        pill.setFixedHeight(14)
+        pill.setStyleSheet(f"background: {BUTTON}; color: {TEXT}; border-radius: 7px; font-size: 9px; padding: 0 8px; margin-left: 6px;")
+        index = self.interpreter_stack.indexOf(view)
+        old = self.interpreter_tabs.tabButton(index, QTabBar.LeftSide)
+        self.interpreter_tabs.setTabButton(index, QTabBar.LeftSide, pill)
+        if old:
+            old.deleteLater()
+        self.fit_tabs()
+
+    def close_interpreter_tab(self, index):
+        view = self.interpreter_stack.widget(index)
+        view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, lambda used: self.remove_interpreter_tab(view, used))
+
+    def remove_interpreter_tab(self, view, used):
+        if used:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Luk side")
+            msg.setText(f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt.")
+            msg.setIcon(QMessageBox.NoIcon)
+            msg.setStyleSheet(f"""
+                QMessageBox {{ background-color: {BG}; }}
+                QLabel {{ color: {BUTTON}; }}
+                QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
+                QPushButton:hover {{ background-color: {HOVER}; }}
+            """)
+            close = msg.addButton("Luk", QMessageBox.AcceptRole)
+            msg.addButton("Annuller", QMessageBox.RejectRole)
+            msg.exec()
+            if msg.clickedButton() is not close:
+                return
+        if self.interpreter_tabs.count() == 1:
+            self.new_interpreter_tab()
+        index = self.interpreter_stack.indexOf(view)
+        self.interpreter_stack.removeWidget(view)
+        self.interpreter_tabs.removeTab(index)
+        view.deleteLater()
+        self.fit_tabs()
+
+    def fit_tabs(self):
+        self.interpreter_tabs.setMaximumWidth(self.interpreter_tabs.sizeHint().width())
+
+    def show_interpreter_tab(self, index):
+        self.interpreter_stack.setCurrentIndex(index)
+        self.focus_interpreter()
+
+    def focus_interpreter(self):
+        self.interpreter_view.setFocus()
+        self.interpreter_view.page().runJavaScript("(lastField ?? first).focus()")
 
     def create_settings_page(self):
         language = QComboBox()
@@ -2418,8 +2557,7 @@ class MainWindow(QMainWindow):
     def slide_finished(self):
         self.stack.setCurrentWidget(self.slide_target)
         if self.slide_target is self.stack.widget(1):
-            self.interpreter_view.setFocus()
-            self.interpreter_view.page().runJavaScript("(lastField ?? first).focus()")
+            self.focus_interpreter()
         if self.slide_target is not self.history[self.history_index]:
             del self.history[self.history_index + 1:]
             self.history.append(self.slide_target)
@@ -2450,6 +2588,7 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", "", "Regneark (*.crbn)")
         if not path:
             return
+        self.set_tab_name(self.interpreter_view, Path(path).stem)
         self.interpreter_view.page().runJavaScript(
             "JSON.stringify(getSheet())",
             lambda data: Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8"),
@@ -2478,11 +2617,13 @@ class MainWindow(QMainWindow):
         if path:
             self.load_regneark(path)
 
-    def load_regneark(self, path):
+    def load_regneark(self, path, view=None):
         rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
-        self.interpreter_view.page().runJavaScript(f"setSheet({json.dumps(rows)})")
+        view = view or self.new_interpreter_tab()
+        self.set_tab_name(view, Path(path).stem)
+        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setSheet({json.dumps(rows)})"))
         self.open_interpreter()
-
+    
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             if self.isFullScreen():
@@ -2523,7 +2664,7 @@ if __name__ == "__main__":
 
     window = MainWindow()
     if len(sys.argv) > 1:
-        window.interpreter_view.loadFinished.connect(lambda ok: window.load_regneark(sys.argv[1]))
+        window.load_regneark(sys.argv[1], window.interpreter_view)
 
     window.showFullScreen()
     app.exec()
