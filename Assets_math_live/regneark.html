@@ -642,6 +642,14 @@
         }
     }
     
+    let lastField = null;
+    editor.addEventListener("focusin", e => { if (isField(e.target)) lastField = e.target; });
+
+    function insertLatex(latex) {
+        const mf = lastField ?? first;
+        mf.focus();
+        mf.executeCommand(["insert", latex, { selectionMode: "placeholder" }]);
+    }
 
     function setAccent(c) { document.documentElement.style.setProperty("--accent", c); }
 

@@ -426,6 +426,14 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
     refresh()
     return container
 
+GREEK = {
+    "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "epsilon": "ε", "zeta": "ζ", "eta": "η", "theta": "θ",
+    "iota": "ι", "kappa": "κ", "lambda": "λ", "mu": "µ", "nu": "ν", "xi": "ξ", "pi": "π", "rho": "ρ",
+    "sigma": "σ", "tau": "τ", "upsilon": "υ", "phi": "φ", "chi": "χ", "psi": "ψ", "omega": "ω",
+    "Gamma": "Γ", "Delta": "Δ", "Theta": "Θ", "Lambda": "Λ", "Xi": "Ξ", "Pi": "Π", "Sigma": "Σ",
+    "Upsilon": "Υ", "Phi": "Φ", "Psi": "Ψ", "Omega": "Ω",
+}
+
 def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\placeholder{}", "")
     s = s.replace(r"\_", "\x00")  # a typed underscore, not a subscript
@@ -442,6 +450,7 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\^\{\\prime\}", "'", s)
     s = re.sub(r"\\[,;:! ]", " ", s)
     s = re.sub(r"\\mu\s*", "µ", s)
+    s = re.sub(r"\\(" + "|".join(GREEK) + r")(?![A-Za-z])", lambda m: GREEK[m.group(1)], s)
     s = s.replace(r"\%", "%")
 
     prev = None
@@ -1543,6 +1552,60 @@ PANELS = {
     "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
 }
 
+class Dropdown(QWidget):
+    def __init__(self, label, content, parent=None):
+        super().__init__(parent)
+        self.header = QPushButton(label)
+        self.header.setFixedHeight(30)
+        self.header.setCheckable(True)
+        self.header.setStyleSheet(button_style)
+        self.arrow = QLabel()
+        self.arrow.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.arrow.setStyleSheet("background: transparent;")
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(0,0,10,0)
+        header_layout.addStretch()
+        header_layout.addWidget(self.arrow)
+
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setStyleSheet(f"""
+            Dropdown {{ background-color: {BG}; border-radius: 8px; }}
+            Dropdown QWidget {{ background: transparent; }}
+        """)
+        self.body = QWidget()
+        body_layout = QVBoxLayout(self.body)
+        body_layout.setContentsMargins(10,10,10,10)
+        body_layout.addWidget(content)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
+        layout.addWidget(self.header)
+        layout.addWidget(self.body)
+
+        self.header.toggled.connect(self.toggle)
+        self.toggle(False)
+
+    def toggle(self, open):
+        self.body.setVisible(open)
+        self.arrow.setPixmap(QIcon(str(ASSETS_DIR / ("Dropdown.svg" if open else "Dropdown_Up.svg"))).pixmap(12,12))
+
+def symbol_grid(symbols, insert):
+    grid_widget = QWidget()
+    grid = QGridLayout(grid_widget)
+    grid.setContentsMargins(0,0,0,0)
+    grid.setSpacing(2)
+    for i, (label, latex) in enumerate(symbols):
+        btn = QPushButton(label)
+        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setStyleSheet(f"""
+            QPushButton {{ color: {BUTTON}; font-size: 18px; border: none; padding: 4px; }}
+            QPushButton:hover {{ color: {HOVER}; }}
+        """)
+        btn.clicked.connect(lambda _=False, l=latex: insert(l))
+        grid.addWidget(btn, i // 6, i % 6)
+    return grid_widget
+
 class Sidebar(QWidget):
     def __init__(self, buttons, parent=None):
         super().__init__(parent)
@@ -1555,11 +1618,14 @@ class Sidebar(QWidget):
         content_layout.setContentsMargins(10,10,10,10)
         content_layout.setSpacing(14)
 
-        for label, callback in buttons:
+        for label, item in buttons:
+            if isinstance(item, QWidget):
+                content_layout.addWidget(Dropdown(label, item))
+                continue
             btn = QPushButton(label)
             btn.setFixedHeight(30)
             btn.setStyleSheet(f"{button_style}")
-            btn.clicked.connect(callback)
+            btn.clicked.connect(item)
             content_layout.addWidget(btn)
         content_layout.addStretch()
 
@@ -1627,6 +1693,10 @@ class Sidebar(QWidget):
         layout.setSpacing(0)
         layout.addWidget(self.panel)
         layout.addWidget(self.handle)
+        for widget in self.findChildren(QWidget):
+            if not isinstance(widget, QLineEdit):
+                widget.setFocusPolicy(Qt.NoFocus)
+
 
     def relayout(self):
         self.layout().activate()
@@ -2277,7 +2347,14 @@ class MainWindow(QMainWindow):
             QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html")))
         )
 
-        layout.addWidget(Sidebar([("Gem", self.save_regneark), ("Åbn", self.open_regneark)]))
+        def insert(latex):
+            self.interpreter_view.page().runJavaScript(f"insertLatex({json.dumps(latex)})")
+
+        layout.addWidget(Sidebar([
+            ("Calculus", QWidget()),
+            ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
+        ]))
+
         layout.addWidget(self.interpreter_view, stretch=1)
         self.stack.addWidget(page)
 
@@ -2370,13 +2447,6 @@ class MainWindow(QMainWindow):
             "JSON.stringify(getSheet())",
             lambda data: Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8"),
         )
-
-    def open_regneark(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Åbn regneark", "", "Regneark (*.crbn)")
-        if not path:
-            return
-        rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
-        self.interpreter_view.page().runJavaScript(f"setSheet({json.dumps(rows)})")
 
     def open_molecule(self):
         pass
