@@ -130,12 +130,13 @@ def round_pH(x, inputs):
 
 
 class FunctionPlot:
-    def __init__(self,exprs, start =-10,end=10):
+    def __init__(self,exprs, start =-10,end=10, labels=None):
         x = sympy.Symbol("x")
         for expr in exprs:
             if expr.free_symbols - {x}:
                 raise ValueError("Funktionerne kan kun bruge x som variabel")
-            
-        self.functions = [{"js":sympy.jscode(expr),"label" : sympy.latex(expr)} for expr in exprs]
+
+        labels = labels or [sympy.latex(expr) for expr in exprs]
+        self.functions = [{"js":sympy.jscode(expr),"label" : label} for expr, label in zip(exprs, labels)]
         self.start = start
         self.end = end

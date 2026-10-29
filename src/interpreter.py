@@ -462,7 +462,14 @@ class EV:
                             pks_values = [float(x) for x in pks_values]
 
                             if inline:
-                                output[pc] = chem.bjerrum_figure(pks_values)
+                                x = sympy.Symbol("x")
+                                plot = utils.FunctionPlot(
+                                    [1 / (1 + 10 ** (x - sympy.Float(pks))) for pks in pks_values],
+                                    0, 14,
+                                    [rf"\text{{pKs: {pks}}}" for pks in pks_values],
+                                )
+                                plot.pks = pks_values
+                                output[pc] = plot
 
                             else: chem.bjerrum(pks_values)
                             pc += 1
