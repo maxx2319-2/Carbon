@@ -1221,8 +1221,8 @@ def bjerrum_panel():
         if not input.text():
             return
         result = interpreter.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
-        if isinstance(result, utils.FunctionPlot):
-            plot_layout.addWidget(FigureCanvasQTAgg(chem.bjerrum_figure(result.pks)))
+        if isinstance(result, Figure):
+            plot_layout.addWidget(FigureCanvasQTAgg(result))
         else:
             error = QLabel(str(result))
             error.setWordWrap(True)

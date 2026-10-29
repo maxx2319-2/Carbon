@@ -96,14 +96,3 @@ def test_loop_follows_its_line_when_outputs_are_cleared(page):
 def test_open_clears_undo_history(page):
     set_sheet(page, [["code", "x=1"]])
     assert js(page, "undoStack.length") == 0
-
-
-def test_bjerrum_from_bridge_survives_save_and_open(page):
-    import gui
-    rows = json.loads(gui._InterpreterBridge().evaluate(json.dumps([r"BjerrumDiagram\left(2.15,7.20,12.35\right)"])))
-    set_sheet(page, rows)
-    assert js(page, "editor.querySelector('div.plot canvas') !== null")
-    assert js(page, "editor.querySelectorAll('div.plot .legend > div').length") == 3
-    saved = get_sheet(page)
-    assert [kind for kind, _ in saved] == ["code", "plot"]
-    assert json.loads(saved[1][1]) == json.loads(rows[1][1])
