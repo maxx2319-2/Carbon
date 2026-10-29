@@ -1589,6 +1589,10 @@ class Dropdown(QWidget):
     def toggle(self, open):
         self.body.setVisible(open)
         self.arrow.setPixmap(QIcon(str(ASSETS_DIR / ("Dropdown.svg" if open else "Dropdown_Up.svg"))).pixmap(12,12))
+        if self.parentWidget():
+            self.layout().activate()
+            self.parentWidget().layout().activate()
+
 
 def symbol_grid(symbols, insert):
     grid_widget = QWidget()
@@ -2413,6 +2417,9 @@ class MainWindow(QMainWindow):
 
     def slide_finished(self):
         self.stack.setCurrentWidget(self.slide_target)
+        if self.slide_target is self.stack.widget(1):
+            self.interpreter_view.setFocus()
+            self.interpreter_view.page().runJavaScript("(lastField ?? first).focus()")
         if self.slide_target is not self.history[self.history_index]:
             del self.history[self.history_index + 1:]
             self.history.append(self.slide_target)
