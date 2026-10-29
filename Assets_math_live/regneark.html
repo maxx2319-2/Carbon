@@ -491,6 +491,7 @@
     function plotElement(data) {
         const el = document.createElement("div");
         el.className = "plot";
+        el.data = data;
         const canvas = document.createElement("canvas");
         const legend = document.createElement("div");
         legend.className = "legend";
@@ -652,6 +653,35 @@
 
         });
     }
+
+    const SAFE_JS = /^(?:\s|x|Math\.(?:abs|acosh?|asinh?|atan2?|atanh|cbrt|ceil|cosh?|exp|floor|log|max|min|pow|sign|sinh?|sqrt|tanh?|E|PI)\b|\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\d.])|[-+*/%(),?:]|[<>]=?|[=!]=|&&|\|\||!)*$/;
+    const safePlot = raw => JSON.parse(raw).functions.every(f => SAFE_JS.test(f.js));
+
+    function getSheet(){
+        return [...editor.children].map(el => {
+            if (!isOut(el)) return ["code", strip(el.value)];
+            if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
+            if (el.querySelector("img")) return ["image", el.querySelector("img").src];
+            return [el.classList.contains("error") ? "error" : "result", el.value];
+        });
+    }
+
+    function setSheet(rows) {
+        hideSuggest();
+        for (const el of [...editor.children]) if (el !== first) el.remove();
+        const code = rows.filter(([kind]) => kind === "code").map(([, raw]) => raw);
+        setLine(first, code[0] ?? "");
+        let last = first;
+        for (const raw of code.slice(1)) last = newLine(last,raw);
+        rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
+        showOutput(rows, lines());
+        lines().forEach(rember);
+        undoStack.length = 0;
+        current = snapshot();
+        updateHint();
+        focusLine(first);
+    }
+
 
     const idle = () => document.body.classList.toggle("idle", !document.hasFocus());
     window.addEventListener("focus",idle);
