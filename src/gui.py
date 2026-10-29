@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
     QCompleter,
     QComboBox,
     QAbstractButton,
+    QFileDialog,
 )
 from PySide6.QtCore import (
     Qt,
@@ -2273,7 +2274,7 @@ class MainWindow(QMainWindow):
             QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html")))
         )
 
-        layout.addWidget(Sidebar([]))
+        layout.addWidget(Sidebar([("Gem", self.save_regneark), ("Åbn", self.open_regneark)]))
         layout.addWidget(self.interpreter_view, stretch=1)
         self.stack.addWidget(page)
 
@@ -2357,6 +2358,22 @@ class MainWindow(QMainWindow):
 
     def open_interpreter(self):
         self.slide_to(self.stack.widget(1))
+
+    def save_regneark(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", "", "Regneark (*.crbn)")
+        if not path:
+            return
+        self.interpreter_view.page().runJavaScript(
+            "JSON.stringify(getSheet())",
+            lambda data: Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8"),
+        )
+
+    def open_regneark(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Åbn regneark", "", "Regneark (*.crbn)")
+        if not path:
+            return
+        rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
+        self.interpreter_view.page().runJavaScript(f"setSheet({json.dumps(rows)})")
 
     def open_molecule(self):
         pass
