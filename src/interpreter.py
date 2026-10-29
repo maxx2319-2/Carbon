@@ -9,6 +9,9 @@ import sympy
 from sympy import symbols, simplify,sin, cos
 import numpy as np
 from matplotlib.figure import Figure
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor, split_symbols
 
 from types import SimpleNamespace
@@ -313,7 +316,17 @@ class EV:
 
                                 else: functions.append(self.prep_sympy(part))
 
-                            result = sympy.solve(functions,*variables,dict = True)
+                            pool = ThreadPool(1)
+                            task = pool.apply_async(sympy.solve, (functions, *variables), {"dict": True})
+                            pool.close()
+                            try:
+                                result = task.get(timeout = 20)
+                            except multiprocessing.TimeoutError:
+                                try:
+                                    result = sympy.nsolve(functions, variables, [1] * len(variables), dict = True)
+                                except (ValueError, ZeroDivisionError):
+                                    result = "Kunne ikke løses inden for 20 sekunder"
+
                             output[pc] = result or "Ingen løsninger"
 
                             pc+=1

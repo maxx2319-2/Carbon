@@ -470,11 +470,13 @@
         if (e.target === editor && e.offsetX < editor.clientWidth) { e.preventDefault(); focusLine(lines().at(-1)); }
     });
 
+    let runId =0, runLines = null;
+
     function run() {
         if (!bridge) return;
-        const all = [...editor.children];
-        const text = all.map(el => isOut(el) ? "" : strip(el.value));
-        bridge.run(JSON.stringify(text),rows => showOutput(JSON.parse(rows),all))
+        runLines = [...editor.children];
+        const text = runLines.map(el => isOut(el) ? "" : strip(el.value));
+        bridge.run(++runId, JSON.stringify(text));
     }
     const PLOT_COLORS = ["#00d9ff", "#ff6ec7", "#ffd166", "#06ffa5", "#c77dff", "#ff9e6d"];
     const tidy = (v,digits) => +v.toPrecision(digits) || 0;
@@ -646,6 +648,8 @@
         new QWebChannel(qt.webChannelTransport, ch =>{
             bridge = ch.objects.bridge;
             bridge.help(h => HELP = JSON.parse(h))
+            bridge.finished.connect((id, rows) => { if (id === runId) showOutput(JSON.parse(rows), runLines); });
+
         });
     }
 

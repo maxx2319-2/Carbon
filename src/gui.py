@@ -529,6 +529,7 @@ def latex_text(s):
 
 
 class _InterpreterBridge(QObject):
+    finished = Signal(int, str)
     @Slot(result=str)
     def help(self):
         return json.dumps({
@@ -538,8 +539,8 @@ class _InterpreterBridge(QObject):
 
 
 
-    @Slot(str, result=str)
-    def run(self, data):
+   
+    def evaluate(self, data):
         latex_lines = json.loads(data)
         ev = interpreter.EV()
         try:
@@ -585,6 +586,12 @@ class _InterpreterBridge(QObject):
                         )
         return json.dumps(rows)
 
+    @Slot(int, str)
+    def run(self,run_id,data):
+        if 'export' in data.lower():
+            self.finished.emit(run_id, self.evaluate(data))
+            return
+        threading.Thread(target=lambda: self.finished.emit(run_id,self.evaluate(data)), daemon=True).start()
 
 class _Bridge(QObject):
     changed = Signal(str)

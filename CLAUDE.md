@@ -75,6 +75,7 @@ everywhere and in everything you say.
 
 **House rules.**
 
+- always start each message with my name ask what my name is at the start dont use my claude name
 - Don't add any comments in the code.
 - Always write in English, except for text in the UI, which you write in Danish.
 - Always run tests and code you are checking in your own virtual environment so it doesn't open on my computer.
