@@ -2006,7 +2006,7 @@ class MainWindow(QMainWindow):
         container.setStyleSheet(f"background-color: {HEADER};")
         self.header_container = container
         outer = QVBoxLayout(container)
-        outer.setContentsMargins(5,0,0,0)
+        outer.setContentsMargins(0,0,0,0)
         outer.setSpacing(0)
 
         window_row = QHBoxLayout()
@@ -2014,6 +2014,7 @@ class MainWindow(QMainWindow):
         outer.addLayout(window_row)
 
         layout = QHBoxLayout()
+        layout.setContentsMargins(5,0,0,0)
         layout.setSpacing(15)
         outer.addLayout(layout)
 
@@ -2050,7 +2051,7 @@ class MainWindow(QMainWindow):
         def nav_icon(mirror):
             icon = QIcon()
             for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Hover.svg", QIcon.Disabled)):
-                pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(64,64)
+                pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(10,10)
                 if mirror:
                     pixmap = pixmap.transformed(QTransform().scale(-1,1))
                 icon.addPixmap(pixmap, mode)
