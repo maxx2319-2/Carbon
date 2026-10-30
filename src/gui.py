@@ -595,7 +595,7 @@ class _InterpreterBridge(QObject):
             values = value if isinstance(value, list) else [value]
             for value in values:
                 if isinstance(value, dict):
-                    rows.append(["result", r"\Rightarrow\:" + r",\ ".join(f"{sympy.latex(k)} = {sympy.latex(v)}" for k, v in value.items())])
+                    rows.append(["result", r"\Rightarrow\:" + r",\ ".join(f"{sympy.latex(k)} = {calc_to_latex(v) if isinstance(v, sympy.Float) else sympy.latex(v)}" for k, v in value.items())])
                     continue
 
                 if isinstance(value, sympy.Basic) and not isinstance(value, sympy.Float):
@@ -2398,6 +2398,24 @@ class MainWindow(QMainWindow):
             QToolButton::menu-indicator {{ image: none; }}
             QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
         """)
+
+        mode_btn = QToolButton()
+        mode_menu = QMenu(mode_btn)
+        mode_menu.setStyleSheet(file_menu.styleSheet())
+        for label, mode in [("Matematik", "math"), ("Tekst", "text"), ("Formel (regnes ikke)", "formula")]:
+            mode_menu.addAction(label, lambda _=False, mode=mode: self.interpreter_view.page().runJavaScript(f"setMode({json.dumps(mode)})"))
+        mode_btn.setText("Linjetype")
+        mode_btn.setToolTip("Skift linjetype")
+        mode_btn.setFocusPolicy(Qt.NoFocus)
+        mode_btn.setPopupMode(QToolButton.InstantPopup)
+        mode_btn.setMenu(mode_menu)
+        mode_btn.setStyleSheet(f"""
+            QToolButton {{ color: {BUTTON}; border: none; font-size: 14px; padding: 0 8px; }}
+            QToolButton:hover {{ color: {HOVER}; }}
+            QToolButton::menu-indicator {{ image: none; }}
+            QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+        """)
+        bar_layout.addWidget(mode_btn)
         bar_layout.addWidget(file_btn)
 
         self.interpreter_tabs = QTabBar()

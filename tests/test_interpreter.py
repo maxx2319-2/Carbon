@@ -320,3 +320,116 @@ def test_each_line_gets_its_own_result(interpreter):
     assert out[0] == "2.88"
     assert out[1] == interpreter.help_text["pH"]
     assert str(out[2]) == "2.0"
+
+
+# --- SystemLøs ---
+
+MIXED = "SystemLøs(Variabler={x,y},y=x^2-2x+3,y=3*1.2^(x)"
+
+
+def solution(out):
+    return {str(k): round(float(v), 4) for k, v in out[0][0].items()}
+
+
+def test_system_without_exact_solution_is_solved_numerically(interpreter):
+    assert solution(interpreter.ev(MIXED + ")")) == {"x": 0.0, "y": 3.0}
+
+
+@pytest.mark.parametrize("guess, expected", [
+    ("{3,5}", {"x": 2.7072, "y": 4.9145}),
+    ("{30, 1000}", {"x": 31.4646, "y": 930.0899}),
+])
+def test_system_start_guess_finds_other_solutions(interpreter, guess, expected):
+    assert solution(interpreter.ev(f"{MIXED},StartGæt={guess})")) == expected
+
+
+def test_system_numeric_failure_is_explained(interpreter):
+    out = interpreter.ev("SystemLøs(Variabler={x,y},y=1.2^(x),y=-x^2-1)")
+    assert out[0] == "Kunne ikke løses. Prøv et andet StartGæt"
+
+
+@pytest.mark.parametrize("guess", ["{1}", "{1,2,3}", "1,2"])
+def test_system_bad_start_guess(interpreter, guess):
+    out = interpreter.ev(f"{MIXED},StartGæt={guess})")
+    assert out[0] == "Error: " + interpreter.error_text["SystemLøs"]
+
+
+def test_system_exact_answer_ignores_start_guess(interpreter):
+    out = interpreter.ev("SystemLøs(x+y=10,x-y=2,Variabler={x,y},StartGæt={100,100})")
+    assert solution(out) == {"x": 6.0, "y": 4.0}
+
+
+def solutions(out):
+    return [{str(k): round(float(v), 4) for k, v in s.items()} for s in out[0]]
+
+
+def test_system_interval_finds_all_solutions(interpreter):
+    assert solutions(interpreter.ev(MIXED + ",Interval=(-50,50))")) == [
+        {"x": 0.0, "y": 3.0},
+        {"x": 2.7072, "y": 4.9145},
+        {"x": 31.4646, "y": 930.0899},
+    ]
+
+
+def test_system_interval_follows_both_branches(interpreter):
+    found = solutions(interpreter.ev("SystemLøs(Variabler={x,y},y=x^3,x^2+y^2=4,Interval=(-3,3))"))
+    assert len(found) == 2
+    assert found[0]["x"] < 0 < found[1]["x"]
+    for s in found:
+        assert s["y"] == pytest.approx(s["x"] ** 3, abs=1e-3)
+        assert s["x"] ** 2 + s["y"] ** 2 == pytest.approx(4, abs=1e-3)
+
+
+def test_system_interval_needs_a_variable_it_can_isolate(interpreter):
+    out = interpreter.ev("SystemLøs(Variabler={x,y},x=y+Cos(y),x=y^2+Sin(y),Interval=(0,1))")
+    assert out[0] == "Error: Kan ikke søge i et interval her. Brug StartGæt i stedet"
+
+
+def test_numeric_answers_have_no_negative_zero(interpreter):
+    for value in interpreter.ev(MIXED + ",Interval=(-50,50))")[0][0].values():
+        assert not str(value).startswith("-0.0")
+
+
+# --- Løs ---
+
+MIXED_EQ = "Løs(x^2-2x+3=3*1.2^(x)"
+
+
+def numbers(out):
+    return [round(float(v), 4) for v in out[0]]
+
+
+def test_løs_without_exact_solution_is_solved_numerically(interpreter):
+    assert numbers(interpreter.ev(MIXED_EQ + ")")) == [0.0]
+
+
+def test_løs_interval_finds_all_solutions(interpreter):
+    assert numbers(interpreter.ev(MIXED_EQ + ",Interval=(-50,50))")) == [0.0, 2.7072, 31.4646]
+
+
+def test_løs_interval_only_searches_inside(interpreter):
+    assert numbers(interpreter.ev(MIXED_EQ + ",Interval=(1,10))")) == [2.7072]
+
+
+def test_løs_interval_finds_repeating_solutions(interpreter):
+    assert numbers(interpreter.ev("Løs(Sin(x)=0.5,Interval=(0,1000))")) == [30.0, 150.0, 390.0, 510.0, 750.0, 870.0]
+
+
+def test_løs_interval_skips_poles(interpreter):
+    assert interpreter.ev("Løs(1/x=0,Interval=(-1,2))")[0] == "Ingen løsninger i intervallet"
+
+
+@pytest.mark.parametrize("line", ["Løs(Sin(x)=0,Interval=(0,360))", "Løs(Tan(x)=0,Interval=(0,360))"])
+def test_løs_interval_includes_both_ends(interpreter, line):
+    assert numbers(interpreter.ev(line)) == [0.0, 180.0, 360.0]
+
+
+@pytest.mark.parametrize("line", [
+    MIXED_EQ + ",Interval=(5,1))",
+    MIXED_EQ + ",Interval=(1))",
+    MIXED_EQ + ",Interval=1,2)",
+    MIXED_EQ + ",2)",
+    "Løs(x+y=1,Interval=(0,1))",
+])
+def test_løs_bad_interval(interpreter, line):
+    assert interpreter.ev(line)[0] == "Error: " + interpreter.error_text["Løs"]

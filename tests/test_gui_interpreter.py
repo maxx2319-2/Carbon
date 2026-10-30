@@ -29,3 +29,17 @@ def test_numerisk_løs_stays_rounded():
 
 def test_system_løs_no_solutions():
     assert results(r"\mathrm{SystemLøs}(Variabler=\{x\},x=1,x=2)") == [r"\Rightarrow\:\mathrm{Ingen\ løsninger}"]
+
+
+@pytest.mark.parametrize("guess, expected", [
+    ("", r"\Rightarrow\:x = \mathrm{0.0},\ y = \mathrm{3}"),
+    (r",StartGæt=\{3,5\}", r"\Rightarrow\:x = \mathrm{2.70719},\ y = \mathrm{4.91451}"),
+])
+def test_numeric_system_løs_stays_rounded(guess, expected):
+    latex = r"\mathrm{SystemLøs}\left(Variabler=\{x,y\},y=x^2-2x+3,y=3\cdot1.2^{x}" + guess + r"\right)"
+    assert results(latex) == [expected]
+
+
+def test_løs_interval_shows_every_solution():
+    latex = r"\mathrm{Løs}\left(x^2-2x+3=3\cdot1.2^{x},Interval=\left(-50,50\right)\right)"
+    assert results(latex) == [r"\Rightarrow\:\mathrm{0.0}", r"\Rightarrow\:\mathrm{2.70719}", r"\Rightarrow\:\mathrm{31.4646}"]

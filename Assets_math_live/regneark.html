@@ -6,6 +6,7 @@
     :root { --accent: #6fc6fb; --results: #9CDCFE; --error: #ff8a80; --bg: #404040; }
     html, body { margin: 0; height: 100%; background: transparent; color: #fff; overflow: hidden; }
     #editor { height: 100%; overflow-y: auto; padding: 8px 12px 8px 48px; box-sizing: border-box; cursor: text; counter-reset: line; margin-right: 4px;}
+    #editor > math-field[data-mode=formula]::before {color: var(--accent);}
     math-field {
         display: block; width: 100%; box-sizing: border-box; min-height: 1.7em;
         font-size: 18px; color: #fff; background: transparent;
@@ -93,7 +94,8 @@
         Help: FUNCTIONS,
         PlotFunktion: ["Interval = (xstart, xslut)"],
         NumeriskLøs: ["Variabel = ","StartGæt = "],
-        SystemLøs : ["Variabler = "]
+        Løs: ["Interval = (start, slut)"],
+        SystemLøs : ["Variabler = ", "StartGæt = ", "Interval = (start, slut)"]
 
     };
     const wordColor = w => ["Help", "Loop"].includes(w) ? COLORS.control : FUNCTIONS.includes(w) ? COLORS.func : MATH.includes(w) ? COLORS.math : null;
@@ -142,10 +144,19 @@
         }
         return latex;
     }
+    const MODES = {"1":"math","2":"text","3": "formula"};
+    const modeOf = mf => mf.dataset.mode ?? "math";
+    const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(raw) : raw;
+
+
+    function applyMode(mf,mode) {
+        if (mode === "math") delete mf.dataset.mode; else mf.dataset.mode = mode;
+    }
+    
 
     function setLine(mf, raw, position) {
         mf.recolouring = true;
-        mf.value = highlight(raw);
+        mf.value = styled(mf, raw);
         mf.recolouring = false;
         if (position !== undefined) mf.position = Math.min(position, mf.lastOffset);
     }
@@ -154,7 +165,7 @@
     function recolour(mf) {
         if (mf.recolouring) return;
         const raw = strip(mf.value);
-        if (highlight(raw) !== mf.value) setLine(mf, raw, mf.position);
+        if (styled(mf, raw) !== mf.value) setLine(mf, raw, mf.position);
     }
 
 
@@ -189,7 +200,7 @@
         suggest.style.display = "none";
     }
     function variables() {
-        const names = lines().map(l => strip(l.value).match(/^([A-Za-zæøåÆØÅ]+)(?:\\:|\s)*=/)?.[1]);
+        const names = lines().filter(l => modeOf(l) === "math").map(l => strip(l.value).match(/^([A-Za-zæøåÆØÅ]+)(?:\\:|\s)*=/)?.[1]);
         return [...new Set(names.filter(n => n && !FUNCTIONS.includes(n)))];
     } 
 
@@ -450,7 +461,7 @@
         const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
         setLine(mf, strip(mf.getValue(0, mf.position, "latex")) + head);
         let last = mf;
-        for (const raw of rest) last = newLine(last, raw);
+        for (const raw of rest) last = newLine(last, raw, modeOf(mf));
         const end = last.lastOffset;
         setLine(last, strip(last.value) + after, end);
         last.focus();
@@ -498,12 +509,13 @@
         mf.shadowRoot.append(style);
     }
 
-    function newLine(after = null, raw = "") {
+    function newLine(after = null, raw = "", mode = "math") {
         const mf = new MathfieldElement();
         if (after) after.after(mf); else editor.append(mf);
         setupField(mf);
+        applyMode(mf, mode);
         setLine(mf, raw);
-        mf.addEventListener("input", () => { clearOutput(mf); makeSqrt(mf); recolour(mf); rember(mf);  updateSuggest(mf); record(); });
+        mf.addEventListener("input", () => { const text = modeOf(mf) === "text"; clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (!text) updateSuggest(mf); record(); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
@@ -514,12 +526,12 @@
     function snapshot () {
         const all = lines();
         const mf = document.activeElement;
-        return {raws: all.map(l => strip(l.value)), line: all.indexOf(mf), position: mf?.position ?? 0};
+        return {raws: all.map(l => strip(l.value)), modes: all.map(modeOf), line: all.indexOf(mf), position: mf?.position ?? 0};
     }
 
     function record() {
         const next = snapshot();
-        if (current && current.raws.join("\n") !== next.raws.join("\n")) undoStack.push(current);
+        if (current && JSON.stringify([current.raws, current.modes]) !== JSON.stringify([next.raws, next.modes])) undoStack.push(current);
         current = next;
     }
 
@@ -535,8 +547,9 @@
         }
         while (all.length < s.raws.length) all.push(newLine());
         all.forEach((mf,i) =>{
-            if (strip(mf.value) === s.raws[i]) return;
+            if (strip(mf.value) === s.raws[i] && modeOf(mf) === s.modes[i]) return;
             clearOutput(mf);
+            applyMode(mf, s.modes[i]);
             setLine(mf,s.raws[i]);
             rember(mf);
 
@@ -552,8 +565,11 @@
     function onKey(e) {
         const mf = e.currentTarget;
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
+        const text = modeOf(mf) === "text";
+        if (text) mf.mode = "text";
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); clearSel(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") { stop(); selectAll(); return; }
+        if ((e.ctrlKey || e.metaKey) && MODES[e.key]) { stop(); setMode(MODES[e.key], mf); return; }
         if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.startsWith("Arrow") && !isOut(mf)) {
             const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
             const edge = e.key === "ArrowLeft" ? mf.position === 0 && prevLine(mf) : mf.position === mf.lastOffset && nextLine(mf);
@@ -601,8 +617,8 @@
         if (e.key === "ArrowDown" && down) { stop(); focusLine(down); return; }
         if (e.key === "ArrowLeft" && atStart && up) { stop(); focusLine(up, "end"); return; }
         if (e.key === "ArrowRight" && atEnd && down) { stop(); focusLine(down, "start"); return; }
-        if (e.key === "_") { stop(); mf.executeCommand("moveToSubscript"); return; }
-        if (e.shiftKey && e.code === "BracketRight") { stop(); mf.executeCommand("moveToSuperscript"); return; }
+        if (!text && e.key === "_") { stop(); mf.executeCommand("moveToSubscript"); return; }
+        if (!text && e.shiftKey && e.code === "BracketRight") { stop(); mf.executeCommand("moveToSuperscript"); return; }
         if (isOut(mf)) {
             if (e.key === "Enter") {
                 stop();
@@ -622,7 +638,7 @@
             const before = strip(mf.getValue(0, mf.position, "latex"));
             const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
             setLine(mf, before);
-            focusLine(newLine(mf, after), "start");
+            focusLine(newLine(mf, after, modeOf(mf)), "start");
             record();
             return;
         }
@@ -649,8 +665,8 @@
             record();
             return;
         }
-        if (e.key === "/") { stop(); mf.executeCommand(["insert", "\\frac{#@}{#?}"]); return; }
-        if (e.key === "[") { stop(); mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]); return; }
+        if (!text && e.key === "/") { stop(); mf.executeCommand(["insert", "\\frac{#@}{#?}"]); return; }
+        if (!text && e.key === "[") { stop(); mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]); return; }
     }
 
     // clicking the empty space below the text continues at the end, like one big text area
@@ -663,7 +679,7 @@
     function run() {
         if (!bridge) return;
         runLines = [...editor.children];
-        const text = runLines.map(el => isOut(el) ? "" : strip(el.value));
+        const text = runLines.map(el => isOut(el) || modeOf(el) !== "math" ? "" : strip(el.value));
         bridge.run(++runId, JSON.stringify(text));
     }
     const PLOT_COLORS = ["#00d9ff", "#ff6ec7", "#ffd166", "#06ffa5", "#c77dff", "#ff9e6d"];
@@ -840,6 +856,22 @@
         mf.executeCommand(["insert", latex, { selectionMode: "placeholder" }]);
     }
 
+    function selectedLines() {
+        const [a, b] = ordered(), all = lines();
+        return all.slice(all.indexOf(a.mf), all.indexOf(b.mf) + 1);
+    }
+
+    function setMode(mode, mf = lastField ?? first) {
+        for (const line of sel ? selectedLines() : [mf]) {
+            if (isOut(line) || modeOf(line) === mode) continue;
+            clearOutput(line);
+            applyMode(line, mode);
+            setLine(line, strip(line.value), line.position);
+        }
+        if (sel) paint(); else mf.focus();
+        record();
+    }
+
     function setAccent(c) { document.documentElement.style.setProperty("--accent", c); }
     function setBackground(c) { document.documentElement.style.setProperty("--bg", c); }
 
@@ -857,7 +889,7 @@
 
     function getSheet(){
         return [...editor.children].map(el => {
-            if (!isOut(el)) return ["code", strip(el.value)];
+            if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", strip(el.value), modeOf(el)];
             if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
             if (el.querySelector("img")) return ["image", el.querySelector("img").src];
             return [el.classList.contains("error") ? "error" : "result", el.value];
@@ -868,10 +900,11 @@
         hideSuggest();
         clearSel();
         for (const el of [...editor.children]) if (el !== first) el.remove();
-        const code = rows.filter(([kind]) => kind === "code").map(([, raw]) => raw);
-        setLine(first, code[0] ?? "");
+        const code = rows.filter(([kind]) => kind === "code");
+        applyMode(first, code[0]?.[2] ?? "math");
+        setLine(first, code[0]?.[1] ?? "");
         let last = first;
-        for (const raw of code.slice(1)) last = newLine(last,raw);
+        for (const [, raw, mode] of code.slice(1)) last = newLine(last, raw, mode);
         rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
         showOutput(rows, lines());
         lines().forEach(rember);

@@ -117,10 +117,10 @@ class EV:
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)",
             "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
-            "Løs" : "Løs(ligning)",
+            "Løs" : "Løs(ligning, evt Interval = (start, slut))",
             "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
             "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)",
-            "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...})",
+            "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...}, evt StartGæt = {1, 1, ...}, evt Interval = (start, slut))",
             "Simplificer" : "Simplificer(x)",
         }
 
@@ -141,10 +141,10 @@ class EV:
             "MængdeBeregning": "MængdeBeregning(m=.., n=.., ...)\nBeregner de manglende størrelser ud fra m, n, M, c, V og p .\nEks: MængdeBeregning(m=10[g], M=58.44[g/mol], V=0.5[l]) ",
             "Puffer": "Puffer(syre koncentration, base koncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76) ",
             "pHTilKoncentration": "pHTilKoncentration(pH)\nBeregner [H3O+] og [OH-] ud fra pH.\nEks: pHTilKoncentration(3.5) ",
-            "Løs": "Løs(ligning)\nLøser en ligning. Kan ikke tage imod enheder.\nEks: Løs(x^2 = 4) ",
+            "Løs": "Løs(ligning, Interval = (start, slut))\nLøser en ligning. Kan ikke tage imod enheder. Interval er valgfrit og finder alle løsninger i intervallet numerisk.\nEks: Løs(x^2 = 4) ",
             "PlotFunktion": "PlotFunktion(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5)) ",
             "NumeriskLøs": "NumeriskLøs(funktion, Variabel = x, StartGæt = 1)\nLøser en ligning numerisk ud fra et startgæt. StartGæt er valgfrit.\nEks: NumeriskLøs(Cos(x) = x, Variabel = x, StartGæt = 10) ",
-            "SystemLøs": "SystemLøs(ligning 1, ligning 2, ..., Variabler = {x, y, ...})\nLøser et ligningssystem med flere ubekendte.\nEks: SystemLøs(x + y = 10, x - y = 2, Variabler = {x, y}) ",
+            "SystemLøs": "SystemLøs(ligning 1, ligning 2, ..., Variabler = {x, y, ...}, StartGæt = {1, 1, ...}, Interval = (start, slut))\nLøser et ligningssystem med flere ubekendte. StartGæt er valgfrit og bruges, når systemet skal løses numerisk. Interval er valgfrit og finder alle løsninger, hvor den første variabel ligger i intervallet.\nEks: SystemLøs(x + y = 10, x - y = 2, Variabler = {x, y}) ",
             "Simplificer": "Simplificer(udtryk)\nUdregner et udtryk med kvadratrødder, brøker osv. til et decimaltal.\nEks: Simplificer(sqrt(12) + sqrt(27)) ",
         }
 
@@ -257,17 +257,30 @@ class EV:
                             pc += 1
 
                         case 'Løs':
-                            if len(args) != 1:
+                            if len(args) not in (1, 2) or (len(args) == 2 and "Interval" not in args[1]):
                                 raise ValueError(self.error_text["Løs"])
                             if "[" in args[0]:
                                 raise ValueError("kan ikke tage imod enheder")
 
                             expr = self.prep_sympy(args[0])
+                            f = expr.lhs - expr.rhs if isinstance(expr, sympy.Eq) else expr
                             if expr is sympy.true:
                                 output[pc] = "Alle tal er løsninger"
 
+                            elif len(args) == 2:
+                                if len(f.free_symbols) != 1:
+                                    raise ValueError(self.error_text["Løs"])
+                                start,end = self.parse_interval(args[1], "Løs")
+                                output[pc] = self.roots_in(f, f.free_symbols.pop(), start, end) or "Ingen løsninger i intervallet"
+
                             else:
-                                solutions = [s for s in sympy.solve(self.prep_sympy(args[0]))]
+                                try:
+                                    solutions = [s for s in sympy.solve(self.prep_sympy(args[0]))]
+                                except NotImplementedError:
+                                    try:
+                                        solutions = [self.clean_number(sympy.nsolve(f, 1))]
+                                    except (ValueError, ZeroDivisionError):
+                                        solutions = "Kunne ikke løses. Prøv med Interval = (start, slut)"
                                 output[pc] = solutions if solutions else "Ingen løsninger"
 
                             pc += 1
@@ -303,6 +316,8 @@ class EV:
 
                         case 'SystemLøs':
                             functions = []
+                            guess = None
+                            interval = None
                             if len(args) < 3:
                                 raise ValueError(self.error_text["SystemLøs"])
 
@@ -314,18 +329,34 @@ class EV:
                                     variables = v.strip().strip("{").strip("}")
                                     variables = [sympy.Symbol(part.strip()) for part in variables.split(",")]
 
+                                elif "StartGæt" in part:
+                                    _,g = part.split("=")
+                                    if "{" not in g or "}" not in g:
+                                        raise ValueError(self.error_text["SystemLøs"])
+                                    guess = [float(n) for n in g.strip().strip("{").strip("}").split(",")]
+
+                                elif "Interval" in part:
+                                    interval = self.parse_interval(part, "SystemLøs")
+
                                 else: functions.append(self.prep_sympy(part))
 
-                            pool = ThreadPool(1)
-                            task = pool.apply_async(sympy.solve, (functions, *variables), {"dict": True})
-                            pool.close()
-                            try:
-                                result = task.get(timeout = 20)
-                            except multiprocessing.TimeoutError:
+                            guess = guess or [1] * len(variables)
+                            if len(guess) != len(variables):
+                                raise ValueError(self.error_text["SystemLøs"])
+
+                            if interval:
+                                result = self.system_roots_in(functions, variables, *interval) or "Ingen løsninger i intervallet"
+                            else:
+                                pool = ThreadPool(1)
+                                task = pool.apply_async(sympy.solve, (functions, *variables), {"dict": True})
+                                pool.close()
                                 try:
-                                    result = sympy.nsolve(functions, variables, [1] * len(variables), dict = True)
-                                except (ValueError, ZeroDivisionError):
-                                    result = "Kunne ikke løses inden for 20 sekunder"
+                                    result = task.get(timeout = 20)
+                                except (multiprocessing.TimeoutError, NotImplementedError):
+                                    try:
+                                        result = [{k: self.clean_number(v) for k, v in sympy.nsolve(functions, variables, guess, dict = True)[0].items()}]
+                                    except (ValueError, ZeroDivisionError):
+                                        result = "Kunne ikke løses. Prøv et andet StartGæt"
 
                             output[pc] = result or "Ingen løsninger"
 
@@ -752,6 +783,66 @@ class EV:
             lhs, rhs = expr.split("=",maxsplit = 1)
             return sympy.Eq(parse_expr(lhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS),parse_expr(rhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS))
         return parse_expr(expr, transformations=transformations, local_dict=SYMPY_FUNCTIONS)
+
+    def parse_interval(self, part, name):
+        _,interval = part.split("=")
+        if "(" not in interval or ")" not in interval or interval.count(",") != 1:
+            raise ValueError(self.error_text[name])
+        start,end = interval.strip().strip("(").strip(")").split(",")
+        if start.strip() == "" or end.strip() == "":
+            raise ValueError(self.error_text[name])
+        start,end = self.input_prep(start).value, self.input_prep(end).value
+        if start >= end:
+            raise ValueError(self.error_text[name])
+        return start, end
+
+    def clean_number(self, value):
+        return sympy.Float(round(float(value), 12) + 0.0)
+
+    def roots_in(self, expr, var, start, end):
+        f = sympy.lambdify(var, expr, "numpy")
+        xs = np.linspace(start, end, 2001)
+        with np.errstate(all = "ignore"):
+            ys = np.broadcast_to(f(xs), xs.shape)
+        zero = lambda y: np.isfinite(y) and abs(y) < 1e-12
+        roots = [x for x, y in zip(xs, ys) if zero(y)]
+        for a, b, fa, fb in zip(xs, xs[1:], ys, ys[1:]):
+            if not (np.isfinite(fa) and np.isfinite(fb)) or zero(fa) or zero(fb) or fa * fb > 0:
+                continue
+            try:
+                r = float(sympy.nsolve(expr, var, (a, b), solver = "bisect", verify = False))
+            except (ValueError, ZeroDivisionError):
+                continue
+            with np.errstate(all = "ignore"):
+                if abs(f(r)) < 1e-6 * max(abs(fa), abs(fb)):
+                    roots.append(r)
+        return sorted({self.clean_number(r) for r in roots})
+
+    def system_roots_in(self, functions, variables, start, end):
+        first, rest = variables[0], variables[1:]
+        for i, last in enumerate(functions):
+            try:
+                branches = sympy.solve(functions[:i] + functions[i + 1:], rest, dict = True)
+            except NotImplementedError:
+                continue
+            branches = [b for b in branches if set(b) == set(rest)]
+            if not branches:
+                continue
+            found = []
+            for branch in branches:
+                eq = last.subs(branch)
+                if first not in eq.free_symbols:
+                    continue
+                f = eq.lhs - eq.rhs if isinstance(eq, sympy.Eq) else eq
+                for r in self.roots_in(f, first, start, end):
+                    values = {v: e.subs(first, r).evalf() for v, e in branch.items()}
+                    if not all(val.is_real for val in values.values()):
+                        continue
+                    solution = {first: r, **{v: self.clean_number(val) for v, val in values.items()}}
+                    if solution not in found:
+                        found.append(solution)
+            return sorted(found, key = lambda s: s[first])
+        raise ValueError("Kan ikke søge i et interval her. Brug StartGæt i stedet")
 
     def unit_bracket_strip(self, val):
         match = re.match(r"([^\[]+)\[([^\]]+)\]", val)
