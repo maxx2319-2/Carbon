@@ -2408,7 +2408,7 @@ class MainWindow(QMainWindow):
         self.interpreter_tabs.setStyleSheet(f"""
             QTabBar::tab {{ background: {SIDEBAR}; border-top-left-radius: 6px; border-top-right-radius: 6px; padding: 4px 6px 4px 10px; margin: 3px 2px 0 0; }}
             QTabBar::tab:selected {{ background: {BG}; margin-top: 0; padding-top: 7px; }}
-            QTabBar::close-button {{ image: url({(ASSETS_DIR / "Close.svg").as_posix()}); padding: 4px; }}
+            QTabBar::close-button {{ image: url({(ASSETS_DIR / "Close.svg").as_posix()}); padding: 4px; subcontrol-position: right;}}
             QTabBar::close-button:hover {{ background: {SCROLL}; border-radius: 3px; }}
         """)
         self.interpreter_tabs.currentChanged.connect(self.show_interpreter_tab)
