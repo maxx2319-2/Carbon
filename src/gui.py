@@ -2457,7 +2457,7 @@ class MainWindow(QMainWindow):
         channel = QWebChannel(view.page())
         channel.registerObject("bridge", _InterpreterBridge(view))
         view.page().setWebChannel(channel)
-        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)})"))
+        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
         view.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
         self.interpreter_stack.addWidget(view)
         index = self.interpreter_tabs.addTab("")
