@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_dmg.sh — wrap dist/FihsihCalc.app into a distributable .dmg
+# build_dmg.sh — wrap dist/Carbon.app into a distributable .dmg
 #
 # Prereqs:
 #   brew install create-dmg

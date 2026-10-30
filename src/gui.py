@@ -12,7 +12,6 @@ import base64
 from matplotlib.figure import Figure
 import utils
 import ctypes
-import winreg
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
@@ -243,6 +242,34 @@ def load_dict_from_settings(key, target):
     if raw:
         target.clear()
         target.update(json.loads(raw))
+
+class CarbonApp(QApplication):
+    def __init__(self, argv):
+        super().__init__(argv)
+        self.window = None
+        self.pending_file = None
+
+    def event(self, event):
+        if event.type() == QEvent.FileOpen:
+            if self.window:
+                self.window.load_regneark(event.file())
+            else:
+                self.pending_file = event.file()
+            return True
+        return super().event(event)
+
+def register_crbn():
+    import winreg
+    exe = sys.executable
+    for key, value in [
+        (r"Software\Classes\.crbn", "Carbon.Regneark"),
+        (r"Software\Classes\Carbon.Regneark", "Carbon regneark"),
+        (r"Software\Classes\Carbon.Regneark\DefaultIcon", f'"{exe}",0'),
+        (r"Software\Classes\Carbon.Regneark\shell\open\command", f'"{exe}" "%1"'),
+    ]:
+        winreg.SetValue(winreg.HKEY_CURRENT_USER, key, winreg.REG_SZ, value)
+    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+
 
 def category_page(title, categories):
     content = QWidget()
@@ -2636,24 +2663,15 @@ class MainWindow(QMainWindow):
     def close_app(self):
         self.close()
 
-def register_crbn():
-    exe = sys.executable
-    for key, value in [
-        (r"Software\Classes\.crbn", "Carbon.Regneark"),
-        (r"Software\Classes\Carbon.Regneark", "Carbon regneark"),
-        (r"Software\Classes\Carbon.Regneark\DefaultIcon", f'"{exe}",0'),
-        (r"Software\Classes\Carbon.Regneark\shell\open\command", f'"{exe}" "%1"'),
-    ]:
-        winreg.SetValue(winreg.HKEY_CURRENT_USER, key, winreg.REG_SZ, value)
-    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
 
 
 if __name__ == "__main__":
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
-    app = QApplication(sys.argv)
+    app = CarbonApp(sys.argv)
     if sys.platform == "win32" and getattr(sys, "frozen", False):
         register_crbn()
 
+    license_manager.migrate_old_config()
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
@@ -2663,8 +2681,10 @@ if __name__ == "__main__":
             sys.exit(0)
 
     window = MainWindow()
-    if len(sys.argv) > 1:
-        window.load_regneark(sys.argv[1], window.interpreter_view)
+    app.window = window
+    path = sys.argv[1] if len(sys.argv) > 1 else app.pending_file
+    if path:
+        window.load_regneark(path, window.interpreter_view)
 
     window.showFullScreen()
     app.exec()

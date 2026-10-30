@@ -23,7 +23,7 @@ def test_resource_path_in_onefile_build(monkeypatch, tmp_path):
 def test_resource_path_in_onedir_build(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.delattr(sys, "_MEIPASS", raising=False)
-    monkeypatch.setattr(sys, "executable", str(tmp_path / "FihsihCalc"))
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "Carbon"))
     assert path.resource_path("units.csv") == tmp_path.resolve() / "units.csv"
 
 

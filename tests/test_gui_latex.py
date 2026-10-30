@@ -1,10 +1,10 @@
-# The pure functions in gui_old.py that translate between the MathLive editor and the interpreter.
+# The pure functions in gui.py that translate between the MathLive editor and the interpreter.
 import json
 
 import pytest
 
 pytest.importorskip("PySide6")
-import gui_old as gui
+import gui
 
 
 # --- LaTeX from the editor -> interpreter text ---
@@ -125,7 +125,7 @@ def test_latex_text_escapes(text, expected):
 # --- the whole Regneark round trip ---
 
 def run_sheet(*lines):
-    return json.loads(gui._MapleBridge().run(json.dumps(list(lines))))
+    return json.loads(gui._InterpreterBridge().evaluate(json.dumps(list(lines))))
 
 
 def test_sheet_result():
@@ -156,7 +156,7 @@ def test_sheet_coloured_function_call():
 
 def test_sheet_multi_line_result():
     rows = run_sheet(r"Help\left(\right)")
-    assert [kind for kind, _ in rows] == ["code"] + ["result"] * len(gui.interpreter_maple.EV().functions)
+    assert [kind for kind, _ in rows] == ["code"] + ["result"] * len(gui.interpreter.EV().functions)
 
 
 @pytest.mark.parametrize("line", [r"\#hej", ""])

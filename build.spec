@@ -5,7 +5,7 @@
 #   macOS:    pyinstaller build.spec
 #
 # Expects to be run from the project root (the folder that contains
-# config.json, src/, todo.txt). Produces dist/FihsihCalc/ (onedir) which the
+# config.json, src/, todo.txt). Produces dist/Carbon/ (onedir) which the
 # Windows installer step and the macOS dmg step both consume.
 
 import sys
@@ -49,7 +49,7 @@ for pkg in COLLECT_PACKAGES:
         print(f"[build.spec] warning: could not collect {pkg}: {e}")
 
 a = Analysis(
-    [str(SRC / "gui_old.py")],
+    [str(SRC / "gui.py")],
     pathex=[str(SRC)],
     binaries=binaries,
     datas=datas,
@@ -76,7 +76,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="FihsihCalc",
+    name="Carbon",
     debug=False,
     strip=False,
     upx=True,
@@ -91,17 +91,33 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=True,
-    name="FihsihCalc",
+    name="Carbon",
 )
 
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="FihsihCalc.app",
+        name="Carbon.app",
         icon=icon_arg,
-        bundle_identifier="com.fihsihcalc.app",
+        bundle_identifier="com.mb.carbon",
         info_plist={
             "NSHighResolutionCapable": "True",
             "CFBundleShortVersionString": "1.0.0",
+            "CFBundleDocumentTypes": [
+                {
+                    "CFBundleTypeName": "Carbon regneark",
+                    "CFBundleTypeRole": "Editor",
+                    "LSHandlerRank": "Owner",
+                    "LSItemContentTypes": ["com.mb.carbon.crbn"],
+                }
+            ],
+            "UTExportedTypeDeclarations": [
+                {
+                    "UTTypeIdentifier": "com.mb.carbon.crbn",
+                    "UTTypeDescription": "Carbon regneark",
+                    "UTTypeConformsTo": ["public.data"],
+                    "UTTypeTagSpecification": {"public.filename-extension": ["crbn"]},
+                }
+            ],
         },
     )

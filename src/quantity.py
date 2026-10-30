@@ -15,7 +15,7 @@ url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=
 
 _cache = {"df": None, "unit_data": None}
 
-CACHE_DIR = Path(user_data_dir("fihsih calc",appauthor=False))
+CACHE_DIR = Path(user_data_dir("Carbon",appauthor=False))
 CACHE_FILE = CACHE_DIR / "units.csv"
 BUNDLED_FILE = resource_path("Assets/units.csv")
 

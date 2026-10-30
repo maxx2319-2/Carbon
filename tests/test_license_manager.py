@@ -169,3 +169,35 @@ def test_activate_without_connection(monkeypatch):
 def test_activate_unexpected_answer(monkeypatch, data):
     monkeypatch.setattr(requests, "post", answer(data))
     assert license_manager.activate("KEY") == (False, "Uventet svar fra serveren")
+
+
+@pytest.fixture
+def dirs(tmp_path, monkeypatch):
+    old, new = tmp_path / "fihsih calc", tmp_path / "Carbon"
+    monkeypatch.setattr(license_manager, "OLD_CONFIG_DIR", old)
+    monkeypatch.setattr(license_manager, "CONFIG_DIR", new)
+    return old, new
+
+
+def test_migrate_moves_old_folder(dirs):
+    old, new = dirs
+    old.mkdir()
+    (old / "license.json").write_text("{}")
+    license_manager.migrate_old_config()
+    assert not old.exists()
+    assert (new / "license.json").read_text() == "{}"
+
+
+def test_migrate_keeps_existing_new_folder(dirs):
+    old, new = dirs
+    old.mkdir()
+    new.mkdir()
+    (new / "license.json").write_text("new")
+    license_manager.migrate_old_config()
+    assert old.exists()
+    assert (new / "license.json").read_text() == "new"
+
+
+def test_migrate_without_old_folder(dirs):
+    license_manager.migrate_old_config()
+    assert not dirs[1].exists()

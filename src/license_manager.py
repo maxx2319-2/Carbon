@@ -44,8 +44,14 @@ def check_license(license_key: str):
     return True, data
 
 
-CONFIG_DIR = Path(user_data_dir("fihsih calc", appauthor=False))
+OLD_CONFIG_DIR = Path(user_data_dir("fihsih calc", appauthor=False))
+CONFIG_DIR = Path(user_data_dir("Carbon", appauthor=False))
 CONFIG_FILE = CONFIG_DIR / "license.json"
+
+
+def migrate_old_config():
+    if OLD_CONFIG_DIR.exists() and not CONFIG_DIR.exists():
+        OLD_CONFIG_DIR.rename(CONFIG_DIR)
 
 
 def save_activation(license_key: str, data: dict):

@@ -7,7 +7,7 @@ import gui
 
 
 def results(latex):
-    rows = json.loads(gui._InterpreterBridge().run(json.dumps([latex])))
+    rows = json.loads(gui._InterpreterBridge().evaluate(json.dumps([latex])))
     return [row for kind, row in rows if kind == "result"]
 
 
