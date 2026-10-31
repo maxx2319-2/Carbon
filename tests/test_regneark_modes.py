@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 
 from test_regneark_editor import CMD, js, press, pump, view
@@ -127,3 +127,23 @@ def test_typing_after_switch_uses_the_new_type(view):
     QTest.keyClicks(view.focusProxy(), "xy")
     pump()
     assert json.loads(js(view, "JSON.stringify(lines().map(l => strip(l.value)))")) == [r"\text{abc}xy"]
+
+
+def test_slider_ignores_arrow_keys_but_follows_clicks(view):
+    import gui
+    window = gui.MainWindow()
+    window.show()
+    window.activateWindow()
+    window.open_interpreter()
+    pump(2500)
+    page = window.interpreter_view
+    js(page, r"setSheet([['code', '1+1'], ['code', '\\text{hej}', 'text']]); true")
+    pump()
+    QTest.keyClick(page.focusProxy(), Qt.Key_Down)
+    pump()
+    assert window.line_type.current == "math"
+    top, bottom = json.loads(js(page, "JSON.stringify((r => [r.top, r.bottom])(lines()[1].getBoundingClientRect()))"))
+    QTest.mouseClick(page.focusProxy(), Qt.LeftButton, Qt.NoModifier, QPoint(100, int((top + bottom) / 2)))
+    pump()
+    assert window.line_type.current == "text"
+    window.close()

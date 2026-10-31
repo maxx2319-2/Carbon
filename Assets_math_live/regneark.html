@@ -848,11 +848,14 @@
         }
     }
     
-    let lastField = null;
+    let lastField = null, usingKeyboard = false;
+    editor.addEventListener("keydown", () => usingKeyboard = true, true);
+    editor.addEventListener("pointerdown", () => usingKeyboard = false, true);
+    editor.addEventListener("click", () => { if (lastField && !isOut(lastField)) reportMode(lastField); }, true);
     editor.addEventListener("focusin", e => {
         if (!isField(e.target)) return;
         lastField = e.target;
-        if (!isOut(e.target)) reportMode(e.target);
+        if (!isOut(e.target) && !usingKeyboard) reportMode(e.target);
     });
 
     function insertLatex(latex) {
