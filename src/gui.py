@@ -2419,18 +2419,14 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(file_btn)
 
         self.interpreter_tabs = QTabBar()
-        self.interpreter_tabs.setTabsClosable(True)
         self.interpreter_tabs.setExpanding(False)
         self.interpreter_tabs.setDrawBase(False)
         self.interpreter_tabs.setFocusPolicy(Qt.NoFocus)
         self.interpreter_tabs.setStyleSheet(f"""
-            QTabBar::tab {{ background: {SIDEBAR}; border-top-left-radius: 6px; border-top-right-radius: 6px; padding: 4px 6px 4px 10px; margin: 3px 2px 0 0; }}
-            QTabBar::tab:selected {{ background: {BG}; margin-top: 0; padding-top: 7px; }}
-            QTabBar::close-button {{ image: url({(ASSETS_DIR / "Close.svg").as_posix()}); padding: 4px; subcontrol-position: right;}}
-            QTabBar::close-button:hover {{ background: {SCROLL}; border-radius: 3px; }}
+            QTabBar::tab {{ background: {SIDEBAR}; border-top-left-radius: 6px; border-top-right-radius: 6px; padding: 0 0 5px 0; margin: 5px 2px 0 0; }}
+            QTabBar::tab:selected {{ background: {BG}; margin-top: 0; padding-top: 5px; }}
         """)
         self.interpreter_tabs.currentChanged.connect(self.show_interpreter_tab)
-        self.interpreter_tabs.tabCloseRequested.connect(self.close_interpreter_tab)
 
         new_tab = QToolButton()
         new_tab.setText("+")
@@ -2492,16 +2488,36 @@ class MainWindow(QMainWindow):
         return name
 
     def tab_name(self, index):
-        return self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).text()
+        return self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLabel).text()
+
 
     def set_tab_name(self, view, name):
         pill = QLabel(name)
         pill.setAlignment(Qt.AlignCenter)
         pill.setFixedHeight(14)
-        pill.setStyleSheet(f"background: {BUTTON}; color: {TEXT}; border-radius: 7px; font-size: 9px; padding: 0 8px; margin-left: 6px;")
+        pill.setStyleSheet(f"background: {BUTTON}; color: {TEXT}; border-radius: 7px; font-size: 9px; padding: 0 8px;")
+
+        close = QToolButton()
+        close.setIcon(hover_icon("Close.svg"))
+        close.setIconSize(QSize(8, 8))
+        close.setFocusPolicy(Qt.NoFocus)
+        close.setStyleSheet(f"""
+            QToolButton {{ background: transparent; border: none; padding: 3px; }}
+            QToolButton:hover {{ background: {SCROLL}; border-radius: 3px; }}
+        """)
+        close.clicked.connect(lambda: self.close_interpreter_tab(self.interpreter_stack.indexOf(view)))
+
+        tab = QWidget()
+        tab.setFixedHeight(20)
+        tab_layout = QHBoxLayout(tab)
+        tab_layout.setContentsMargins(6, 0, 0, 0)
+        tab_layout.setSpacing(4)
+        tab_layout.addWidget(pill)
+        tab_layout.addWidget(close)
+
         index = self.interpreter_stack.indexOf(view)
         old = self.interpreter_tabs.tabButton(index, QTabBar.LeftSide)
-        self.interpreter_tabs.setTabButton(index, QTabBar.LeftSide, pill)
+        self.interpreter_tabs.setTabButton(index, QTabBar.LeftSide, tab)
         if old:
             old.deleteLater()
         self.fit_tabs()
@@ -2541,6 +2557,10 @@ class MainWindow(QMainWindow):
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
+        for i in range(self.interpreter_tabs.count()):
+            tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
+            if tab:
+                tab.layout().setContentsMargins(6, 0 if i == index else 4, 0, 0)
 
     def focus_interpreter(self):
         self.interpreter_view.setFocus()
