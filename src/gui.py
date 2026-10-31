@@ -2427,6 +2427,7 @@ class MainWindow(QMainWindow):
             QTabBar::tab:selected {{ background: {BG}; margin-top: 0; padding-top: 5px; }}
         """)
         self.interpreter_tabs.currentChanged.connect(self.show_interpreter_tab)
+        self.interpreter_tabs.tabBarDoubleClicked.connect(self.rename_tab)
 
         new_tab = QToolButton()
         new_tab.setText("+")
@@ -2488,14 +2489,19 @@ class MainWindow(QMainWindow):
         return name
 
     def tab_name(self, index):
-        return self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLabel).text()
-
+        return self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLineEdit).text()
 
     def set_tab_name(self, view, name):
-        pill = QLabel(name)
+        pill = QLineEdit(name)
         pill.setAlignment(Qt.AlignCenter)
         pill.setFixedHeight(14)
-        pill.setStyleSheet(f"background: {BUTTON}; color: {TEXT}; border-radius: 7px; font-size: 9px; padding: 0 8px;")
+        pill.setFocusPolicy(Qt.NoFocus)
+        pill.setAttribute(Qt.WA_TransparentForMouseEvents)
+        pill.setStyleSheet(f"background: {BUTTON}; color: {TEXT}; border: none; border-radius: 7px; font-size: 9px; padding: 0 8px;")
+        self.fit_pill(pill)
+        pill.textEdited.connect(lambda: self.resize_tab(pill))
+        pill.editingFinished.connect(lambda: self.finish_rename(pill))
+        pill.returnPressed.connect(self.focus_interpreter)
 
         close = QToolButton()
         close.setIcon(hover_icon("Close.svg"))
@@ -2553,6 +2559,31 @@ class MainWindow(QMainWindow):
 
     def fit_tabs(self):
         self.interpreter_tabs.setMaximumWidth(self.interpreter_tabs.sizeHint().width())
+
+    def fit_pill(self, pill):
+        pill.ensurePolished()
+        pill.setFixedWidth(pill.fontMetrics().horizontalAdvance(pill.text()) + 21)
+
+    def resize_tab(self, pill):
+        self.fit_pill(pill)
+        pill.parentWidget().adjustSize()
+        self.interpreter_tabs.setIconSize(self.interpreter_tabs.iconSize())
+        self.fit_tabs()
+
+    def rename_tab(self, index):
+        if index < 0:
+            return
+        self.interpreter_tabs.setCurrentIndex(index)
+        pill = self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLineEdit)
+        self.renaming = pill.text()
+        pill.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        pill.setFocus()
+        pill.selectAll()
+
+    def finish_rename(self, pill):
+        pill.setText(pill.text().strip() or self.renaming)
+        pill.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.resize_tab(pill)
 
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
@@ -2650,7 +2681,7 @@ class MainWindow(QMainWindow):
         self.slide_to(self.stack.widget(1))
 
     def save_regneark(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", "", "Regneark (*.crbn)")
+        path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", self.tab_name(self.interpreter_tabs.currentIndex()) + ".crbn", "Regneark (*.crbn)")
         if not path:
             return
         self.set_tab_name(self.interpreter_view, Path(path).stem)
