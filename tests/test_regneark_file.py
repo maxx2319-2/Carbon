@@ -40,14 +40,23 @@ class FakeView:
         return self._page
 
 
+class FakeTabs:
+    def currentIndex(self):
+        return 0
+
+
 class FakeWindow:
     load_regneark = gui.MainWindow.load_regneark
 
     def __init__(self, page):
         self.interpreter_view = FakeView(page)
+        self.interpreter_tabs = FakeTabs()
         self.opened = False
         self.new_tabs = 0
         self.tab_names = []
+
+    def tab_name(self, index):
+        return "Ny Fil"
 
     def new_interpreter_tab(self):
         self.new_tabs += 1
@@ -60,19 +69,25 @@ class FakeWindow:
         self.opened = True
 
 
-def fake_dialog(monkeypatch, path):
+def fake_dialog(monkeypatch, path, offered=None):
+    def save(*a):
+        if offered is not None:
+            offered.append(a[2])
+        return (str(path), "")
     class FakeDialog:
-        getSaveFileName = staticmethod(lambda *a: (str(path), ""))
+        getSaveFileName = staticmethod(save)
         getOpenFileName = staticmethod(lambda *a: (str(path), ""))
     monkeypatch.setattr(gui, "QFileDialog", FakeDialog)
 
 
 def test_save_writes_rows_as_json(tmp_path, monkeypatch):
     path = tmp_path / "ark.crbn"
-    fake_dialog(monkeypatch, path)
+    offered = []
+    fake_dialog(monkeypatch, path, offered)
     page = FakePage(json.dumps(ROWS))
     window = FakeWindow(page)
     gui.MainWindow.save_regneark(window)
+    assert offered == ["Ny Fil.crbn"]
     assert window.tab_names == ["ark"]
     assert page.calls == ["JSON.stringify(getSheet())"]
     text = path.read_text(encoding="utf-8")

@@ -570,6 +570,12 @@ def latex_text(s):
 
 class _InterpreterBridge(QObject):
     finished = Signal(int, str)
+    modeChanged = Signal(str)
+
+    @Slot(str)
+    def reportMode(self, mode):
+        self.modeChanged.emit(mode)
+
     @Slot(result=str)
     def help(self):
         return json.dumps({
@@ -577,9 +583,6 @@ class _InterpreterBridge(QObject):
             for name, text in interpreter.EV().help_text.items()
         })
 
-
-
-   
     def evaluate(self, data):
         latex_lines = json.loads(data)
         ev = interpreter.EV()
@@ -1580,6 +1583,50 @@ PANELS = {
     "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
 }
 
+class SegmentedControl(QWidget):
+    changed = Signal(str)
+
+    def __init__(self, options, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setStyleSheet(f"SegmentedControl {{ background-color: {SIDEBAR}; border-radius: 12px; }}")
+
+        self.highlight = QWidget(self)
+        self.highlight.setStyleSheet(f"background-color: {BG}; border-radius: 10px;")
+        self.anim = QPropertyAnimation(self.highlight, b"geometry", self)
+        self.anim.setDuration(200)
+        self.anim.setEasingCurve(QEasingCurve.OutCubic)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2,2,2,2)
+        layout.setSpacing(0)
+        self.buttons = {}
+        for label, value, tooltip in options:
+            btn = QPushButton(label)
+            btn.setToolTip(tooltip)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setStyleSheet(f"""
+                QPushButton {{ background: transparent; color: {BUTTON}; border: none; font-weight: bold; padding: 3px 12px; }}
+                QPushButton:hover {{ color: {HOVER}; }}
+                QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+            """)
+            btn.clicked.connect(lambda _=False, v=value: (self.setCurrent(v), self.changed.emit(v)))
+            layout.addWidget(btn)
+            self.buttons[value] = btn
+        self.current = options[0][1]
+
+    def setCurrent(self, value):
+        self.current = value
+        self.anim.stop()
+        self.anim.setStartValue(self.highlight.geometry())
+        self.anim.setEndValue(self.buttons[value].geometry())
+        self.anim.start()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.anim.stop()
+        self.highlight.setGeometry(self.buttons[self.current].geometry())
+
 class Dropdown(QWidget):
     def __init__(self, label, content, parent=None):
         super().__init__(parent)
@@ -2376,6 +2423,14 @@ class MainWindow(QMainWindow):
         bar.setStyleSheet(f"background-color: {SCROLL};")
         bar_layout = QHBoxLayout(bar)
         bar_layout.setContentsMargins(10,4,10,4)
+
+        self.line_type = SegmentedControl([
+            ("Matematik", "math", "Ctrl+1"),
+            ("Tekst", "text", "Ctrl+2"),
+            ("Formel", "formula", "Regnes ikke (Ctrl+3)"),
+        ])
+        self.line_type.changed.connect(lambda mode: self.interpreter_view.page().runJavaScript(f"setMode({json.dumps(mode)})"))
+        bar_layout.addWidget(self.line_type)
         bar_layout.addStretch()
 
         file_btn = QToolButton()
@@ -2399,23 +2454,6 @@ class MainWindow(QMainWindow):
             QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
         """)
 
-        mode_btn = QToolButton()
-        mode_menu = QMenu(mode_btn)
-        mode_menu.setStyleSheet(file_menu.styleSheet())
-        for label, mode in [("Matematik", "math"), ("Tekst", "text"), ("Formel (regnes ikke)", "formula")]:
-            mode_menu.addAction(label, lambda _=False, mode=mode: self.interpreter_view.page().runJavaScript(f"setMode({json.dumps(mode)})"))
-        mode_btn.setText("Linjetype")
-        mode_btn.setToolTip("Skift linjetype")
-        mode_btn.setFocusPolicy(Qt.NoFocus)
-        mode_btn.setPopupMode(QToolButton.InstantPopup)
-        mode_btn.setMenu(mode_menu)
-        mode_btn.setStyleSheet(f"""
-            QToolButton {{ color: {BUTTON}; border: none; font-size: 14px; padding: 0 8px; }}
-            QToolButton:hover {{ color: {HOVER}; }}
-            QToolButton::menu-indicator {{ image: none; }}
-            QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
-        """)
-        bar_layout.addWidget(mode_btn)
         bar_layout.addWidget(file_btn)
 
         self.interpreter_tabs = QTabBar()
@@ -2470,7 +2508,9 @@ class MainWindow(QMainWindow):
         view = QWebEngineView()
         view.page().setBackgroundColor(QColor(BG))
         channel = QWebChannel(view.page())
-        channel.registerObject("bridge", _InterpreterBridge(view))
+        bridge = _InterpreterBridge(view)
+        bridge.modeChanged.connect(lambda mode: self.line_type.setCurrent(mode) if view is self.interpreter_view else None)
+        channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
         view.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
@@ -2588,6 +2628,7 @@ class MainWindow(QMainWindow):
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
+        self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.line_type.setCurrent(mode) if mode else None)
         for i in range(self.interpreter_tabs.count()):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:

@@ -3,7 +3,6 @@ import json
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QToolButton
 
 from test_regneark_editor import CMD, js, press, pump, view
 
@@ -107,14 +106,24 @@ def test_formula_line_number_uses_accent(view):
     assert js(view, colour.format(1)) == "rgb(133, 133, 133)"
 
 
-def test_line_type_menu(view):
+def test_line_type_slider(view):
     import gui
     window = gui.MainWindow()
     pump(2500)
-    button = next(b for b in window.findChildren(QToolButton) if b.text() == "Linjetype")
-    actions = {a.text(): a for a in button.menu().actions()}
-    assert list(actions) == ["Matematik", "Tekst", "Formel (regnes ikke)"]
-    actions["Tekst"].trigger()
+    slider = window.line_type
+    assert [b.text() for b in slider.buttons.values()] == ["Matematik", "Tekst", "Formel"]
+    slider.buttons["text"].click()
     pump()
     assert json.loads(js(window.interpreter_view, "JSON.stringify(lines().map(modeOf))")) == ["text"]
+    js(window.interpreter_view, "setMode('formula'); true")
+    pump()
+    assert slider.current == "formula"
     window.close()
+
+
+def test_typing_after_switch_uses_the_new_type(view):
+    load(view, [r"\text{abc}", "text"])
+    press(view, Qt.Key_1, CMD)
+    QTest.keyClicks(view.focusProxy(), "xy")
+    pump()
+    assert json.loads(js(view, "JSON.stringify(lines().map(l => strip(l.value)))")) == [r"\text{abc}xy"]

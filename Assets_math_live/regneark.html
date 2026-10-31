@@ -146,6 +146,7 @@
     }
     const MODES = {"1":"math","2":"text","3": "formula"};
     const modeOf = mf => mf.dataset.mode ?? "math";
+    const reportMode = mf => bridge?.reportMode(modeOf(mf));
     const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(raw) : raw;
 
 
@@ -557,6 +558,7 @@
         const mf = all[s.line] ?? all.at(-1);
         mf.focus();
         mf.position = Math.min(s.position,mf.lastOffset);
+        reportMode(mf);
         current = snapshot();
         updateHint();
     }
@@ -566,7 +568,7 @@
         const mf = e.currentTarget;
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
         const text = modeOf(mf) === "text";
-        if (text) mf.mode = "text";
+        mf.mode = text ? "text" : "math";
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); clearSel(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") { stop(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && MODES[e.key]) { stop(); setMode(MODES[e.key], mf); return; }
@@ -847,7 +849,11 @@
     }
     
     let lastField = null;
-    editor.addEventListener("focusin", e => { if (isField(e.target)) lastField = e.target; });
+    editor.addEventListener("focusin", e => {
+        if (!isField(e.target)) return;
+        lastField = e.target;
+        if (!isOut(e.target)) reportMode(e.target);
+    });
 
     function insertLatex(latex) {
         clearSel();
@@ -869,6 +875,7 @@
             setLine(line, strip(line.value), line.position);
         }
         if (sel) paint(); else mf.focus();
+        reportMode(mf);
         record();
     }
 
