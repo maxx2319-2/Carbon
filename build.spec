@@ -109,6 +109,7 @@ if sys.platform == "darwin":
                     "CFBundleTypeRole": "Editor",
                     "LSHandlerRank": "Owner",
                     "LSItemContentTypes": ["com.mb.carbon.crbn"],
+                    "CFBundleTypeIconFile": "icon.icns",
                 }
             ],
             "UTExportedTypeDeclarations": [
@@ -117,6 +118,7 @@ if sys.platform == "darwin":
                     "UTTypeDescription": "Carbon regneark",
                     "UTTypeConformsTo": ["public.data"],
                     "UTTypeTagSpecification": {"public.filename-extension": ["crbn"]},
+                    "UTTypeIconFile": "icon.icns",
                 }
             ],
         },
