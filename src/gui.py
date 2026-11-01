@@ -87,6 +87,7 @@ from PySide6.QtGui import (
     QPalette,
     QColor,
     QTransform,
+    QCursor,
 )
 import re
 import interpreter
@@ -130,6 +131,39 @@ SCROLL = "#323232"
 LINE_HEIGHT = 27
 BOX_HEIGHT = 120
 SIDEBAR_WIDTH = 220
+
+GWL_STYLE = -16
+WS_FRAME_STYLES = 0x00C00000 | 0x00040000 | 0x00020000 | 0x00010000
+SWP_FRAMECHANGED = 0x0001 | 0x0002 | 0x0004 | 0x0020
+WM_NCCALCSIZE = 0x0083
+WM_NCHITTEST = 0x0084
+HTCLIENT = 1
+HTCAPTION = 2
+HIT_TEST = {
+    (True, False, False, False): 10, (False, True, False, False): 11,
+    (False, False, True, False): 12, (True, False, True, False): 13, (False, True, True, False): 14,
+    (False, False, False, True): 15, (True, False, False, True): 16, (False, True, False, True): 17,
+}
+
+class MSG(ctypes.Structure):
+    _fields_ = [("hwnd", ctypes.c_void_p), ("message", ctypes.c_uint), ("wParam", ctypes.c_size_t), ("lParam", ctypes.c_ssize_t)]
+
+class RECT(ctypes.Structure):
+    _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+class MONITORINFO(ctypes.Structure):
+    _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", RECT), ("rcWork", RECT), ("dwFlags", ctypes.c_ulong)]
+
+if sys.platform == "win32":
+    user32 = ctypes.windll.user32
+    user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+    user32.GetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    user32.SetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
+    user32.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    user32.IsZoomed.argtypes = [ctypes.c_void_p]
+    user32.MonitorFromWindow.restype = ctypes.c_void_p
+    user32.MonitorFromWindow.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+    user32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 
 button_style =  f"""
         QPushButton {{
@@ -996,25 +1030,6 @@ class DraggablePanel(QWidget):
         y = max(0, min(pos.y(), parent_rect.height() - self.height()))
         return pos.__class__(x, y)
 
-class ResizeEdge(QWidget):
-    def __init__(self, edges, cursor, parent):
-        super().__init__(parent)
-        self.edges = edges
-        self.setCursor(cursor)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.window().windowHandle().startSystemResize(self.edges)
-
-    def place(self, m=6):
-        w, h = self.parent().width(), self.parent().height()
-        x = 0 if self.edges & Qt.LeftEdge else w - m if self.edges & Qt.RightEdge else m
-        y = 0 if self.edges & Qt.TopEdge else h - m if self.edges & Qt.BottomEdge else m
-        width = m if self.edges & (Qt.LeftEdge | Qt.RightEdge) else w - 2 * m
-        height = m if self.edges & (Qt.TopEdge | Qt.BottomEdge) else h - 2 * m
-        self.setGeometry(x, y, width, height)
-        self.raise_()
-
 @dataclass
 class Panel:
     label: str
@@ -1836,7 +1851,12 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Carbon")
         self.setWindowIcon(QIcon(str(ASSETS_DIR / "Carbon_Round.svg")))
-        self.setWindowFlag(Qt.FramelessWindowHint)
+        if sys.platform == "darwin":
+            self.setWindowFlags(self.windowFlags() | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint)
+            self.setAttribute(Qt.WA_ContentsMarginsRespectsSafeArea, False)
+        else:
+            self.setWindowFlag(Qt.FramelessWindowHint)
+
         self.setStyleSheet(f"background-color: {BG};")
         self.setMinimumWidth(600)
 
@@ -1869,15 +1889,6 @@ class MainWindow(QMainWindow):
         self.version_label = QLabel(version, self)
         self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
         self.version_label.setAttribute(Qt.WA_TransparentForMouseEvents)
-
-        self.resize_edges = [
-            ResizeEdge(edges, cursor, self) for edges, cursor in [
-                (Qt.LeftEdge, Qt.SizeHorCursor), (Qt.RightEdge, Qt.SizeHorCursor),
-                (Qt.TopEdge, Qt.SizeVerCursor), (Qt.BottomEdge, Qt.SizeVerCursor),
-                (Qt.TopEdge | Qt.LeftEdge, Qt.SizeFDiagCursor), (Qt.BottomEdge | Qt.RightEdge, Qt.SizeFDiagCursor),
-                (Qt.TopEdge | Qt.RightEdge, Qt.SizeBDiagCursor), (Qt.BottomEdge | Qt.LeftEdge, Qt.SizeBDiagCursor),
-            ]
-        ]
 
         self.create_changelog()
         if _settings.value("changelog_seen") != version:
@@ -2119,8 +2130,6 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        for edge in self.resize_edges:
-            edge.place()
         self.version_label.adjustSize()
         self.version_label.move(
             self.width() - self.version_label.width() - 5,
@@ -2212,9 +2221,10 @@ class MainWindow(QMainWindow):
         self.forward_btn = make_button("Pointer.svg", "Frem", lambda: self.go_history(1))
         self.back_btn.setIcon(nav_icon(False))
         self.forward_btn.setIcon(nav_icon(True))
+        min_btn = make_button("Minimize.svg", "Minimer", self.showMinimized)
         self.max_btn = make_button("Maximize.svg", "Maksimer", self.toggle_maximized)
         close_btn = make_button("Close.svg", "Luk", self.close)
-        for btn in (self.back_btn, self.forward_btn, make_button("Minimize.svg", "Minimer", self.showMinimized), self.max_btn, close_btn):
+        for btn in (self.back_btn, self.forward_btn, min_btn, self.max_btn, close_btn):
             btn.setIconSize(QSize(10,10))
             btn.setCursor(Qt.ArrowCursor)
             hover = "#da373c" if btn is close_btn else f"{SCROLL}"
@@ -2230,6 +2240,10 @@ class MainWindow(QMainWindow):
             window_row.addWidget(btn)
             if btn is self.forward_btn:
                 window_row.addStretch()
+        if sys.platform == "darwin":
+            for btn in (min_btn, self.max_btn, close_btn):
+                btn.hide()
+
         self.page_title = QToolButton(container)
         self.page_title.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.page_title.setIconSize(QSize(16,16))
@@ -2288,6 +2302,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(container)
         container.installEventFilter(self)
         self.stack.currentChanged.connect(self.update_page_button)
+    
     def create_search(self):
         self.search_targets = {}
         for name, page in [("Kemi", self.kemi_page), ("Fysik", self.fysik_page), ("Biotek", self.biotek_page)]:
@@ -2362,7 +2377,7 @@ class MainWindow(QMainWindow):
     def place_page_title(self):
         self.page_title.move(
             (self.header_container.width() - self.page_title.width()) // 2,
-            (self.max_btn.sizeHint().height() - self.page_title.height()) // 2,
+            self.header_container.layout().contentsMargins().top() + (self.max_btn.sizeHint().height() - self.page_title.height()) // 2,
         )
 
 
@@ -2370,7 +2385,45 @@ class MainWindow(QMainWindow):
         if self.isMaximized() or self.isFullScreen():
             self.showNormal()
         else:
-            self.showFullScreen()
+            self.showMaximized()
+
+    def fit_safe_area(self, margins):
+        self.header_container.layout().setContentsMargins(margins.left(), margins.top(), margins.right(), 0)
+        self.toolbar.setFixedHeight(75 + margins.top())
+
+    def event(self, event):
+        if event.type() == QEvent.WinIdChange and sys.platform == "win32":
+            hwnd = int(self.winId())
+            user32.SetWindowLongPtrW(hwnd, GWL_STYLE, user32.GetWindowLongPtrW(hwnd, GWL_STYLE) | WS_FRAME_STYLES)
+            user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED)
+        if event.type() == QEvent.WinIdChange and sys.platform == "darwin":
+            self.windowHandle().safeAreaMarginsChanged.connect(self.fit_safe_area, Qt.UniqueConnection)
+            self.fit_safe_area(self.windowHandle().safeAreaMargins())
+        return super().event(event)
+
+    def nativeEvent(self, event_type, message):
+        if bytes(event_type) != b"windows_generic_MSG":
+            return False, 0
+        msg = MSG.from_address(int(message))
+        if msg.message == WM_NCCALCSIZE and msg.wParam:
+            if user32.IsZoomed(msg.hwnd):
+                info = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
+                user32.GetMonitorInfoW(user32.MonitorFromWindow(msg.hwnd, 2), ctypes.byref(info))
+                ctypes.memmove(msg.lParam, ctypes.byref(info.rcWork), ctypes.sizeof(RECT))
+            return True, 0
+        if msg.message == WM_NCHITTEST:
+            if self.isFullScreen():
+                return True, HTCLIENT
+            pos, r, m = QCursor.pos(), self.frameGeometry(), 6
+            edges = (pos.x() < r.left() + m, pos.x() > r.right() - m, pos.y() < r.top() + m, pos.y() > r.bottom() - m)
+            if edges in HIT_TEST and not self.isMaximized():
+                return True, HIT_TEST[edges]
+            if self.childAt(self.mapFromGlobal(pos)) in (self.toolbar, self.header_container):
+                return True, HTCAPTION
+            return True, HTCLIENT
+        return False, 0
+
+
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -2378,8 +2431,6 @@ class MainWindow(QMainWindow):
             maximized = self.isMaximized() or self.isFullScreen()
             self.max_btn.setIcon(hover_icon("Restore.svg" if maximized else "Maximize.svg"))
             self.max_btn.setToolTip("Gendan" if maximized else "Maksimer")
-            for edge in self.resize_edges:
-                edge.setHidden(maximized)
 
     def create_mainmenu(self):
         central = QWidget()
@@ -2796,5 +2847,5 @@ if __name__ == "__main__":
     if path:
         window.load_regneark(path, window.interpreter_view)
 
-    window.showFullScreen()
+    window.showMaximized()
     app.exec()
