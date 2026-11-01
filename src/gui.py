@@ -2825,6 +2825,8 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key_F11:
             if not self.isFullScreen():
                 self.showFullScreen()
+            else:
+                self.showMaximized()
 
     def restore_window(self):
         if self.isFullScreen():
