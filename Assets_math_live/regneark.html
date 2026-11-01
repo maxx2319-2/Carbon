@@ -624,6 +624,7 @@
             if (e.key === "Escape") {stop(); hideSuggest(); return;}
             if (e.key === "ArrowLeft" || e.key === "ArrowRight") hideSuggest();
         }
+        if (e.key === "Escape") { stop(); bridge?.escape(); return; }
 
 
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { stop(); run(); return; }

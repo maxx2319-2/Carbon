@@ -605,10 +605,15 @@ def latex_text(s):
 class _InterpreterBridge(QObject):
     finished = Signal(int, str)
     modeChanged = Signal(str)
+    escaped = Signal()
 
     @Slot(str)
     def reportMode(self, mode):
         self.modeChanged.emit(mode)
+
+    @Slot()
+    def escape(self):
+        self.escaped.emit()
 
     @Slot(result=str)
     def help(self):
@@ -2561,6 +2566,7 @@ class MainWindow(QMainWindow):
         channel = QWebChannel(view.page())
         bridge = _InterpreterBridge(view)
         bridge.modeChanged.connect(lambda mode: self.line_type.setCurrent(mode) if view is self.interpreter_view else None)
+        bridge.escaped.connect(self.restore_window)
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
@@ -2814,12 +2820,15 @@ class MainWindow(QMainWindow):
     
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
-            if self.isFullScreen():
-                self.showNormal()
+            self.restore_window()
 
         elif event.key() == Qt.Key_F11:
             if not self.isFullScreen():
                 self.showFullScreen()
+
+    def restore_window(self):
+        if self.isFullScreen():
+            self.showNormal()
 
     def close_app(self):
         self.close()
