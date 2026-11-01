@@ -6,12 +6,43 @@ import math
 import sympy
 import numpy as np
 from matplotlib.figure import Figure
+from scipy.optimize import curve_fit
 
 
 from path import resource_path
 
 with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
+
+
+
+
+FUNCTIONS = {
+    "Ln": math.log,
+    "Log": math.log10,
+    "Exp": math.exp,
+    "Sin": lambda x : math.sin(math.radians(x)),
+    "Cos": lambda x : math.cos(math.radians(x)),
+    "Tan": lambda x : math.tan(math.radians(x)),
+    "ArcSin": lambda x : math.degrees(math.asin(x)),
+    "ArcCos": lambda x : math.degrees(math.acos(x)),
+    "ArcTan": lambda x : math.degrees(math.atan(x)),
+    "Sinh": math.sinh,
+    "Cosh": math.cosh,
+    "Tanh": math.tanh,
+    "ArcSinh": math.asinh,
+    "ArcCosh": math.acosh,
+    "ArcTanh": math.atanh,
+    "Cbrt": math.cbrt,
+    "Abs": math.fabs,
+    "Floor": math.floor,
+    "Ceil": math.ceil,
+    "Round": lambda x, n=0: round(x, int(n)),
+    "Degrees": math.degrees,
+    "Radians": math.radians,
+    "Gamma": math.gamma,
+    "Erf": math.erf,
+}
 
 
 def is_positive(x):
@@ -139,3 +170,53 @@ class FunctionPlot:
         self.functions = [{"js":sympy.jscode(expr),"label" : sympy.latex(expr)} for expr in exprs]
         self.start = start
         self.end = end
+
+
+
+
+
+
+
+
+
+def regretion(f,freturn,params,xs,ys):
+    fit = {}
+    popt, pcov = curve_fit(f,xs,ys,maxfev = 100000)
+    for i,part in enumerate(params): fit[part] = popt[i]
+    result = freturn.subs(fit)
+    rounded = result.xreplace({n: sympy.Float(n, 4) for n in result.atoms(sympy.Float)})
+    residuals = np.array(ys) - f(np.array(xs), *popt)
+    rmse = np.sqrt(np.mean(residuals**2))
+    r2 = 1 - np.sum(residuals**2) / np.sum((np.array(ys) - np.mean(ys))**2)
+
+
+    fig = Figure(figsize=(5, 4))
+    fig.patch.set_facecolor("#404040")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("#323232")
+
+    line_x = np.linspace(min(xs), max(xs), 400)
+    ax.plot(line_x, f(line_x, *popt), color="#00d9ff", linewidth=2.2, label=f"$y = {sympy.latex(rounded)}$\n$R^2 = {r2:.4f}$\nRMSE = {rmse:.4g}")
+    ax.scatter(xs, ys, color="#ffffff", s=30, zorder=5)
+
+    legend = ax.legend(facecolor="#1e1e1e", edgecolor="#555566", handlelength=0, handletextpad=0)
+    for text in legend.get_texts():
+        text.set_color("white")
+
+    ax.grid(True, color="#1F1F28", alpha=0.5)
+    ax.set_xlabel("x", color="white")
+    ax.set_ylabel("y", color="white")
+    ax.tick_params(colors="white")
+    for spine in ax.spines.values():
+        spine.set_color("#555566")
+
+    fig.tight_layout()
+    return fig
+
+    
+    
+
+    
+
+
+

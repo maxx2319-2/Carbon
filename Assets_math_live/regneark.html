@@ -86,7 +86,8 @@
     const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MængdeBeregning","Puffer","pHTilKoncentration",
-                    "Løs","PlotFunktion","NumeriskLøs","SystemLøs","Simplificer"
+                    "Løs","PlotFunktion","NumeriskLøs","SystemLøs","Simplificer","Regression",
+                    "LinReg","PropReg","ExpReg","KvadReg","LogistReg","HarmReg",
                 ];
     const ARGS = {
         BjerrumDiagram: ["export"],
@@ -256,7 +257,7 @@
         else if (suggestFor) renderSuggest();
     });
     const tooltip = document.getElementById("tooltip");
-    let HELP = {}, helptimer = null, helpfor = null;
+    let HELP = {}, helptimer = null, helpfor = null, helpat = null;
 
     function hideHelp() {
         clearTimeout(helptimer);
@@ -264,15 +265,26 @@
         tooltip.style.display = "none";
     }
 
+    function wordAt(mf, x, y) {
+        const p = Math.max(mf.getOffsetFromPoint(x, y), 0);
+        const letter = i => /^[A-Za-zæøåÆØÅ]$/.test(strip(mf.getValue(i - 1, i, "latex")));
+        let start = p, end = p;
+        while (start > 0 && letter(start)) start--;
+        while (end < mf.lastOffset && letter(end + 1)) end++;
+        return { start, end, name: strip(mf.getValue(start, end, "latex")) };
+    }
+
     function showHelp(e){
         const mf = e.target;
-        const name = isField(mf) && !isOut(mf) && strip(mf.value).match(/^[A-Za-zæøåÆØÅ]+/)?.[0]
-        const a = HELP[name] && mf.getElementInfo(1)?.bounds;
-        const b = a && mf.getElementInfo(name.length)?.bounds;
+        const w = isField(mf) && !isOut(mf) && wordAt(mf, e.clientX, e.clientY);
+        const name = w && w.name;
+        const a = HELP[name] && mf.getElementInfo(w.start + 1)?.bounds;
+        const b = a && mf.getElementInfo(w.end)?.bounds;
         if (!b || e.clientX <a.left || e.clientX > b.right || e.clientY < a.top || e.clientY > a.bottom) return hideHelp();
-        if (helpfor === mf) return;
+        if (helpfor === mf && helpat === w.start) return;
         hideHelp();
         helpfor = mf;
+        helpat = w.start;
         helptimer = setTimeout(() => {
     tooltip.replaceChildren(...HELP[name].map(latex => {
         const mf = new MathfieldElement();

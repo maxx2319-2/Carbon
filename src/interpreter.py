@@ -6,7 +6,7 @@ import re
 import biotek
 import json
 import sympy 
-from sympy import symbols, simplify,sin, cos
+from sympy import simplify
 import numpy as np
 from matplotlib.figure import Figure
 import multiprocessing
@@ -97,6 +97,13 @@ class EV:
             "NumeriskLøs",
             "SystemLøs",
             "Simplificer",
+            "Regression",
+            "LinReg",
+            "PropReg",
+            "ExpReg",
+            "KvadReg",
+            "LogistReg",
+            "HarmReg",
 
         ]
 
@@ -122,6 +129,13 @@ class EV:
             "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)",
             "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...}, evt StartGæt = {1, 1, ...}, evt Interval = (start, slut))",
             "Simplificer" : "Simplificer(x)",
+            "Regression" : "Regression(funktion af x, {x værdier}, {y værdier})",
+            "LinReg" : "LinReg({x værdier}, {y værdier})",
+            "PropReg" : "PropReg({x værdier}, {y værdier})",
+            "ExpReg" : "ExpReg({x værdier}, {y værdier})",
+            "KvadReg" : "KvadReg({x værdier}, {y værdier})",
+            "LogistReg" : "LogistReg({x værdier}, {y værdier})",
+            "HarmReg" : "HarmReg({x værdier}, {y værdier})",
         }
 
         self.help_text = {
@@ -146,6 +160,37 @@ class EV:
             "NumeriskLøs": "NumeriskLøs(funktion, Variabel = x, StartGæt = 1)\nLøser en ligning numerisk ud fra et startgæt. StartGæt er valgfrit.\nEks: NumeriskLøs(Cos(x) = x, Variabel = x, StartGæt = 10) ",
             "SystemLøs": "SystemLøs(ligning 1, ligning 2, ..., Variabler = {x, y, ...}, StartGæt = {1, 1, ...}, Interval = (start, slut))\nLøser et ligningssystem med flere ubekendte. StartGæt er valgfrit og bruges, når systemet skal løses numerisk. Interval er valgfrit og finder alle løsninger, hvor den første variabel ligger i intervallet.\nEks: SystemLøs(x + y = 10, x - y = 2, Variabler = {x, y}) ",
             "Simplificer": "Simplificer(udtryk)\nUdregner et udtryk med kvadratrødder, brøker osv. til et decimaltal.\nEks: Simplificer(sqrt(12) + sqrt(27)) ",
+            "Regression": "Regression(funktion af x, {x1, x2, ...}, {y1, y2, ...})\nFinder de ukendte konstanter i funktionen, så den passer bedst til datapunkterne. Viser grafen med forskrift, R^2 og RMSE.\nEks: Regression(ax^2 + b, {0, 1, 2, 3}, {1, 2, 5, 10}) ",
+            "LinReg": "LinReg({x1, x2, ...}, {y1, y2, ...})\nLineær regression. Finder a og b i f(x) = ax + b. Viser grafen med forskrift, R^2 og RMSE.\nEks: LinReg({1, 2, 3, 4}, {3, 5, 7, 9}) ",
+            "PropReg": "PropReg({x1, x2, ...}, {y1, y2, ...})\nProportional regression. Finder a i f(x) = ax. Viser grafen med forskrift, R^2 og RMSE.\nEks: PropReg({1, 2, 3, 4}, {2, 4, 6, 8}) ",
+            "ExpReg": "ExpReg({x1, x2, ...}, {y1, y2, ...})\nEksponentiel regression. Finder a og b i f(x) = a*b^x. Viser grafen med forskrift, R^2 og RMSE.\nEks: ExpReg({0, 1, 2, 3}, {2, 6, 18, 54}) ",
+            "KvadReg": "KvadReg({x1, x2, ...}, {y1, y2, ...})\nKvadratisk regression. Finder a, b og c i f(x) = ax^2 + bx + c. Viser grafen med forskrift, R^2 og RMSE.\nEks: KvadReg({0, 1, 2, 3}, {1, 2, 5, 10}) ",
+            "LogistReg": "LogistReg({x1, x2, ...}, {y1, y2, ...})\nLogistisk regression. Finder a, b og c i f(x) = c/(1+a*Exp(-bx)). Viser grafen med forskrift, R^2 og RMSE.\nEks: LogistReg({0, 2, 4, 6, 8}, {1, 4.5, 8.3, 9.7, 9.96}) ",
+            "HarmReg": "HarmReg({x1, x2, ...}, {y1, y2, ...})\nHarmonisk svingning. Finder amplituden A, vinkelfrekvensen ω, faseforskydningen φ og ligevægtslinjen k i f(x) = A*sin(ωx+φ)+k. Viser grafen med forskrift, R^2 og RMSE.\nEks: HarmReg({0, 1, 2, 3, 4, 5}, {2, 3.4, 3.1, 1.7, 0.6, 0.9}) ",
+            "Ln": "Ln(x)\nNaturlig logaritme (grundtal e).\nEks: Ln(10) ",
+            "Log": "Log(x)\nTitalslogaritme (grundtal 10).\nEks: Log(1000) ",
+            "Exp": "Exp(x)\nEksponentialfunktionen e^x.\nEks: Exp(2) ",
+            "Sin": "Sin(vinkel)\nSinus til en vinkel i grader.\nEks: Sin(30) ",
+            "Cos": "Cos(vinkel)\nCosinus til en vinkel i grader.\nEks: Cos(60) ",
+            "Tan": "Tan(vinkel)\nTangens til en vinkel i grader.\nEks: Tan(45) ",
+            "ArcSin": "ArcSin(x)\nOmvendt sinus. Giver vinklen i grader.\nEks: ArcSin(0.5) ",
+            "ArcCos": "ArcCos(x)\nOmvendt cosinus. Giver vinklen i grader.\nEks: ArcCos(0.5) ",
+            "ArcTan": "ArcTan(x)\nOmvendt tangens. Giver vinklen i grader.\nEks: ArcTan(1) ",
+            "Sinh": "Sinh(x)\nHyperbolsk sinus.\nEks: Sinh(1) ",
+            "Cosh": "Cosh(x)\nHyperbolsk cosinus.\nEks: Cosh(1) ",
+            "Tanh": "Tanh(x)\nHyperbolsk tangens.\nEks: Tanh(1) ",
+            "ArcSinh": "ArcSinh(x)\nOmvendt hyperbolsk sinus.\nEks: ArcSinh(1) ",
+            "ArcCosh": "ArcCosh(x)\nOmvendt hyperbolsk cosinus. x skal være mindst 1.\nEks: ArcCosh(2) ",
+            "ArcTanh": "ArcTanh(x)\nOmvendt hyperbolsk tangens. x skal ligge mellem -1 og 1.\nEks: ArcTanh(0.5) ",
+            "Cbrt": "Cbrt(x)\nKubikrod (tredje rod).\nEks: Cbrt(27) ",
+            "Abs": "Abs(x)\nNumerisk værdi, altså afstanden til 0.\nEks: Abs(-5) ",
+            "Floor": "Floor(x)\nRunder ned til nærmeste heltal.\nEks: Floor(2.7) ",
+            "Ceil": "Ceil(x)\nRunder op til nærmeste heltal.\nEks: Ceil(2.1) ",
+            "Round": "Round(x, decimaler)\nAfrunder til et antal decimaler. Decimaler er valgfrit.\nEks: Round(3.14159, 2) ",
+            "Degrees": "Degrees(x)\nOmregner radianer til grader.\nEks: Degrees(3.14159) ",
+            "Radians": "Radians(x)\nOmregner grader til radianer.\nEks: Radians(180) ",
+            "Gamma": "Gamma(x)\nGammafunktionen. For heltal er Gamma(n) = (n-1)!\nEks: Gamma(5) ",
+            "Erf": "Erf(x)\nFejlfunktionen (error function).\nEks: Erf(1) ",
         }
 
     input_prep = lambda self,x : quantity.si_convert(parser.evaluate(self.prep_ev(x)))
@@ -394,6 +439,120 @@ class EV:
                             else:
                                 output[pc] = utils.FunctionPlot(functions)
                             pc += 1
+
+                        case 'Regression':
+                            if len(args) != 3:
+                                raise ValueError(self.error_text["Regression"])
+                            xs = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[2]).strip().strip("{}").split(",")]
+                            if len(xs) != len(ys):
+                                raise ValueError("ikke lige mange x og y værdier")
+                            
+                            expr = self.prep_sympy(args[0])
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc+=1
+
+                        case 'LinReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["LinReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("ax + b")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1
+
+                        case 'PropReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["PropReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("ax")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1
+
+                        case 'ExpReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["ExpReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("a*b^x")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1
+
+                        case 'KvadReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["KvadReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("a*x^2 + bx + c")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1
+
+                        case 'LogistReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["LogistReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("c/(1+aE^(-bx))")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1 
+
+                        case 'HarmReg':
+                            if len(args) != 2:
+                                raise ValueError(self.error_text["HarmReg"])
+                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+
+                            expr = self.prep_sympy("a*sin(b*x+c)+d")
+                            x = sympy.Symbol("x")
+                            params = sorted(expr.free_symbols - {x}, key=str)
+
+                            f = sympy.lambdify((x, *params), expr, "numpy")
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            pc += 1  
+
+                                              
+
+
+
+
+
+
 
 
 
@@ -721,8 +880,7 @@ class EV:
                                 if '{' not in b or not '}' in b:
                                     raise ValueError("Du skal slutte og starte en liste med { og }")
 
-                                b = b.strip("{").strip("}")
-                                b = b.split(",")
+                               
                                 self.variables[a] = Variables(b,"list")
 
 

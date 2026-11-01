@@ -79,3 +79,4 @@ everywhere and in everything you say.
 - Don't add any comments in the code.
 - Always write in English, except for text in the UI, which you write in Danish.
 - Always run tests and code you are checking in your own virtual environment so it doesn't open on my computer.
+- when i ask simple questions about diffrent things in for example python dont take everything in context to what i have written or said before just give me a plain simple fast answer
