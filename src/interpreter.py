@@ -891,10 +891,10 @@ class EV:
                             self._invalidate_pattern()
                             output[pc] = self.variables[a].value
                             pc += 1
-
-
-
-
+       
+                        elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
+                            output[pc] = parse_expr(line, transformations=standard_transformations + (split_symbols, implicit_multiplication, convert_xor), local_dict={**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
+                            pc += 1
 
                         else:
                             output[pc] = parser.evaluate(self.prep_ev(line))

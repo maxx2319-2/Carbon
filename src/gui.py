@@ -496,6 +496,79 @@ GREEK = {
     "Upsilon": "Υ", "Phi": "Φ", "Psi": "Ψ", "Omega": "Ω",
 }
 
+CALCULUS = re.compile(r"\\(int|sum|lim)(?![A-Za-z])|\\frac\{\\differentialD\}")
+INTEGRAL_PARTS = re.compile(r"\\frac\{\\differentialD\}\{\\differentialD|\\int(?![A-Za-z])|\\differentialD")
+
+
+def latex_group(s, i):
+    while s[i] == " ":
+        i += 1
+    if s[i] != "{":
+        m = re.compile(r"\\[A-Za-z]+|.").match(s, i)
+        return m.group(), m.end()
+    depth = 0
+    for j in range(i, len(s)):
+        depth += {"{": 1, "}": -1}.get(s[j], 0)
+        if depth == 0:
+            return s[i + 1:j], j + 1
+    raise ValueError
+
+def calculus_operand(s, i):
+    while i < len(s) and s[i] == " ":
+        i += 1
+    if i < len(s) and s[i] == "(":
+        depth = 0
+        for j in range(i, len(s)):
+            depth += {"(": 1, ")": -1}.get(s[j], 0)
+            if depth == 0:
+                return s[i + 1:j], j + 1
+    return s[i:], len(s)
+
+def calculus_call(s, i, kind):
+    scripts = {}
+    while i < len(s) and s[i] in "_^":
+        scripts[s[i]], i = latex_group(s, i + 1)
+    scripts = {k: Latex_to_calc(v) for k, v in scripts.items()}
+
+    if kind == "int":
+        depth = 1
+        for part in INTEGRAL_PARTS.finditer(s, i):
+            depth += {r"\int": 1, r"\differentialD": -1}.get(part.group(), 0)
+            if depth == 0:
+                break
+        else:
+            raise ValueError
+        body = Latex_to_calc(s[i:part.start()])
+        var, end = latex_group(s, part.end())
+        var = Latex_to_calc(var)
+        if scripts:
+            return f"integrate({body}, ({var}, {scripts['_']}, {scripts['^']}))", end
+        return f"integrate({body}, {var})", end
+
+    if kind is None:
+        var, i = latex_group(s, i)
+        var = Latex_to_calc(var.removeprefix(r"\differentialD"))
+        body, end = calculus_operand(s, i)
+        return f"diff({Latex_to_calc(body)}, {var})", end
+
+    body, end = calculus_operand(s, i)
+    if kind == "sum":
+        k, a = scripts["_"].split("=", 1)
+        return f"summation({Latex_to_calc(body)}, ({k}, {a}, {scripts['^']}))", end
+    x, a = scripts["_"].split("->", 1)
+    return f"limit({Latex_to_calc(body)}, {x}, {a})", end
+
+
+def calculus_to_calc(s):
+    m = CALCULUS.search(s)
+    if not m:
+        return s
+    try:
+        call, end = calculus_call(s, m.end(), m.group(1))
+    except (IndexError, KeyError, ValueError):
+        return s
+    return s[:m.start()] + call + calculus_to_calc(s[end:])
+
 def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\placeholder{}", "")
     s = s.replace(r"\_", "\x00")  # a typed underscore, not a subscript
@@ -514,6 +587,8 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\mu\s*", "µ", s)
     s = re.sub(r"\\(" + "|".join(GREEK) + r")(?![A-Za-z])", lambda m: GREEK[m.group(1)], s)
     s = s.replace(r"\%", "%")
+    s = s.replace(r"\infty", "oo")
+    s = calculus_to_calc(s)
 
     prev = None
 
@@ -2471,7 +2546,13 @@ class MainWindow(QMainWindow):
             self.interpreter_view.page().runJavaScript(f"insertLatex({json.dumps(latex)})")
 
         layout.addWidget(Sidebar([
-            ("Calculus", QWidget()),
+            ("Calculus", symbol_grid([
+                ("∫", r"\int #?\,\differentialD #?"),
+                ("∫ₐᵇ", r"\int_{#?}^{#?}#?\,\differentialD #?"),
+                ("d/dx", r"\frac{\differentialD}{\differentialD #?}\left(#?\right)"),
+                ("lim", r"\lim_{#?\to#?}\left(#?\right)"),
+                ("Σ", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
+            ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
         ]))
 
