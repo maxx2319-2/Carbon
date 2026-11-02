@@ -6,6 +6,7 @@ import re
 import biotek
 import json
 import sympy 
+import keyword
 from sympy import simplify
 import numpy as np
 from matplotlib.figure import Figure
@@ -70,7 +71,24 @@ SYMPY_FUNCTIONS = {
     "Summation": sympy.summation,
 
 }
+TRANSFORMATIONS = standard_transformations + (split_symbols, implicit_multiplication, convert_xor)
+SAFE_GLOBALS = {
+    "__builtins__": {},
+    "Symbol": sympy.Symbol, "Integer": sympy.Integer, "Float": sympy.Float, "Rational": sympy.Rational, "Number": sympy.Number, "Function": sympy.Function,
+    "integrate": sympy.integrate, "diff": sympy.diff, "limit": sympy.limit, "summation": sympy.summation,
+    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "E": sympy.E,
+}
 
+def safe_parse(text, local_dict):
+    if re.search(r"_|\.(?!\d)|[^\w\s+\-*/^(),.]", text):
+        raise ValueError("Ugyldigt tegn i udtrykket")
+    for name in re.findall(r"[^\W\d]\w*", text):
+        if keyword.iskeyword(name):
+            raise ValueError(f'Ukendt navn "{name}"')
+    for name in re.findall(r"([^\W\d]\w+)\s*\(", text):
+        if name not in local_dict and name not in SAFE_GLOBALS:
+            raise ValueError(f'Ukendt funktion "{name}"')
+    return parse_expr(text, local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=TRANSFORMATIONS)
 
 class Variables:
     def __init__(self, value, var_type):
@@ -912,7 +930,7 @@ class EV:
                             pc += 1
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
-                            output[pc] = parse_expr(line, transformations=standard_transformations + (split_symbols, implicit_multiplication, convert_xor), local_dict={**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
+                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
                             pc += 1
 
                         else:
@@ -953,17 +971,13 @@ class EV:
             expr = "".join(parts)
         expr = re.sub(r"\[([^\]]*)\]", r" (\1)", expr)
         return expr
-
+    
     def prep_sympy(self, expr):
-        transformations = standard_transformations + (split_symbols, implicit_multiplication, convert_xor)
-        for name in re.findall(r"([^\W\d_]\w+)\(", expr):
-            if name not in SYMPY_FUNCTIONS and name not in SYMPY_GLOBALS:
-                raise ValueError(f'Ukendt funktion "{name}"')
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
-            return sympy.Eq(parse_expr(lhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS),parse_expr(rhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS))
-        return parse_expr(expr, transformations=transformations, local_dict=SYMPY_FUNCTIONS)
-
+            return sympy.Eq(safe_parse(lhs, SYMPY_FUNCTIONS), safe_parse(rhs, SYMPY_FUNCTIONS))
+        return safe_parse(expr, SYMPY_FUNCTIONS)
+    
     def parse_interval(self, part, name):
         _,interval = part.split("=")
         if "(" not in interval or ")" not in interval or interval.count(",") != 1:

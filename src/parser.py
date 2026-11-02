@@ -171,7 +171,7 @@ class _Parser:
                 values = self.args()
                 if any(v.units for v in values):
                      raise ValueError(f'{value} kan ikke tage imod enhed')
-                return quantity(round(FUNCTIONS[value](*(v.value for v in values)),config.rounding_decimals),{})
+                return quantity(FUNCTIONS[value](*(v.value for v in values)),{})
             raise ValueError(f'Ukendt funktion "{value}"')
 
                    
