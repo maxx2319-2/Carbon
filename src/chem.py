@@ -733,7 +733,91 @@ def emperical_analysis(atom_procent):
 
     
 
+DA_EN_NAMES = {
+    "eddikesyre": "acetic acid",
+    "myresyre": "formic acid",
+    "mælkesyre": "lactic acid",
+    "citronsyre": "citric acid",
+    "benzoesyre": "benzoic acid",
+    "saltsyre": "hydrochloric acid",
+    "svovlsyre": "sulfuric acid",
+    "salpetersyre": "nitric acid",
+    "flussyre": "hydrofluoric acid",
+    "kulsyre": "carbonic acid",
+    "vand": "water",
+    "ammoniak": "ammonia",
+    "druesukker": "glucose",
+    "rørsukker": "sucrose",
+}
+
+DA_EN_METALS = {
+    "natrium": "sodium",
+    "kalium": "potassium",
+    "jern": "iron",
+    "kobber": "copper",
+    "sølv": "silver",
+    "guld": "gold",
+    "bly": "lead",
+    "kviksølv": "mercury",
+    "zink": "zinc",
+    "calcium": "calcium",
+    "magnesium": "magnesium",
+    "lithium": "lithium",
+    "barium": "barium",
+    "aluminium": "aluminium",
+    "ammonium": "ammonium",
+    "hydrogen": "hydrogen",
+}
+
+ALKYLS = "methyl|ethyl|propyl|butyl|pentyl|hexyl"
+
+DA_EN_RULES = [
+    (r"(an|en|yn)(di)?syre$", r"\1\2oic acid"),
+    (r"syre$", "ic acid"),
+    (r"(chlor|brom|fluor|iod)(?=[a-z])(?!o|id|at|it|ic)", r"\1o"),
+    (rf"^({ALKYLS})(\w+oat)$", r"\1 \2"),
+    (r"oat$", "oate"),
+    (r"(?<!ac)(id|at|it)$", r"\1e"),
+    (r"amin$", "amine"),
+    (r"(an|-[\d,]+-(?:di|tri)?)on$", r"\1one"),
+    (r"(an|en|yn)(-[\d,]+-)?(di|tri|tetra)", r"\1e\2\3"),
+    (r"(?<!g)(an|en|yn)$", r"\1e"),
+]
+
+EN_DA_RULES = [
+    (r"oic acid$", "syre"),
+    (r"ic acid$", "syre"),
+    (r"(chlor|brom|fluor|iod)o", r"\1"),
+    (r"(an|en|yn)e(?=\b|di|tri|tetra)", r"\1"),
+    (r"one\b", "on"),
+    (r"amine\b", "amin"),
+    (r"(id|at|it)e\b", r"\1"),
+    (rf"^({ALKYLS}) (\w+at)$", r"\1\2"),
+]
 
 
+def da_to_en(name):
+    name = name.strip().lower()
+    if name in DA_EN_NAMES:
+        return DA_EN_NAMES[name]
+    m = re.match(rf"^({'|'.join(DA_EN_METALS)})(\(\w+\))?(.+)$", name)
+    if m:
+        name = f"{DA_EN_METALS[m[1]]}{m[2] or ''} {m[3]}"
+    for pattern, repl in DA_EN_RULES:
+        name = re.sub(pattern, repl, name)
+    return name
 
 
+def en_to_da(name):
+    name = name.strip().replace(";"," ")
+    reverse = {en: da for da,en in DA_EN_NAMES.items()}
+    if name in reverse:
+        return reverse[name]
+    for pattern,repl in EN_DA_RULES:
+        name = re.sub(pattern,repl,name)
+    
+    metals = {en: da for da, en in DA_EN_METALS.items()}
+    m = re.match(rf"^({'|'.join(metals)}) (.+)$", name)
+    if m:
+        name = metals[m[1]] + m[2]
+    return name
