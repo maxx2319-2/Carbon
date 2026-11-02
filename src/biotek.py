@@ -175,12 +175,7 @@ def DNA_to_peptide(dna_seq):
         if invalid:
             return f"Error ukendt codon {invalid}"
 
-        result = ""
-        for codon in codons:
-            x = DNA_CODON_TABLE[codon]
-            result += f"{x}, "
-
-        return result
+        return ", ".join(DNA_CODON_TABLE[codon] for codon in codons)
     else:
         return "Error Antal baser skal gå op i 3"
 
@@ -200,12 +195,8 @@ def RNA_to_peptide(rna_seq):
         if invalid:
             return f"Error ukendt codon {invalid}"
 
-        result = ""
-        for codon in codons:
-            x = RNA_CODON_TABLE[codon]
-            result += f"{x}, "
+        return ", ".join(RNA_CODON_TABLE[codon] for codon in codons)
 
-        return result
     else:
         return "Error Antal baser skal gå op i 3"
 
