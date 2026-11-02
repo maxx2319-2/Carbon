@@ -77,7 +77,7 @@
     const editor = document.getElementById("editor");
     let bridge = null;
 
-    const MATH = ["Ln", "Log", "Exp", "Sin", "Cos", "Tan", "ArcSin", "ArcCos", "ArcTan", "Sinh", "Cosh", "Tanh",
+    const MATH = ["Ln", "Log", "Exp", "Sin", "Cos", "Tan", "ArcSin", "ArcCos", "ArcTan", "sin", "cos", "tan", "Arcsin", "Arccos", "Arctan", "Sinh", "Cosh", "Tanh",
                   "ArcSinh", "ArcCosh", "ArcTanh", "Cbrt", "Abs", "Floor", "Ceil", "Round", "Degrees", "Radians",
                   "Gamma", "Erf"];
     const MATH_CALL = new RegExp(String.raw`(?<![A-Za-zæøåÆØÅ\\])(${MATH.join("|")})(?=\\left\(|\()`, "g");

@@ -46,6 +46,12 @@ SYMPY_FUNCTIONS = {
     "ArcSin": lambda a: sympy.asin(a) * 180 / sympy.pi,
     "ArcCos": lambda a: sympy.acos(a) * 180 / sympy.pi,
     "ArcTan": lambda a: sympy.atan(a) * 180 / sympy.pi,
+    "sin":sympy.sin,
+    "cos": sympy.cos,
+    "tan": sympy.tan,
+    "Arcsin": sympy.asin,
+    "Arccos": sympy.acos,
+    "Arctan": sympy.atan,
     "Sinh": sympy.sinh,
     "Cosh": sympy.cosh,
     "Tanh": sympy.tanh,
@@ -58,6 +64,11 @@ SYMPY_FUNCTIONS = {
     "Ceil": sympy.ceiling,
     "Degrees": lambda a: a * 180 / sympy.pi,
     "Radians": lambda a: a * sympy.pi / 180,
+    "Integrate": sympy.integrate,
+    "Diff": sympy.diff,
+    "Limit": sympy.limit,
+    "Summation": sympy.summation,
+
 }
 
 
@@ -176,6 +187,12 @@ class EV:
             "ArcSin": "ArcSin(x)\nOmvendt sinus. Giver vinklen i grader.\nEks: ArcSin(0.5) ",
             "ArcCos": "ArcCos(x)\nOmvendt cosinus. Giver vinklen i grader.\nEks: ArcCos(0.5) ",
             "ArcTan": "ArcTan(x)\nOmvendt tangens. Giver vinklen i grader.\nEks: ArcTan(1) ",
+            "sin": "sin(vinkel)\nSinus til en vinkel i radianer.\nEks: sin(1) ",
+            "cos": "cos(vinkel)\nCosinus til en vinkel i radianer.\nEks: cos(1) ",
+            "tan": "tan(vinkel)\nTangens til en vinkel i radianer.\nEks: tan(1) ",
+            "Arcsin": "Arcsin(x)\nOmvendt sinus. Giver vinklen i radianer.\nEks: Arcsin(0.5) ",
+            "Arccos": "Arccos(x)\nOmvendt cosinus. Giver vinklen i radianer.\nEks: Arccos(0.5) ",
+            "Arctan": "Arctan(x)\nOmvendt tangens. Giver vinklen i radianer.\nEks: Arctan(1) ",
             "Sinh": "Sinh(x)\nHyperbolsk sinus.\nEks: Sinh(1) ",
             "Cosh": "Cosh(x)\nHyperbolsk cosinus.\nEks: Cosh(1) ",
             "Tanh": "Tanh(x)\nHyperbolsk tangens.\nEks: Tanh(1) ",
@@ -937,6 +954,9 @@ class EV:
 
     def prep_sympy(self, expr):
         transformations = standard_transformations + (split_symbols, implicit_multiplication, convert_xor)
+        for name in re.findall(r"([^\W\d_]\w+)\(", expr):
+            if name not in SYMPY_FUNCTIONS and name not in SYMPY_GLOBALS:
+                raise ValueError(f'Ukendt funktion "{name}"')
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
             return sympy.Eq(parse_expr(lhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS),parse_expr(rhs, transformations=transformations, local_dict=SYMPY_FUNCTIONS))
