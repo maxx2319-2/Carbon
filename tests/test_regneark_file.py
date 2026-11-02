@@ -35,9 +35,16 @@ class FakeView:
     def __init__(self, page):
         self._page = page
         self.loadFinished = FakeSignal()
+        self.props = {}
 
     def page(self):
         return self._page
+
+    def property(self, name):
+        return self.props.get(name)
+
+    def setProperty(self, name, value):
+        self.props[name] = value
 
 
 class FakeTabs:
@@ -47,6 +54,8 @@ class FakeTabs:
 
 class FakeWindow:
     load_regneark = gui.MainWindow.load_regneark
+    save_regneark = gui.MainWindow.save_regneark
+    save_regneark_as = gui.MainWindow.save_regneark_as
 
     def __init__(self, page):
         self.interpreter_view = FakeView(page)
@@ -89,7 +98,7 @@ def test_save_writes_rows_as_json(tmp_path, monkeypatch):
     gui.MainWindow.save_regneark(window)
     assert offered == ["Ny Fil.crbn"]
     assert window.tab_names == ["ark"]
-    assert page.calls == ["JSON.stringify(getSheet())"]
+    assert page.calls == ["JSON.stringify(getSheet())", f"markSaved({json.dumps(json.dumps(ROWS))})"]
     text = path.read_text(encoding="utf-8")
     assert json.loads(text) == {"rows": ROWS}
     assert "Løs" in text

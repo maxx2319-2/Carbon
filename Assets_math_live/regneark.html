@@ -546,6 +546,21 @@
         const next = snapshot();
         if (current && JSON.stringify([current.raws, current.modes]) !== JSON.stringify([next.raws, next.modes])) undoStack.push(current);
         current = next;
+        reportDirty();
+    }
+
+    let savedSheet = "", wasDirty = false;
+
+    function reportDirty() {
+        const dirty = JSON.stringify(getSheet()) !== savedSheet;
+        if (dirty === wasDirty || !bridge?.reportDirty) return;
+        wasDirty = dirty;
+        bridge.reportDirty(dirty);
+    }
+
+    function markSaved(sheet = JSON.stringify(getSheet())) {
+        savedSheet = sheet;
+        reportDirty();
     }
 
     function undo() {
@@ -573,6 +588,7 @@
         reportMode(mf);
         current = snapshot();
         updateHint();
+        reportDirty();
     }
 
 
@@ -946,6 +962,7 @@
         current = snapshot();
         updateHint();
         focusLine(first);
+        markSaved();
     }
 
 
@@ -963,6 +980,7 @@
     updateHint();
     focusLine(first);
     current = snapshot();
+    markSaved();
 
 
 </script>

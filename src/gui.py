@@ -88,6 +88,8 @@ from PySide6.QtGui import (
     QColor,
     QTransform,
     QCursor,
+    QShortcut,
+    QKeySequence,
 )
 import re
 import interpreter
@@ -682,6 +684,11 @@ class _InterpreterBridge(QObject):
     finished = Signal(int, str)
     modeChanged = Signal(str)
     escaped = Signal()
+    dirtyChanged = Signal(bool)
+
+    @Slot(bool)
+    def reportDirty(self, dirty):
+        self.dirtyChanged.emit(dirty)
 
     @Slot(str)
     def reportMode(self, mode):
@@ -2619,6 +2626,8 @@ class MainWindow(QMainWindow):
         """)
         file_menu.addAction("Åbn", self.open_regneark)
         file_menu.addAction("Gem", self.save_regneark)
+        file_menu.addAction("Gem som", self.save_regneark_as)
+        QShortcut(QKeySequence.Save, page, self.save_regneark, Qt.WidgetWithChildrenShortcut)
         file_btn.setIcon(hover_icon("Save.svg"))
         file_btn.setIconSize(QSize(24,24))
         file_btn.setToolTip("Fil")
@@ -2688,6 +2697,7 @@ class MainWindow(QMainWindow):
         bridge = _InterpreterBridge(view)
         bridge.modeChanged.connect(lambda mode: self.line_type.setCurrent(mode) if view is self.interpreter_view else None)
         bridge.escaped.connect(self.restore_window)
+        bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
@@ -2731,12 +2741,22 @@ class MainWindow(QMainWindow):
         """)
         close.clicked.connect(lambda: self.close_interpreter_tab(self.interpreter_stack.indexOf(view)))
 
+        dot = QLabel()
+        dot.setObjectName("dirty")
+        dot.setFixedSize(6,6)
+        dot.setStyleSheet(f"background: {BUTTON}; border-radius: 3px;")
+        policy = dot.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        dot.setSizePolicy(policy)
+        dot.setVisible(bool(view.property("dirty")))
+
         tab = QWidget()
         tab.setFixedHeight(20)
         tab_layout = QHBoxLayout(tab)
         tab_layout.setContentsMargins(6, 0, 0, 0)
         tab_layout.setSpacing(4)
         tab_layout.addWidget(pill)
+        tab_layout.addWidget(dot)
         tab_layout.addWidget(close)
 
         index = self.interpreter_stack.indexOf(view)
@@ -2745,6 +2765,11 @@ class MainWindow(QMainWindow):
         if old:
             old.deleteLater()
         self.fit_tabs()
+
+    def set_dirty(self, view, dirty):
+        view.setProperty("dirty", dirty)
+        index = self.interpreter_stack.indexOf(view)
+        self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLabel, "dirty").setVisible(dirty)
 
     def close_interpreter_tab(self, index):
         view = self.interpreter_stack.widget(index)
@@ -2944,14 +2969,25 @@ class MainWindow(QMainWindow):
         self.slide_to(self.stack.widget(1))
 
     def save_regneark(self):
+        view = self.interpreter_view
+        path = view.property("path")
+        if not path:
+            return self.save_regneark_as()
+        
+        def write(data):
+            Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8")
+            view.page().runJavaScript(f"markSaved({json.dumps(data)})")
+
+        view.page().runJavaScript("JSON.stringify(getSheet())", write)
+
+
+    def save_regneark_as(self):
         path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", self.tab_name(self.interpreter_tabs.currentIndex()) + ".crbn", "Regneark (*.crbn)")
         if not path:
             return
         self.set_tab_name(self.interpreter_view, Path(path).stem)
-        self.interpreter_view.page().runJavaScript(
-            "JSON.stringify(getSheet())",
-            lambda data: Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8"),
-        )
+        self.interpreter_view.setProperty("path", path)
+        self.save_regneark()
 
     def open_molecule(self):
         self.slide_to(self.molecule_page)
@@ -3018,6 +3054,7 @@ class MainWindow(QMainWindow):
         rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
         view = view or self.new_interpreter_tab()
         self.set_tab_name(view, Path(path).stem)
+        view.setProperty("path", path)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setSheet({json.dumps(rows)})"))
         self.open_interpreter()
     
