@@ -44,10 +44,10 @@ def test_only_one_codon_for_met_and_trp():
 # --- translation ---
 
 @pytest.mark.parametrize("seq, expected", [
-    ("ATGAAA", "Met, Lys, "),
-    ("atgaaa", "Met, Lys, "),
-    ("ATG AAA", "Met, Lys, "),
-    ("ATGTAAAAA", "Met, Stop, Lys, "),      # carries on after a stop codon
+    ("ATGAAA", "Met, Lys"),
+    ("atgaaa", "Met, Lys"),
+    ("ATG AAA", "Met, Lys"),
+    ("ATGTAAAAA", "Met, Stop, Lys"),      # carries on after a stop codon
     ("", ""),
 ])
 def test_DNA_to_peptide(seq, expected):
@@ -69,9 +69,9 @@ def test_DNA_unknown_codon(seq, bad):
 
 
 @pytest.mark.parametrize("seq, expected", [
-    ("AUGUUU", "Met, Phe, "),
-    ("augguu", "Met, Val, "),
-    ("AUG UUU", "Met, Phe, "),
+    ("AUGUUU", "Met, Phe"),
+    ("augguu", "Met, Val"),
+    ("AUG UUU", "Met, Phe"),
     ("", ""),
 ])
 def test_RNA_to_peptide(seq, expected):
