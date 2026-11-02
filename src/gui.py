@@ -2086,6 +2086,7 @@ class MainWindow(QMainWindow):
         items = [
             ("Hovedmenu", self.open_menu, None),
             ("Regneark", self.open_interpreter, None),
+            ("Molekyle Tegner", self.open_molecule, None),
             ("Kemi", self.open_kemi, self.kemi_page),
             ("Fysik", self.open_fysik, self.fysik_page),
             ("Biotek", self.open_biotek, self.biotek_page),
