@@ -640,7 +640,8 @@
             if (e.key === "Escape") {stop(); hideSuggest(); return;}
             if (e.key === "ArrowLeft" || e.key === "ArrowRight") hideSuggest();
         }
-        if (e.key === "Escape") { stop(); bridge?.escape(); return; }
+        if (e.key === "Escape") { stop(); if (running) { running = false; runId++; bridge.cancel(); } else bridge?.escape(); return; }
+
 
 
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { stop(); run(); return; }
@@ -705,12 +706,13 @@
         if (e.target === editor && e.offsetX < editor.clientWidth) { e.preventDefault(); focusLine(lines().at(-1)); }
     });
 
-    let runId =0, runLines = null;
+    let runId =0, runLines = null, running = false;
 
     function run() {
         if (!bridge) return;
         runLines = [...editor.children];
         const text = runLines.map(el => isOut(el) || modeOf(el) !== "math" ? "" : strip(el.value));
+        running = true;
         bridge.run(++runId, JSON.stringify(text));
     }
     const PLOT_COLORS = ["#00d9ff", "#ff6ec7", "#ffd166", "#06ffa5", "#c77dff", "#ff9e6d"];
@@ -800,13 +802,13 @@
             const sx = niceStep(view.x1 - view.x0), sy = niceStep(view.y1 - view.y0);
             const labelY = Math.min(Math.max(py(0) + 14, 14), h - 4);
             const labelX = Math.min(Math.max(px(0) + 4, 4), w - 40);
-            for (let i = Math.ceil(view.x0 / sx); i * sx <= view.x1; i++) {
+            for (let i = Math.ceil(view.x0 / sx); i * sx <= view.x1 && n<50; i++,n++) {
                 const x = i * sx;
                 ctx.strokeStyle = "#28282e";
                 ctx.beginPath(); ctx.moveTo(px(x), 0); ctx.lineTo(px(x), h); ctx.stroke();
                 ctx.fillText(tidy(x, 12), px(x) + 3, labelY);
             }
-            for (let i = Math.ceil(view.y0 / sy); i * sy <= view.y1; i++) {
+            for (let i = Math.ceil(view.y0 / sy); i * sy <= view.y1 && n <50; i++,n++) {
                 const y = i * sy;
                 ctx.strokeStyle = "#28282e";
                 ctx.beginPath(); ctx.moveTo(0, py(y)); ctx.lineTo(w, py(y)); ctx.stroke();
@@ -851,8 +853,12 @@
             e.preventDefault();
             const [x, y] = at(e);
             const f = e.deltaY > 0 ? 1.2 : 1 / 1.2;
-            view = { x0: x + (view.x0 - x) * f, x1: x + (view.x1 - x) * f, y0: y + (view.y0 - y) * f, y1: y + (view.y1 - y) * f };
+            const next = { x0: x + (view.x0 - x) * f, x1: x + (view.x1 - x) * f, y0: y + (view.y0 - y) * f, y1: y + (view.y1 - y) * f };
+            const tooSmall = (a, b) => b - a < 1e-9 * Math.max(Math.abs(a), Math.abs(b));
+            if (f < 1 && (tooSmall(next.x0, next.x1) || tooSmall(next.y0, next.y1))) return;
+            view = next;
             draw();
+            
         }, { passive: false });
         canvas.addEventListener("dblclick", () => { view = { ...home }; draw(); });
 
@@ -929,13 +935,15 @@
         new QWebChannel(qt.webChannelTransport, ch =>{
             bridge = ch.objects.bridge;
             bridge.help(h => HELP = JSON.parse(h))
-            bridge.finished.connect((id, rows) => { if (id === runId) showOutput(JSON.parse(rows), runLines); });
+            bridge.finished.connect((id, rows) => { if (id === runId) { running = false; showOutput(JSON.parse(rows), runLines); } });
+
 
         });
     }
 
     const SAFE_JS = /^(?:\s|x|Math\.(?:abs|acosh?|asinh?|atan2?|atanh|cbrt|ceil|cosh?|exp|floor|log|max|min|pow|sign|sinh?|sqrt|tanh?|E|PI)\b|\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\d.])|[-+*/%(),?:]|[<>]=?|[=!]=|&&|\|\||!)*$/;
-    const safePlot = raw => JSON.parse(raw).functions.every(f => SAFE_JS.test(f.js));
+    const safePlot = raw => { try { return JSON.parse(raw).functions.every(f => SAFE_JS.test(f.js)); } catch { return false; } };
+
 
     function getSheet(){
         return [...editor.children].map(el => {

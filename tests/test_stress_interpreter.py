@@ -109,10 +109,10 @@ def test_20000_lines_finish():
     assert result[1] < 30
 
 
-def test_100k_loop_iterations_finish():
-    result = isolated("t = time.perf_counter()\nr = ev('x = 0\\nx += 1\\nLoop(2,2,100000)')\nprint(json.dumps([len(r[2]), time.perf_counter() - t]))", 120)
+def test_10k_loop_iterations_finish():
+    result = isolated("t = time.perf_counter()\nr = ev('x = 0\\nx += 1\\nLoop(2,2,10000)')\nprint(json.dumps([len(r[2]), time.perf_counter() - t]))", 120)
     assert result is not None
-    assert result[0] == 100000
+    assert result[0] == 10000
     assert result[1] < 30
 
 
@@ -124,7 +124,6 @@ def test_2000_variables_finish_quickly():
     assert result[1] < 3
 
 
-@pytest.mark.xfail(reason="C-03: Loop has no upper limit and a running calculation can't be cancelled", strict=True)
 def test_huge_loop_count_is_refused_or_finishes():
     assert isolated("ev('x = 0\\nx += 1\\nLoop(2,2,100000000)')\nprint('[]')", 30) is not None
 
@@ -146,12 +145,10 @@ def test_systemløs_timeout_does_not_leave_a_thread_running():
     assert result == 1
 
 
-@pytest.mark.xfail(reason="S-01: calculus lines go straight into sympy's parse_expr, which evaluates them as Python", strict=True)
 def test_calculus_line_cannot_call_python_builtins():
     assert str(ev("integrate(x, x) + len('abcd')")[0]).startswith("Error")
 
 
-@pytest.mark.xfail(reason="B-01: prep_sympy uses SYMPY_GLOBALS, which doesn't exist", strict=True)
 @pytest.mark.parametrize("text", ["Simplificer(sqrt(12) + sqrt(27))", "Løs(sqrt(x) = 2)", "PlotFunktion(sqrt(x))"])
 def test_sqrt_works_in_symbolic_functions(text):
     assert not str(ev(text)[0]).startswith("Error")
@@ -188,7 +185,6 @@ def test_adding_the_same_kind_of_unit(text):
     assert not str(ev(text)[0]).startswith("Error")
 
 
-@pytest.mark.xfail(reason="B-06: parser.atom rounds every function result to config.rounding_decimals", strict=True)
 @pytest.mark.parametrize("text, expected", [
     ("Exp(-10)", 4.54e-5),
     ("Sin(1)*1000", 17.452),

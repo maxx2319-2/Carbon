@@ -183,8 +183,8 @@ def test_add_section_can_be_called(view):
     assert js(view, "typeof addSection") == "function"
 
 
-ZOOM = r"""
-import os, sys
+PLOT = r"""
+import json, os, sys
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --log-level=3"
 from PySide6.QtCore import QEventLoop, QTimer, QUrl
@@ -206,22 +206,33 @@ loop = QEventLoop()
 v.loadFinished.connect(loop.quit)
 v.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
 loop.exec()
-js(v, 'setSheet([["code",""]]); showOutput([["code",""],["plot", JSON.stringify({functions: [{js: "x*x", label: "x^2"}], start: -10, end: 10})]], lines()); true')
-for _ in range(40):
+js(v, 'setSheet([["code",""]]); showOutput([["code",""],["plot", ' + json.dumps(sys.argv[1]) + ']], lines()); true')
+QTimer.singleShot(1500, loop.quit)
+loop.exec()
+for _ in range(int(sys.argv[2])):
     alive = js(v, "(() => { const c = editor.querySelector('div.plot canvas'); const r = c.getBoundingClientRect(); for (let i = 0; i < 10; i++) c.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, clientX: r.left + r.width * 0.75, clientY: r.top + r.height * 0.3, bubbles: true, cancelable: true})); return true; })()")
     if not alive:
         print("FROZE", flush=True)
         os._exit(0)
-print("OK", flush=True)
+print("OK" if js(v, "1") else "FROZE", flush=True)
 os._exit(0)
 """
 
 
-@pytest.mark.xfail(reason="C-01: zooming far into a plot makes the grid loop in draw() run forever and the page freezes", strict=True)
-def test_deep_plot_zoom_does_not_freeze():
+def plot_survives(data, wheel_rounds):
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
     try:
-        proc = subprocess.run([sys.executable, "-c", ZOOM], cwd=SRC, env=env, capture_output=True, text=True, timeout=180)
+        proc = subprocess.run([sys.executable, "-c", PLOT, json.dumps(data), str(wheel_rounds)], cwd=SRC, env=env, capture_output=True, text=True, timeout=180)
     except subprocess.TimeoutExpired:
-        pytest.fail("zoom test did not finish")
-    assert proc.stdout.strip().splitlines()[-1] == "OK"
+        pytest.fail("plot test did not finish")
+    return proc.stdout.strip().splitlines()[-1] == "OK"
+
+
+@pytest.mark.xfail(reason="C-01: zooming far into a plot makes the grid loop in draw() run forever and the page freezes", strict=True)
+def test_deep_plot_zoom_does_not_freeze():
+    assert plot_survives({"functions": [{"js": "x*x", "label": "x^2"}], "start": -10, "end": 10}, 40)
+
+
+@pytest.mark.xfail(reason="C-01: the same grid loop never ends when the values are huge next to their spread, so PlotFunktion(x+10^17) freezes on its first draw", strict=True)
+def test_plot_with_huge_values_does_not_freeze():
+    assert plot_survives({"functions": [{"js": "x + 100000000000000000", "label": "x + 100000000000000000"}], "start": -10, "end": 10}, 0)
