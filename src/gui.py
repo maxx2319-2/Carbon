@@ -1958,7 +1958,6 @@ class MainWindow(QMainWindow):
         self.create_drawer()
         self.create_search()
         self.create_settings_page()
-        #self.create_formel_page()
 
         self.history = [self.stack.currentWidget()]
         self.history_index = 0
@@ -2081,7 +2080,6 @@ class MainWindow(QMainWindow):
             ("Kemi", self.open_kemi, self.kemi_page),
             ("Fysik", self.open_fysik, self.fysik_page),
             ("Biotek", self.open_biotek, self.biotek_page),
-            ("Formelsamling", self.open_formula, None),
             ("Indstillinger", self.open_settings, None),
             ("Nyheder", self.open_changelog, None),
             ("Afslut", self.close_app, None),
@@ -2883,9 +2881,6 @@ class MainWindow(QMainWindow):
 
     def open_settings(self):
         self.slide_to(self.settings_page)
-
-    def open_formula(self):
-        self.stack.setCurrentIndex(7)
 
     def open_regneark(self):
         path, _ = QFileDialog.getOpenFileName(self, "Åbn regneark", "", "Regneark (*.crbn)")
