@@ -755,6 +755,17 @@
 
         }
 
+    function addSection() {
+        clearSel();
+        let at = lastField ?? first;
+        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
+        const header = newLine(at,"","section");
+        newLine(header);
+        focusLine(header);
+        record();
+    }
+
+
         function draw() {
             const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio;
             canvas.width = w*dpr;
@@ -885,7 +896,7 @@
 
     function setMode(mode, mf = lastField ?? first) {
         for (const line of sel ? selectedLines() : [mf]) {
-            if (isOut(line) || modeOf(line) === mode) continue;
+            if (isOut(line) || modeOf(line) === mode || modeOf(line) === "section") continue;
             clearOutput(line);
             applyMode(line, mode);
             setLine(line, strip(line.value), line.position);
