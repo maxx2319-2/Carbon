@@ -1948,7 +1948,7 @@ class MainWindow(QMainWindow):
         self.create_header()
         self.create_mainmenu()
         self.create_interpreter_page()
-        #self.create_molecule_page()
+        self.create_molecule_page()
         self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning","puffer","h3o"])
         self.fysik_page = PanelPage(["unit"])
         self.biotek_page = PanelPage(["unit","dna_peptid","rna_peptid"])
@@ -2339,22 +2339,22 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Marvin_Icon.svg", "Molekyle Tegner", self.open_molecule)
+            make_button("Marvin_Icon.svg", "Molekyle Tegner", self.open_molecule, 2)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Kemi_Icon.svg","Kemi", self.open_kemi, 2)
+            make_button("Kemi_Icon.svg","Kemi", self.open_kemi, 3)
         )
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik, 3)
+            make_button("Fysik_Icon.svg", "Fysik", self.open_fysik, 4)
         )
         layout.addStretch()
         
         layout.addWidget(
-            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek, 4)
+            make_button("Biotek_Icon.svg", "Biotek", self.open_biotek, 5)
         )
         layout.addStretch()
 
@@ -2801,6 +2801,12 @@ class MainWindow(QMainWindow):
         self.settings_page.setWindowIcon(QIcon(str(ASSETS_DIR / "Settings_Icon.svg")))
         self.stack.addWidget(self.settings_page)
 
+    def create_molecule_page(self):
+        self.molecule_view = QWebEngineView()
+        self.molecule_view.page().setBackgroundColor(QColor(BG))
+        self.molecule_view.load(QUrl.fromLocalFile(str(resource_path("Assets_ketcher/index.html"))))
+        self.stack.addWidget(self.molecule_view)
+
     def slide_to(self, page):
         current = self.stack.currentWidget()
         if page is current or self.slide_anim.state() == QParallelAnimationGroup.Running:
@@ -2868,7 +2874,7 @@ class MainWindow(QMainWindow):
         )
 
     def open_molecule(self):
-        pass
+        self.slide_to(self.molecule_view)
 
     def open_kemi(self):
         self.slide_to(self.kemi_page)
