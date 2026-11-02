@@ -102,6 +102,7 @@ from path import resource_path
 version = "Bv 2.0"
 
 CHANGELOG_URL = "https://raw.githubusercontent.com/MaxCortes1507/Carbon-change-logs/main/Change-log-BV2.md"
+PUBCHEM_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
 
 ASSETS_DIR = resource_path("Assets")
 
@@ -749,6 +750,14 @@ class _InterpreterBridge(QObject):
             self.finished.emit(run_id, self.evaluate(data))
             return
         threading.Thread(target=lambda: self.finished.emit(run_id,self.evaluate(data)), daemon=True).start()
+
+class _KetcherBridge(QObject):
+    smilesReady = Signal(str)
+
+
+    @Slot(str)
+    def setSmiles(self, s):
+        self.smilesReady.emit(s)
 
 class _Bridge(QObject):
     changed = Signal(str)
@@ -2802,10 +2811,46 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.settings_page)
 
     def create_molecule_page(self):
+        self.molecule_page = QWidget()
+        layout = QVBoxLayout(self.molecule_page)
+        layout.setContentsMargins(6,6,6,6)
+        layout.setSpacing(6)
+
+        row = QHBoxLayout()
+        self.molecule_name = QLineEdit()
+        self.molecule_name.setPlaceholderText("Navn på engelsk, f.eks. acetic acid")
+        self.molecule_name.setStyleSheet(f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 8px; padding: 4px 10px; }}")
+        self.molecule_name.returnPressed.connect(self.name_to_structure)
+        row.addWidget(self.molecule_name,stretch=1)
+
+        draw_btn = QPushButton("Tegn")
+        draw_btn.setStyleSheet(calc_button_style)
+        draw_btn.clicked.connect(self.name_to_structure)
+        row.addWidget(draw_btn)
+
+        name_btn = QPushButton("Find navn")
+        name_btn.setStyleSheet(calc_button_style)
+        name_btn.clicked.connect(self.structure_to_name)
+        row.addWidget(name_btn)
+
+        self.molecule_status = QLabel()
+        self.molecule_status.setStyleSheet(f"color: {BUTTON};")
+        row.addWidget(self.molecule_status)
+        layout.addLayout(row)
+
         self.molecule_view = QWebEngineView()
         self.molecule_view.page().setBackgroundColor(QColor(BG))
-        self.molecule_view.load(QUrl.fromLocalFile(str(resource_path("Assets_ketcher/index.html"))))
-        self.stack.addWidget(self.molecule_view)
+        bridge = _KetcherBridge(self.molecule_view)
+        bridge.smilesReady.connect(self.smiles_to_name)
+        channel = QWebChannel(self.molecule_view.page())
+        channel.registerObject("bridge", bridge)
+        self.molecule_view.page().setWebChannel(channel)
+        self.molecule_view.loadFinished.connect(lambda ok: self.molecule_view.page().runJavaScript("document.documentElement.style.filter = 'invert(.75) hue-rotate(180deg)'"))
+        self.molecule_view.load(QUrl.fromLocalFile(str(resource_path("Assets_Ketcher/index.html"))))
+        layout.addWidget(self.molecule_view, stretch=1)
+
+        self.stack.addWidget(self.molecule_page)
+
 
     def slide_to(self, page):
         current = self.stack.currentWidget()
@@ -2874,7 +2919,48 @@ class MainWindow(QMainWindow):
         )
 
     def open_molecule(self):
-        self.slide_to(self.molecule_view)
+        self.slide_to(self.molecule_page)
+
+    def name_to_structure(self):
+        name = self.molecule_name.text().strip()
+        if not name:
+            return
+        self.molecule_status.clear()
+        request = QNetworkRequest(QUrl(f"{PUBCHEM_URL}/name/property/SMILES/TXT"))
+        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/x-www-form-urlencoded")
+        reply = self.network.post(request, b"name=" + bytes(QUrl.toPercentEncoding(name)))
+        reply.finished.connect(lambda: self.draw_smiles(reply))
+
+    def draw_smiles(self, reply):
+        if reply.error() == QNetworkReply.NoError:
+            smiles = bytes(reply.readAll()).decode("utf-8").splitlines()[0]
+            self.molecule_view.page().runJavaScript(f'ketcher.setMolecule({json.dumps(smiles)})')
+        else:
+            self.molecule_status.setText("Ikke fundet")
+        reply.deleteLater()
+
+    def structure_to_name(self):
+        self.molecule_status.clear()
+        self.molecule_view.page().runJavaScript("ketcher.getSmiles().then(s => bridge.setSmiles(s))")
+
+    def smiles_to_name(self, smiles):
+        if not smiles:
+            return
+        request = QNetworkRequest(QUrl(f"{PUBCHEM_URL}/smiles/property/Title/JSON"))
+        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/x-www-form-urlencoded")
+        reply = self.network.post(request,b"smiles=" + bytes(QUrl.toPercentEncoding(smiles)))
+        reply.finished.connect(lambda: self.show_name(reply))
+
+    def show_name(self, reply):
+        name = None
+        if reply.error() == QNetworkReply.NoError:
+            name = json.loads(bytes(reply.readAll()))["PropertyTable"]["Properties"][0].get("Title")
+
+        if name:
+            self.molecule_name.setText(name)
+        else:
+            self.molecule_status.setText("Ikke fundet")
+        reply.deleteLater()
 
     def open_kemi(self):
         self.slide_to(self.kemi_page)
