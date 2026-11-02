@@ -1892,10 +1892,11 @@ class Sidebar(QWidget):
         self.anim.start()
 
 class PanelPage(QWidget):
-    def __init__(self, keys, parent=None):
+    def __init__(self, keys, icon, parent=None):
         super().__init__(parent)
         self.keys = keys
         self.panels = {}
+        self.logo = QIcon(str(ASSETS_DIR / icon))
 
         self.canvas = QWidget()
         self.canvas.setStyleSheet(f"background-color: {BG};")
@@ -1927,6 +1928,12 @@ class PanelPage(QWidget):
         if obj is self.canvas and event.type() == QEvent.Resize:
             for panel in self.panels.values():
                 panel.move(panel._clamp_to_parent(panel.pos()))
+        if obj is self.canvas and event.type() == QEvent.Paint:
+            margin = min(self.canvas.width(), self.canvas.height()) // 4
+            painter = QPainter(self.canvas)
+            painter.setOpacity(0.05)
+            self.logo.paint(painter, self.canvas.rect().adjusted(margin, margin, -margin, -margin))
+            painter.end()
         return super().eventFilter(obj, event)
 
 class MainWindow(QMainWindow):
@@ -1958,9 +1965,28 @@ class MainWindow(QMainWindow):
         self.create_mainmenu()
         self.create_interpreter_page()
         self.create_molecule_page()
-        self.kemi_page = PanelPage(["unit","pH","pOH","balance","analysis","bjerrum","udbytteprocent","volumenprocent","masseprocent","mængdeberegning","puffer","h3o"])
-        self.fysik_page = PanelPage(["unit"])
-        self.biotek_page = PanelPage(["unit","dna_peptid","rna_peptid"])
+        self.kemi_page = PanelPage([
+            "unit",
+            "pH",
+            "pOH",
+            "balance",
+            "analysis",
+            "bjerrum",
+            "udbytteprocent",
+            "volumenprocent",
+            "masseprocent",
+            "mængdeberegning",
+            "puffer",
+            "h3o"],
+            "Kemi_Icon.svg")
+        self.fysik_page = PanelPage([
+            "unit"],
+            "Fysik_Icon.svg")
+        self.biotek_page = PanelPage([
+            "unit",
+            "dna_peptid",
+            "rna_peptid"],
+            "Biotek_Icon.svg")
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
