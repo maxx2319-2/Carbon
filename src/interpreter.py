@@ -292,6 +292,8 @@ class EV:
                             l1 = int(l1)
                             l2 = int(l2)
                             count = int(count)
+                            if count > 10000: raise ValueError("Loop kan højst køre 10000 gange")
+
 
                             if l1 < 1 or l1 > l2 or l1 - 1 <= pc < l2:
                                 raise ValueError("Kan ikke have loop inde i sig selv")

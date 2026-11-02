@@ -12,11 +12,6 @@ import base64
 from matplotlib.figure import Figure
 import utils
 import ctypes
-
-os.environ.setdefault("SSL_CERT_FILE", certifi.where())
-os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
-os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
-
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -98,8 +93,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import biotek
 import license_manager
 import sympy
+import multiprocessing
 
 from path import resource_path
+
+
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
 
 version = "Bv 2.0"
 
@@ -680,11 +681,24 @@ def latex_text(s):
 
 
 
-class _InterpreterBridge(QObject):
+class _InterpreterBridge(QObject):    
     finished = Signal(int, str)
     modeChanged = Signal(str)
     escaped = Signal()
     dirtyChanged = Signal(bool)
+    leaked = Signal()
+
+
+    def __init__(self,parent = None):
+        super().__init__(parent)
+        self.pool = multiprocessing.Pool(1)
+        self.job = None
+        self.leaked.connect(self.restart)
+
+    @staticmethod
+    def evaluate_in_worker(data):
+        return _InterpreterBridge(data), threading.active_count() > 1
+
 
     @Slot(bool)
     def reportDirty(self, dirty):
@@ -697,6 +711,16 @@ class _InterpreterBridge(QObject):
     @Slot()
     def escape(self):
         self.escaped.emit()
+
+    def done(self, run_id,rows, leaked):
+        self.finished.emit(run_id,rows)
+        if leaked:
+            self.leaked.emit()
+
+    @Slot()
+    def restart(self):
+        if self.job is None or self.job.ready():
+            self.cancel()
 
     @Slot(result=str)
     def help(self):
@@ -756,7 +780,18 @@ class _InterpreterBridge(QObject):
         if 'export' in data.lower():
             self.finished.emit(run_id, self.evaluate(data))
             return
-        threading.Thread(target=lambda: self.finished.emit(run_id,self.evaluate(data)), daemon=True).start()
+        if self.job and not self.job.ready():
+            self.cancel()
+        self.job = self.pool.apply_async(_InterpreterBridge.evaluate_in_worker,(data,),
+            callback=lambda result: self.done(run_id,*result),
+            error_callback=lambda e: self.finished.emit(run_id, json.dumps([["error", latex_text(f'Error: {e}')]])))
+        
+    @Slot()
+    def cancel(self):
+        self.pool.terminate()
+        self.pool = multiprocessing.pool(1)
+        self.job = None
+
 
 class _KetcherBridge(QObject):
     smilesReady = Signal(str)
@@ -2773,6 +2808,7 @@ class MainWindow(QMainWindow):
 
     def close_interpreter_tab(self, index):
         view = self.interpreter_stack.widget(index)
+        view.findChild(_InterpreterBridge).pool.terminate()
         view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, lambda used: self.remove_interpreter_tab(view, used))
 
     def ask_close(self, title, text):
@@ -3051,7 +3087,13 @@ class MainWindow(QMainWindow):
             self.load_regneark(path)
 
     def load_regneark(self, path, view=None):
-        rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
+        try:
+            rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
+            if not isinstance(rows, list) or not all(isinstance(r, list) and 2 <= len(r) <= 3 and all(isinstance(x, str) for x in r) for r in rows):
+                raise ValueError
+        except(OSError, UnicodeError, ValueError, KeyError, TypeError):
+            QMessageBox.warning(self, "åbn regneark","filen kunne ikke åbnes. Den er måske corrupted")
+            return
         view = view or self.new_interpreter_tab()
         self.set_tab_name(view, Path(path).stem)
         view.setProperty("path", path)
@@ -3092,6 +3134,7 @@ class MainWindow(QMainWindow):
             view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, collect)
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = CarbonApp(sys.argv)
     if sys.platform == "win32" and getattr(sys, "frozen", False):
