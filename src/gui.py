@@ -1944,6 +1944,7 @@ class MainWindow(QMainWindow):
         load_dict_from_settings("pKb_values", pKb_values)
 
         self.gen = 1
+        self.close_confirmed = False
 
         self.setWindowTitle("Carbon")
         self.setWindowIcon(QIcon(str(ASSETS_DIR / "Carbon_Round.svg")))
@@ -2749,23 +2750,25 @@ class MainWindow(QMainWindow):
         view = self.interpreter_stack.widget(index)
         view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, lambda used: self.remove_interpreter_tab(view, used))
 
+    def ask_close(self, title, text):
+        msg = QMessageBox(self)
+        msg.setWindowTitle(title)
+        msg.setText(text)
+        msg.setIcon(QMessageBox.NoIcon)
+        msg.setStyleSheet(f"""
+            QMessageBox {{ background-color: {BG}; }}
+            QLabel {{ color: {BUTTON}; }}
+            QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
+            QPushButton:hover {{ background-color: {HOVER}; }}
+        """)
+        close = msg.addButton("Luk", QMessageBox.AcceptRole)
+        msg.addButton("Annuller", QMessageBox.RejectRole)
+        msg.exec()
+        return msg.clickedButton() is close
+
     def remove_interpreter_tab(self, view, used):
-        if used:
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Luk side")
-            msg.setText(f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt.")
-            msg.setIcon(QMessageBox.NoIcon)
-            msg.setStyleSheet(f"""
-                QMessageBox {{ background-color: {BG}; }}
-                QLabel {{ color: {BUTTON}; }}
-                QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
-                QPushButton:hover {{ background-color: {HOVER}; }}
-            """)
-            close = msg.addButton("Luk", QMessageBox.AcceptRole)
-            msg.addButton("Annuller", QMessageBox.RejectRole)
-            msg.exec()
-            if msg.clickedButton() is not close:
-                return
+        if used and not self.ask_close("Luk side", f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt."):
+            return
         if self.interpreter_tabs.count() == 1:
             self.new_interpreter_tab()
         index = self.interpreter_stack.indexOf(view)
@@ -3035,7 +3038,21 @@ class MainWindow(QMainWindow):
     def close_app(self):
         self.close()
 
+    def closeEvent(self, event):
+        if self.close_confirmed:
+            return super().closeEvent(event)
+        event.ignore()
+        views = [self.interpreter_stack.widget(i) for i in range(self.interpreter_stack.count())]
+        used = []
 
+        def collect(result):
+            used.append(result)
+            if len(used) == len(views) and (not any(used) or self.ask_close("Luk Carbon", "Vil du lukke Carbon?\nDet, der ikke er gemt, går tabt.")):
+                self.close_confirmed = True
+                self.close()
+
+        for view in views:
+            view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, collect)
 
 if __name__ == "__main__":
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"

@@ -118,6 +118,7 @@ def test_line_type_slider(view):
     js(window.interpreter_view, "setMode('formula'); true")
     pump()
     assert slider.current == "formula"
+    window.close_confirmed = True
     window.close()
 
 
@@ -146,4 +147,5 @@ def test_slider_ignores_arrow_keys_but_follows_clicks(view):
     QTest.mouseClick(page.focusProxy(), Qt.LeftButton, Qt.NoModifier, QPoint(100, int((top + bottom) / 2)))
     pump()
     assert window.line_type.current == "text"
+    window.close_confirmed = True
     window.close()
