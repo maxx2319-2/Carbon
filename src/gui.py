@@ -2121,6 +2121,8 @@ class MainWindow(QMainWindow):
             ("Afslut", self.close_app, None),
         ]
 
+        self.drawer_items = items
+
         style = f"""
                 QPushButton {{
                     color: white;
@@ -2419,9 +2421,12 @@ class MainWindow(QMainWindow):
     
     def create_search(self):
         self.search_targets = {}
-        for name, page in [("Kemi", self.kemi_page), ("Fysik", self.fysik_page), ("Biotek", self.biotek_page)]:
-            for key in page.keys:
-                self.search_targets[f"{PANELS[key].label} ({name})"] = (page, key)
+        for text, callback, page in self.drawer_items:
+            if callback == self.close_app:
+                continue
+            self.search_targets[text] = callback
+            for key in page.keys if page else []:
+                self.search_targets[f"{PANELS[key].label} ({text})"] = lambda p=page, k=key: self.open_panel(p, k)
 
         self.suggest = QListWidget(self)
         self.suggest.setFocusPolicy(Qt.NoFocus)
@@ -2472,7 +2477,7 @@ class MainWindow(QMainWindow):
         item = self.suggest.currentItem()
         if not self.suggest.isVisible() or item is None:
             return
-        self.open_panel(*self.search_targets[item.text()])
+        self.search_targets[item.text()]()
         self.search.clear()
 
     def update_page_title(self, i):
