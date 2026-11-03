@@ -621,8 +621,8 @@ def bjerrum_figure(pks):
 
 
 def procent(top,bottom):
-    if top.units != bottom.units:
-        raise ValueError(f"Tæller og nævner skal have samme type enhed Tæller: {top.units} Nævner: {bottom.units}")
+    if top.dimension != bottom.dimension:
+        raise ValueError(f"Tæller og nævner skal have samme type enhed Tæller: {top.current_units} Nævner: {bottom.current_units}")
     
     
     result = f"({top} / {bottom}) * 100"

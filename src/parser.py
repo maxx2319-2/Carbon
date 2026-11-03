@@ -119,7 +119,7 @@ class _Parser:
         if self.peek() in (("op", "-"), ("op", "+")):
             op = self.take()[1]
             value = self.unary()
-            return quantity(-value.value, value.units) if op == "-" else value
+            return quantity(-value.value, value.dimension, value.current_units) if op == "-" else value
         return self.power()
 
     def power(self):
@@ -127,7 +127,7 @@ class _Parser:
         if self.peek() == ("op", "^"):
             self.take()
             exponent = self.exponent()
-            if exponent.units:
+            if exponent.dimension:
                 raise ValueError("En eksponent kan ikke have en enhed")
             p = exponent.value
             return base ** (int(p) if float(p).is_integer() else p)
@@ -137,7 +137,7 @@ class _Parser:
         if self.peek() in (("op", "-"), ("op", "+")):
             op = self.take()[1]
             value = self.exponent()
-            return quantity(-value.value, value.units) if op == "-" else value
+            return quantity(-value.value, value.dimension, value.current_units) if op == "-" else value
         return self.power()
 
 
@@ -163,21 +163,21 @@ class _Parser:
             return self.group()
         kind, value = self.take()
         if kind == "number":
-            return quantity(float(value), {})
+            return quantity(float(value), {}, {})
         if kind == "unit" and self.peek() == ("op","("):
             if value == "sqrt":
                 return self.group() ** 0.5
             if value in FUNCTIONS:
                 values = self.args()
-                if any(v.units for v in values):
+                if any(v.dimension for v in values):
                      raise ValueError(f'{value} kan ikke tage imod enhed')
-                return quantity(FUNCTIONS[value](*(v.value for v in values)),{})
+                return quantity(FUNCTIONS[value](*(v.value for v in values)),{},{})
             raise ValueError(f'Ukendt funktion "{value}"')
 
                    
 
         if kind == "unit":
-            return quantity(1.0,{value: 1})
+            return quantity.create_quantity(1.0, value)
         if kind is None:
             raise ValueError(f'udtrykket sluter for tidligt: "{self.text}"')
         raise ValueError(f'uventet "{value}" i {self.text}')

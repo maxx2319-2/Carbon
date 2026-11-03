@@ -32,7 +32,7 @@ with open(resource_path("config.json")) as f:
 
 def round_quantity(quant,inputs):
     value = utils.significant_figures(quant.value,inputs)
-    return quantity(value,quant.units)
+    return quantity(value,quant.dimension,quant.current_units)
 
 CONSTANTS = ("e", "π")
 
@@ -650,7 +650,7 @@ class EV:
                             else:
                                 result = quantity.unit_convert(Qstart, unit)
 
-                            output_unit = result.units
+                            output_unit = result.current_units
                             
                             output[pc] = round_quantity(result,[self.prep_ev(start)])
                             pc += 1
@@ -665,7 +665,7 @@ class EV:
                             )
                             indhold = f"Masse procent:\n{'\n'.join(procent)}"
                             output[pc] = (
-                                f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {quantity.quantity_convert(round(mol,config.rounding_decimals),"g/mol")}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
+                                f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {quantity.create_quantity(round(mol,config.rounding_decimals),"g/mol")}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
                             )
                             pc += 1
 
@@ -785,8 +785,8 @@ class EV:
                                 provided_keys.add(key)
 
                                 q = parser.evaluate(self.prep_ev(val))
-                                if not q.units:
-                                    q = quantity.quantity_convert(q.value,unit_map[key])
+                                if not q.dimension:
+                                    q = quantity.create_quantity(q.value,unit_map[key])
                                 kwargs[key_map[key]] = quantity.si_convert(q)
                                 
                             result = chem.mængdeberegning(**kwargs)
@@ -812,11 +812,11 @@ class EV:
                                     val = converted.value
                                     if isinstance(val, float) and val.is_integer():
                                         val = int(val)
-                                    linjer.append(f"{k}: {quantity(val, converted.units)}")
+                                    linjer.append(f"{k}: {quantity(val, converted.dimension, converted.current_units)}")
                                 else:
                                     sig_inputs = [raw_values[d] for d in find_deps(short)]
                                     rounded = utils.significant_figures(converted.value, sig_inputs) 
-                                    linjer.append(f"{k}: {quantity(rounded, converted.units)}")
+                                    linjer.append(f"{k}: {quantity(rounded, converted.dimension, converted.current_units)}")
     
                             output[pc] = "\n".join(linjer) if linjer else ""
                             pc += 1
