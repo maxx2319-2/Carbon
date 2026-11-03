@@ -27,7 +27,7 @@
     }
     math-field { line-height: 1; }
     math-field::part(container) { align-items: center; min-height: 0; }
-    math-field::part(content)   { padding: 0; min-height: 0; }
+    math-field::part(content)   { padding: 0; min-height: 0; overflow-x: auto; scrollbar-width: none; }
     math-field:focus-within { outline: none; }
     math-field::part(virtual-keyboard-toggle),
     math-field::part(menu-toggle) { display: none; }
@@ -99,8 +99,7 @@ function setValue(latex) { mf.value = latex; scheduleFit(); }
     let bridge = null;
 
     const BASE_SIZE = 12;   
-    const MIN_SIZE  = 7;    
-    const PAD_X     = 14;   
+    const MIN_SIZE  = 7;      
 
 
 
@@ -112,12 +111,11 @@ function setValue(latex) { mf.value = latex; scheduleFit(); }
         const content = root && (root.querySelector(".ML__latex") || root.querySelector(".ML__content"));
         if (!content) return;
 
-        const availW = mf.clientWidth - PAD_X;
         const availH = mf.clientHeight - 2;
 
         while (size > MIN_SIZE) {
             const r = content.getBoundingClientRect();
-            if (r.width <= availW && r.height <= availH) break;
+            if (r.height <= availH) break;
             size -= 0.5;
             mf.style.fontSize = size + "px";
         }
@@ -126,6 +124,13 @@ function setValue(latex) { mf.value = latex; scheduleFit(); }
     function scheduleFit() { requestAnimationFrame(fit); }
 
     mf.addEventListener("input", scheduleFit);
+    mf.addEventListener("wheel", e => {
+        const c = mf.shadowRoot.querySelector(".ML__content");
+        if (!c || c.scrollWidth <= c.clientWidth) return;
+        c.scrollLeft += e.deltaY + e.deltaX;
+        e.preventDefault();
+    }, {passive: false});
+
     window.addEventListener("resize", scheduleFit);
 
 
