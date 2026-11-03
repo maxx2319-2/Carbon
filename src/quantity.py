@@ -138,6 +138,8 @@ class quantity:
 
     # addition for quanteties
     def __add__(self, other):
+        self = self.si_convert(self)
+        other = self.si_convert(other)
         if self.units == other.units:
             new_value = self.value + other.value
             return quantity(new_value, self._clean(self.units))

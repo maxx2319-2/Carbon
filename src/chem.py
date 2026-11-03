@@ -233,7 +233,11 @@ def split_charge(formula):
     n = int(num) if num else 1
     return body,n if sign == "+" else -n
 
-
+def expand_groups(formula):
+    n = 1
+    while n:
+        formula, n = re.subn(r"\(([^()]*)\)(\d*)", lambda m: m.group(1) * int(m.group(2) or 1), formula)
+    return formula
 
 
 def reaction_parser(reaction):
@@ -246,7 +250,7 @@ def reaction_parser(reaction):
     products = []
     compund = 0
     for side, out in ((reactant, reactants), (product, products)):
-        for formula in re.findall(r"[A-Za-z0-9()]+(?:\^\d*[+-])?", side):
+        for formula in re.findall(r"([A-Z][a-z]?)(\d*)", expand_groups(body)):
             compund +=1
             body,charge = split_charge(formula)
             for part, amount in re.findall(r"([A-Z][a-z]?)(\d*)", body):
@@ -302,6 +306,10 @@ def get_coefficients(matrix):
     coeffs = [int(round(f * lcm)) for f in fracs]
     if coeffs[0] < 0:
         coeffs = [-c for c in coeffs]
+
+    if np.any(matrix @ coeffs):
+        raise ValueError("Reaktionen kan ikke afstemmes")
+
     return coeffs
 
 
@@ -379,7 +387,7 @@ def pOH(x, con):
 
 def molecule_formula(x):
     molecule_dict = {}
-    matches = re.findall(r"([A-Z][a-z]?)(\d*)", x)
+    matches = re.findall(r"([A-Z][a-z]?)(\d*)", expand_groups(x))
     matches = [(atom, amount) for atom, amount in matches if atom]
     parsed = [(atom, int(amount) if amount else 1) for atom, amount in matches]
 
@@ -515,7 +523,7 @@ def bjerrum(pks):
     plt.legend()
     plt.grid(True)
     plt.xlabel("pH")
-    plt.ylabel("Syre brøk")
+    plt.ylabel("Syrebrøk")
     plt.gcf().canvas.manager.set_window_title("Bjerrum Plot")
 
     plt.xlim(0, 14)

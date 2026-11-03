@@ -27,15 +27,14 @@ with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
 
 
-def as_expr(q):
-    parts = [repr(q.value)] + [f"{u}^({p})" for u, p in q.units.items()]
-    return "(" + "*".join(parts) + ")"
+
 
 
 def round_quantity(quant,inputs):
     value = utils.significant_figures(quant.value,inputs)
     return quantity(value,quant.units)
 
+CONSTANTS = ("e", "π")
 
 SYMPY_FUNCTIONS = {
     "Ln": sympy.log,
@@ -122,7 +121,7 @@ class EV:
             "Puffer",
             "pHTilKoncentration",
             "Løs",
-            "PlotFunktion",
+            "Plot",
             "NumeriskLøs",
             "SystemLøs",
             "Simplificer",
@@ -154,7 +153,7 @@ class EV:
             "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
             "Løs" : "Løs(ligning, evt Interval = (start, slut))",
-            "PlotFunktion" : "PlotFunktion(function 1,function 2,...,Interval = (x start , x slut) )",
+            "Plot" : "Plot(function 1,function 2,...,Interval = (x start , x slut) )",
             "NumeriskLøs" : "NumeriskLøs(function, variabel, evt gæt)",
             "SystemLøs" : "SystemLøs(ligning 1,ligning 2,ligning... , Variabler = {x, y, ...}, evt StartGæt = {1, 1, ...}, evt Interval = (start, slut))",
             "Simplificer" : "Simplificer(x)",
@@ -185,7 +184,7 @@ class EV:
             "Puffer": "Puffer(syre koncentration, base koncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76) ",
             "pHTilKoncentration": "pHTilKoncentration(pH)\nBeregner [H3O+] og [OH-] ud fra pH.\nEks: pHTilKoncentration(3.5) ",
             "Løs": "Løs(ligning, Interval = (start, slut))\nLøser en ligning. Kan ikke tage imod enheder. Interval er valgfrit og finder alle løsninger i intervallet numerisk.\nEks: Løs(x^2 = 4) ",
-            "PlotFunktion": "PlotFunktion(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5)) ",
+            "Plot": "Plot(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5)) ",
             "NumeriskLøs": "NumeriskLøs(funktion, Variabel = x, StartGæt = 1)\nLøser en ligning numerisk ud fra et startgæt. StartGæt er valgfrit.\nEks: NumeriskLøs(Cos(x) = x, Variabel = x, StartGæt = 10) ",
             "SystemLøs": "SystemLøs(ligning 1, ligning 2, ..., Variabler = {x, y, ...}, StartGæt = {1, 1, ...}, Interval = (start, slut))\nLøser et ligningssystem med flere ubekendte. StartGæt er valgfrit og bruges, når systemet skal løses numerisk. Interval er valgfrit og finder alle løsninger, hvor den første variabel ligger i intervallet.\nEks: SystemLøs(x + y = 10, x - y = 2, Variabler = {x, y}) ",
             "Simplificer": "Simplificer(udtryk)\nUdregner et udtryk med kvadratrødder, brøker osv. til et decimaltal.\nEks: Simplificer(sqrt(12) + sqrt(27)) ",
@@ -236,17 +235,15 @@ class EV:
         for n, line in enumerate(lines):
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
             call = re.fullmatch(r"\s*(\w+)\((.*)\)\s*", line)
-            if call and call.group(1) == "loop":
+            if call and call.group(1) == "Loop":
                 func, input = call.groups()
-                if func == "Loop":
+                try:
+                    l1, l2, _ = (int(p) for p in input.split(","))
+                except ValueError:
+                    continue
 
-                    try:
-                        l1, l2, _ = (int(p) for p in input.split(","))
-                    except ValueError:
-                        continue
-
-                    if not l1 - 1 <= n < l2:
-                        skip.extend(range(l1 - 1, l2))
+                if not l1 - 1 <= n < l2:
+                    skip.extend(range(l1 - 1, l2))
 
         return skip
 
@@ -270,7 +267,7 @@ class EV:
     def ev(self, s):
         output = {}
 
-        lines = s.splitlines()
+        lines = s.split("\n")
 
         skip = self.exclude_loops(lines)
 
@@ -400,15 +397,16 @@ class EV:
                             functions = []
                             guess = None
                             interval = None
+                            variables = None
                             if len(args) < 3:
                                 raise ValueError(self.error_text["SystemLøs"])
 
                             for part in args:
                                 if "Variabler" in part:
                                     _,v = part.split("=")
-                                    if "{" not in v or "}" not in v:
+                                    if "(" not in v or ")" not in v:
                                         raise ValueError(self.error_text["SystemLøs"])
-                                    variables = v.strip().strip("{").strip("}")
+                                    variables = v.strip().strip("(").strip(")")
                                     variables = [sympy.Symbol(part.strip()) for part in variables.split(",")]
 
                                 elif "StartGæt" in part:
@@ -422,6 +420,9 @@ class EV:
 
                                 else: functions.append(self.prep_sympy(part))
 
+                            if variables == None:
+                                raise ValueError(self.error_text["SystemLøs"])
+                            
                             guess = guess or [1] * len(variables)
                             if len(guess) != len(variables):
                                 raise ValueError(self.error_text["SystemLøs"])
@@ -664,7 +665,7 @@ class EV:
                             )
                             indhold = f"Masse procent:\n{'\n'.join(procent)}"
                             output[pc] = (
-                                f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {round(mol,config.rounding_decimals)}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
+                                f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {quantity.quantity_convert(round(mol,config.rounding_decimals),"g/mol")}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
                             )
                             pc += 1
 
@@ -775,18 +776,19 @@ class EV:
                                 if "=" not in token:
                                     raise ValueError(self.error_text["MængdeBeregning"])
                                 key, val = token.split("=", maxsplit=1)
+                                key = key.strip()
                                 if key not in key_map:
                                     raise ValueError(f"Ukendt input {key!r}")
     
-                                raw_values[key] = val
+                                raw_values[key] = self.prep_ev(val)
     
                                 provided_keys.add(key)
-    
-                                if "[" not in val:
-                                    val = f'{val}[{unit_map[key]}]'
-                                v, u = self.unit_bracket_strip(val)
-                                kwargs[key_map[key]] = quantity.si_convert(quantity.quantity_convert(v, u))
-    
+
+                                q = parser.evaluate(self.prep_ev(val))
+                                if not q.units:
+                                    q = quantity.quantity_convert(q.value,unit_map[key])
+                                kwargs[key_map[key]] = quantity.si_convert(q)
+                                
                             result = chem.mængdeberegning(**kwargs)
     
                             def find_deps(unknown):  
@@ -852,7 +854,7 @@ class EV:
                             if input == "":
                                 output[pc] = "\n".join(self.functions)
                             else:
-                                if input not in self.error_text:
+                                if input not in self.help_text:
                                     raise ValueError(
                                         f"Ukendt function {input}, eller ingen hjælpe text til functionen"
                                     )
@@ -890,6 +892,9 @@ class EV:
                             a, b = (p.strip() for p in line.split("=", 1))
                             if a == "" or b == "":
                                 raise ValueError("Variabel er defineret forkert")
+                            if not re.fullmatch(r"[^\W\d]\w*", a) or a in self.functions or a in SYMPY_FUNCTIONS or a in CONSTANTS:
+                                raise ValueError(f"{a} kan ikke bruges som variabelnavn")
+
                             if '"' in b or "'" in b:
                                 if "'" in b and '"' in b:
                                     raise ValueError(
@@ -952,7 +957,7 @@ class EV:
             if self.variables:
                 names = sorted(self.variables, key=len, reverse=True)
                 self._pattern = re.compile(
-                    r"\b(" + "|".join(re.escape(n) for n in names) + r")\b"
+                    r"(?<![A-Za-zæøåÆØÅ_])(" + "|".join(re.escape(n) for n in names) + r")(?!\w)"
                 )
             else:
                 self._pattern = None
@@ -966,7 +971,10 @@ class EV:
             parts = re.split(r"(\[[^\]]*\])", expr)  # bracket parts land on odd indexes
             for i in range(0, len(parts), 2):
                 parts[i] = pattern.sub(
-                    lambda m: self.variables[m.group(0)].value, parts[i]
+                    lambda m: "(" + self.variables[m.group(0)].value + ")"
+                    if self.variables[m.group(0)].var_type.lower() == "quantity"
+                    else self.variables[m.group(0)].value,
+                    parts[i],
                 )
             expr = "".join(parts)
         expr = re.sub(r"\[([^\]]*)\]", r" (\1)", expr)
