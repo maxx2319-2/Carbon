@@ -253,12 +253,21 @@ def test_panel_drag_is_clamped_to_the_page(window):
 
 def test_closed_tabs_release_their_processes(window):
     psutil = pytest.importorskip("psutil")
+
+    def processes():
+        return {p.pid for p in psutil.Process().children(recursive=True) if p.name().lower().startswith(("qtwebengine", "python"))}
+
+    before = processes()
     views = [window.new_interpreter_tab() for _ in range(6)]
     assert all(ready(v) for v in views)
-    pids = {v.page().renderProcessPid() for v in views}
+    for v in views:
+        js(v, "setSheet([['code','1+1']]); run(); true")
+    settle(3000)
+    started = processes() - before
+    assert started
     for v in views:
         window.remove_interpreter_tab(v, False)
-    assert wait_for(lambda: not any(psutil.pid_exists(p) for p in pids), 15000)
+    assert wait_for(lambda: not (processes() & started), 15000)
 
 
 @pytest.mark.xfail(reason="P-06: every MathInput/MathOutput is its own QWebEngineView with its own renderer process (55 processes, 1.6 GB with all panels open)", strict=True)
@@ -269,7 +278,6 @@ def test_panel_fields_share_renderer_processes(window):
     assert len({v.page().renderProcessPid() for v in views}) <= 2
 
 
-@pytest.mark.xfail(reason="C-07: a failed save raises inside the runJavaScript callback, so nothing tells the user", strict=True)
 def test_failed_save_is_reported(window, tmp_path):
     locked = tmp_path / "locked.crbn"
     locked.write_text('{"rows": []}', encoding="utf-8")
@@ -296,18 +304,18 @@ def test_failed_save_is_reported(window, tmp_path):
     assert seen
 
 
-@pytest.mark.xfail(reason="C-07: closing a tab during a calculation makes the worker thread raise 'Signal source has been deleted'", strict=True)
-def test_closing_a_tab_during_a_calculation_is_quiet(window, slot_errors, monkeypatch):
-    monkeypatch.setattr(gui._InterpreterBridge, "evaluate", lambda self, data: (time.sleep(0.8), "[]")[1])
+def test_closing_a_tab_during_a_calculation_is_quiet(window, slot_errors):
     view = window.new_interpreter_tab()
     ready(view)
-    js(view, "setSheet([['code','1+1']]); run(); true")
+    js(view, r"setSheet([['code','x=0'],['code','x+1'],['code','\\mathrm{Loop}\\left(2,2,100000\\right)']]); run(); true")
+    settle(500)
+    workers = list(view.findChild(gui._InterpreterBridge).pool._pool)
     window.remove_interpreter_tab(view, False)
-    settle(1800)
+    settle(1500)
     assert slot_errors == []
+    assert workers and not any(p.is_alive() for p in workers)
 
 
-@pytest.mark.xfail(reason="C-07 / M-07: empty and captive-portal replies from PubChem raise or show nothing", strict=True)
 @pytest.mark.parametrize("handler, body", [("draw_smiles", b""), ("draw_smiles", PORTAL), ("show_name", PORTAL)])
 def test_molecule_lookup_reports_odd_replies(window, handler, body):
     window.molecule_status.clear()
@@ -321,7 +329,6 @@ def test_offline_lookup_says_there_is_no_connection(window):
     assert "forbindelse" in window.molecule_status.text().lower()
 
 
-@pytest.mark.xfail(reason="C-07 / M-08: a changelog reply that isn't UTF-8 raises in show_changelog", strict=True)
 def test_changelog_handles_an_unreadable_reply(window):
     window.show_changelog(FakeReply(b"\xe6\xf8\xe5 nyheder"))
 
@@ -347,7 +354,6 @@ def test_percent_help_lists_inputs_in_panel_order(key, build):
     assert help_text.find(first.split("[")[0]) < help_text.find(second.split("[")[0])
 
 
-@pytest.mark.xfail(reason="B-27: a second click on a tab's close button runs remove_interpreter_tab twice and opens a new empty tab", strict=True)
 def test_double_click_on_tab_close_does_not_add_a_tab(window):
     view = window.new_interpreter_tab()
     ready(view)
@@ -531,12 +537,12 @@ def test_analyse_keeps_the_window_responsive(window):
     assert ticks or blocked < 0.2
 
 
-@pytest.mark.xfail(reason="P-08: importing gui takes about 4 s because chem pulls in parser, mendeleev, pyplot and scipy", strict=True)
-def test_gui_imports_in_under_two_seconds():
+@pytest.mark.xfail(reason="P-08: importing gui takes 2-4 s because chem pulls in parser, mendeleev, pyplot and scipy", strict=True)
+def test_gui_imports_in_under_a_second():
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "MPLBACKEND": "agg"}
     code = "import time; t = time.perf_counter(); import gui; print(time.perf_counter() - t)"
     proc = subprocess.run([sys.executable, "-c", code], cwd=SRC, env=env, capture_output=True, text=True, timeout=120)
-    assert float(proc.stdout.strip().splitlines()[-1]) < 2.0
+    assert float(proc.stdout.strip().splitlines()[-1]) < 1.0
 
 
 @pytest.mark.xfail(reason="P-09: every add/remove in the pK table rebuilds all rows, so the cost grows with the square of the size", strict=True)

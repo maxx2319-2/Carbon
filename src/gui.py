@@ -13,6 +13,8 @@ from matplotlib.figure import Figure
 import utils
 import ctypes
 import sys
+import traceback
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from PySide6.QtWidgets import (
@@ -65,6 +67,7 @@ from PySide6.QtCore import (
     QPoint,
     QParallelAnimationGroup,
     QEvent,
+    QTimer,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -100,7 +103,7 @@ from path import resource_path
 
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
-os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3 --renderer-process-limit=4"
 
 version = "Bv 2.0"
 
@@ -691,13 +694,13 @@ class _InterpreterBridge(QObject):
 
     def __init__(self,parent = None):
         super().__init__(parent)
-        self.pool = multiprocessing.Pool(1)
+        self.pool = None
         self.job = None
         self.leaked.connect(self.restart)
 
     @staticmethod
     def evaluate_in_worker(data):
-        return _InterpreterBridge(data), threading.active_count() > 1
+        return _InterpreterBridge.evaluate(None, data), threading.active_count() > 1
 
 
     @Slot(bool)
@@ -782,14 +785,17 @@ class _InterpreterBridge(QObject):
             return
         if self.job and not self.job.ready():
             self.cancel()
+        if self.pool is None:
+            self.pool = multiprocessing.Pool(1)
         self.job = self.pool.apply_async(_InterpreterBridge.evaluate_in_worker,(data,),
             callback=lambda result: self.done(run_id,*result),
             error_callback=lambda e: self.finished.emit(run_id, json.dumps([["error", latex_text(f'Error: {e}')]])))
         
     @Slot()
     def cancel(self):
-        self.pool.terminate()
-        self.pool = multiprocessing.pool(1)
+        if self.pool:
+            self.pool.terminate()
+        self.pool = None
         self.job = None
 
 
@@ -2106,7 +2112,7 @@ class MainWindow(QMainWindow):
 
     def show_changelog(self, reply):
         if reply.error() == QNetworkReply.NoError:
-            self.changelog_text.setMarkdown(bytes(reply.readAll()).decode("utf-8"))
+            self.changelog_text.setMarkdown(bytes(reply.readAll()).decode("utf-8", "replace"))
             self.changelog.setGeometry(self.rect())
             self.changelog.show()
             self.changelog.raise_()
@@ -2804,11 +2810,12 @@ class MainWindow(QMainWindow):
     def set_dirty(self, view, dirty):
         view.setProperty("dirty", dirty)
         index = self.interpreter_stack.indexOf(view)
+        if index < 0:
+            return
         self.interpreter_tabs.tabButton(index, QTabBar.LeftSide).findChild(QLabel, "dirty").setVisible(dirty)
 
     def close_interpreter_tab(self, index):
         view = self.interpreter_stack.widget(index)
-        view.findChild(_InterpreterBridge).pool.terminate()
         view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, lambda used: self.remove_interpreter_tab(view, used))
 
     def ask_close(self, title, text):
@@ -2828,8 +2835,11 @@ class MainWindow(QMainWindow):
         return msg.clickedButton() is close
 
     def remove_interpreter_tab(self, view, used):
+        if self.interpreter_stack.indexOf(view) < 0:
+            return
         if used and not self.ask_close("Luk side", f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt."):
             return
+        view.findChild(_InterpreterBridge).cancel()
         if self.interpreter_tabs.count() == 1:
             self.new_interpreter_tab()
         index = self.interpreter_stack.indexOf(view)
@@ -3011,7 +3021,12 @@ class MainWindow(QMainWindow):
             return self.save_regneark_as()
         
         def write(data):
-            Path(path).write_text(json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                text = json.dumps({"rows": json.loads(data)}, ensure_ascii=False, indent=2)
+                Path(path).write_text(text, encoding="utf-8")
+            except (OSError, TypeError, ValueError) as e:
+                QMessageBox.warning(self, "Gem regneark", f"Filen kunne ikke gemmes:\n{e}")
+                return
             view.page().runJavaScript(f"markSaved({json.dumps(data)})")
 
         view.page().runJavaScript("JSON.stringify(getSheet())", write)
@@ -3039,9 +3054,9 @@ class MainWindow(QMainWindow):
         reply.finished.connect(lambda: self.draw_smiles(reply))
 
     def draw_smiles(self, reply):
-        if reply.error() == QNetworkReply.NoError:
-            smiles = bytes(reply.readAll()).decode("utf-8").splitlines()[0]
-            self.molecule_view.page().runJavaScript(f'ketcher.setMolecule({json.dumps(smiles)})')
+        lines = bytes(reply.readAll()).decode("utf-8", "replace").splitlines()
+        if reply.error() == QNetworkReply.NoError and lines and "<" not in lines[0]:
+            self.molecule_view.page().runJavaScript(f'ketcher.setMolecule({json.dumps(lines[0])})')
         else:
             self.molecule_status.setText("Ikke fundet")
         reply.deleteLater()
@@ -3061,8 +3076,10 @@ class MainWindow(QMainWindow):
     def show_name(self, reply):
         name = None
         if reply.error() == QNetworkReply.NoError:
-            name = json.loads(bytes(reply.readAll()))["PropertyTable"]["Properties"][0].get("Title")
-
+            try:
+                name = json.loads(bytes(reply.readAll()))["PropertyTable"]["Properties"][0].get("Title")
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                pass
         if name:
             self.molecule_name.setText(name)
         else:
@@ -3133,10 +3150,21 @@ class MainWindow(QMainWindow):
         for view in views:
             view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, collect)
 
+def log_error(kind, value, tb):
+    license_manager.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    text = "".join(traceback.format_exception(kind, value, tb))
+    with open(license_manager.CONFIG_DIR / "fejl.log", "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}\n{text}\n")
+
+def report_error(kind, value, tb):
+    log_error(kind, value, tb)
+    QTimer.singleShot(0, lambda: QMessageBox.warning(None, "Carbon", f"Der skete en fejl:\n{value}"))
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--log-level=3"
     app = CarbonApp(sys.argv)
+    sys.excepthook = report_error
+    threading.excepthook = lambda a: log_error(a.exc_type, a.exc_value, a.exc_traceback)
     if sys.platform == "win32" and getattr(sys, "frozen", False):
         register_crbn()
 
