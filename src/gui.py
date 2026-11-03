@@ -694,7 +694,7 @@ class _InterpreterBridge(QObject):
 
     def __init__(self,parent = None):
         super().__init__(parent)
-        self.pool = None
+        self.pool = multiprocessing.Pool(1)
         self.job = None
         self.leaked.connect(self.restart)
 
@@ -795,7 +795,7 @@ class _InterpreterBridge(QObject):
     def cancel(self):
         if self.pool:
             self.pool.terminate()
-        self.pool = None
+        self.pool = multiprocessing.Pool(1)
         self.job = None
 
 
@@ -2839,7 +2839,7 @@ class MainWindow(QMainWindow):
             return
         if used and not self.ask_close("Luk side", f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt."):
             return
-        view.findChild(_InterpreterBridge).cancel()
+        view.findChild(_InterpreterBridge).pool.terminate()
         if self.interpreter_tabs.count() == 1:
             self.new_interpreter_tab()
         index = self.interpreter_stack.indexOf(view)
