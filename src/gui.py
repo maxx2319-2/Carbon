@@ -788,8 +788,6 @@ class _InterpreterBridge(QObject):
             return
         if self.job and not self.job.ready():
             self.cancel()
-        if self.pool is None:
-            self.pool = multiprocessing.Pool(1)
         self.job = self.pool.apply_async(_InterpreterBridge.evaluate_in_worker,(data,),
             callback=lambda result: self.done(run_id,*result),
             error_callback=lambda e: self.finished.emit(run_id, json.dumps([["error", latex_text(f'Error: {e}')]])))
@@ -2955,6 +2953,7 @@ class MainWindow(QMainWindow):
         channel = QWebChannel(self.molecule_view.page())
         channel.registerObject("bridge", bridge)
         self.molecule_view.page().setWebChannel(channel)
+        self.molecule_view.page().profile().downloadRequested.connect(self.save_molecule)
         self.molecule_view.loadFinished.connect(lambda ok: self.molecule_view.page().runJavaScript("document.documentElement.style.filter = 'invert(.75) hue-rotate(180deg)'"))
         self.molecule_view.load(QUrl.fromLocalFile(str(resource_path("Assets_Ketcher/index.html"))))
         layout.addWidget(self.molecule_view, stretch=1)
@@ -3068,6 +3067,15 @@ class MainWindow(QMainWindow):
     def structure_to_name(self):
         self.molecule_status.clear()
         self.molecule_view.page().runJavaScript("ketcher.getSmiles().then(s => bridge.setSmiles(s))")
+
+    def save_molecule(self, download):
+        path, _=QFileDialog.getSaveFileName(self, "Gem molekyle", os.path.join(download.downloadDirectory(), download.downloadFileName()))
+        if not path:
+            download.cancel()
+            return
+        download.setDownloadDirectory(os.path.dirname(path))
+        download.setDownloadFileName(os.path.basename(path))
+        download.accept()
 
     def smiles_to_name(self, smiles):
         if not smiles:
