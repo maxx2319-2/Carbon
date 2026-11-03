@@ -166,14 +166,14 @@ def DNA_to_peptide(dna_seq):
         if len(part) % 3 == 0:
             continue
         else:
-            return "Error codon længder er ikke rigtige"
+            return "Error kodon længder er ikke rigtige"
 
     if len(dna_seq.replace(" ", "")) % 3 == 0:
         codons = re.findall("...", (dna_seq.upper()).replace(" ", ""))
 
         invalid = [c for c in codons if c not in DNA_CODON_TABLE]
         if invalid:
-            return f"Error ukendt codon {invalid}"
+            return f"Error ukendt kodon {invalid}"
 
         return ", ".join(DNA_CODON_TABLE[codon] for codon in codons)
     else:
@@ -186,14 +186,14 @@ def RNA_to_peptide(rna_seq):
         if len(part) % 3 == 0:
             continue
         else:
-            return "Error codon længder er ikke rigtige"
+            return "Error kodon længder er ikke rigtige"
 
     if len(rna_seq.replace(" ", "")) % 3 == 0:
         codons = re.findall("...", (rna_seq.upper()).replace(" ", ""))
 
         invalid = [c for c in codons if c not in RNA_CODON_TABLE]
         if invalid:
-            return f"Error ukendt codon {invalid}"
+            return f"Error ukendt kodon {invalid}"
 
         return ", ".join(RNA_CODON_TABLE[codon] for codon in codons)
 

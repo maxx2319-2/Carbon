@@ -196,8 +196,8 @@ calc_button_style = f"""
     """
 
 SUB_HELP = (
-    "\nFor at skrive sænket skrivt er det Shift+Bindestreg."
-    "\nFor at skrive hævet skrivt er det Shift+^."
+    "\nFor at skrive sænket skrift er det Shift+Bindestreg."
+    "\nFor at skrive hævet skrift er det Shift+^."
     )
 
 HELPTEXT = {
@@ -279,11 +279,14 @@ HELPTEXT = {
 }
 
 def load_dict_from_settings(key, target):
-    raw = _settings.value(key)
-    if raw:
+    try:
+        data = json.loads(_settings.value(key) or "null")
+    except (TypeError, ValueError):
+        return
+    if isinstance(data, dict):
         target.clear()
-        target.update(json.loads(raw))
-
+        target.update(data)
+    
 class CarbonApp(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
@@ -1006,7 +1009,7 @@ class LicenseWindow(QDialog):
         button_row.addWidget(ok_btn)
 
         cancel_btn = QPushButton("Afbryd")
-        cancel_btn.clicked.connect(lambda: sys.exit(0))
+        cancel_btn.clicked.connect(self.reject())
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
@@ -1089,7 +1092,7 @@ class DraggablePanel(QWidget):
             export_btn.setIconSize(QSize(14,14))
             export_btn.setFixedSize(20,20)
             export_btn.setToolTip("Eksporter")
-            export_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+            export_btn.setStyleSheet("QToolButton { background: transparent; border: none; }")
             export_btn.clicked.connect(body_widget.export)
             header_layout.addWidget(export_btn)
 
@@ -1412,7 +1415,7 @@ def bjerrum_panel():
             plot_layout.takeAt(0).widget().deleteLater()
         if not input.text():
             return
-        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
+        result = interpreter.EV().ev(f"BjerrumsDiagram({input.text()})").get(0,"")
         if isinstance(result, Figure):
             plot_layout.addWidget(FigureCanvasQTAgg(result))
         else:
@@ -1422,7 +1425,7 @@ def bjerrum_panel():
             plot_layout.addWidget(error, alignment=Qt.AlignTop)
 
     def export():
-        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
+        result = interpreter.EV().ev(f"BjerrumsDiagram({input.text()},export)").get(0, "")
         if result:
             calc()
 
@@ -1719,12 +1722,12 @@ def ph_konc_panel():
     return body
 
 PANELS = {
-    "unit": Panel("Enhed","Enheds Omregner", unit_panel),
+    "unit": Panel("Enhed","Enhedsomregner", unit_panel),
     "pH": Panel("pH","pH Beregning", pH_panel),
     "pOH": Panel("pOH","pOH Beregning", pOH_panel),
-    "balance": Panel("Afstemning","Reaktions Afstemning",afstemning_panel),
+    "balance": Panel("Afstemning","Reaktionsafstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
-    "bjerrum": Panel("Bjerrumdiagram","Bjerrumsdiagram",bjerrum_panel, (450,450)),
+    "bjerrum": Panel("Bjerrumsdiagram","Bjerrumsdiagram",bjerrum_panel, (450,450)),
     "udbytteprocent": Panel("Udbytteprocent","Udbytteprocent",udbytte_panel),
     "volumenprocent": Panel("Volumenprocent","Volumenprocent",volumen_panel),
     "masseprocent": Panel("Masseprocent", "Masseprocent",masse_panel),
@@ -2161,7 +2164,7 @@ class MainWindow(QMainWindow):
         items = [
             ("Hovedmenu", self.open_menu, None),
             ("Regneark", self.open_interpreter, None),
-            ("Molekyle Tegner", self.open_molecule, None),
+            ("Molekyletegner", self.open_molecule, None),
             ("Kemi", self.open_kemi, self.kemi_page),
             ("Fysik", self.open_fysik, self.fysik_page),
             ("Biotek", self.open_biotek, self.biotek_page),
@@ -2426,7 +2429,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         layout.addWidget(
-            make_button("Marvin_Icon.svg", "Molekyle Tegner", self.open_molecule, 2)
+            make_button("Marvin_Icon.svg", "Molekyletegner", self.open_molecule, 2)
         )
         layout.addStretch()
 
@@ -2751,10 +2754,10 @@ class MainWindow(QMainWindow):
 
     def new_file_name(self):
         names = [self.tab_name(i) for i in range(self.interpreter_tabs.count())]
-        name, n = "Ny Fil", 1
+        name, n = "Ny fil", 1
         while name in names:
             n += 1
-            name = f"Ny Fil {n}"
+            name = f"Ny fil {n}"
         return name
 
     def tab_name(self, index):
@@ -2816,7 +2819,7 @@ class MainWindow(QMainWindow):
 
     def close_interpreter_tab(self, index):
         view = self.interpreter_stack.widget(index)
-        view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, lambda used: self.remove_interpreter_tab(view, used))
+        self.remove_interpreter_tab(view, bool(view.property("dirty")))
 
     def ask_close(self, title, text):
         msg = QMessageBox(self)
@@ -2831,6 +2834,7 @@ class MainWindow(QMainWindow):
         """)
         close = msg.addButton("Luk", QMessageBox.AcceptRole)
         msg.addButton("Annuller", QMessageBox.RejectRole)
+        msg.setDefaultButton(msg.addButton("Annuller",QMessageBox.RejectRole))
         msg.exec()
         return msg.clickedButton() is close
 
@@ -3135,20 +3139,12 @@ class MainWindow(QMainWindow):
         self.close()
 
     def closeEvent(self, event):
-        if self.close_confirmed:
-            return super().closeEvent(event)
-        event.ignore()
         views = [self.interpreter_stack.widget(i) for i in range(self.interpreter_stack.count())]
-        used = []
-
-        def collect(result):
-            used.append(result)
-            if len(used) == len(views) and (not any(used) or self.ask_close("Luk Carbon", "Vil du lukke Carbon?\nDet, der ikke er gemt, går tabt.")):
-                self.close_confirmed = True
-                self.close()
-
-        for view in views:
-            view.page().runJavaScript("lines().some(mf => mf.value !== '')", 0, collect)
+        text = "Vil du lukke Carbon?\nDet, der ikke er gemt, går tabt."
+        if any(v.property("dirty") for v in views) and not self.ask_close("Luk Carbon", text):
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 def log_error(kind, value, tb):
     license_manager.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
