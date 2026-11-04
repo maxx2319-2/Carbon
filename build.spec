@@ -32,6 +32,7 @@ datas = [
     (str(PROJECT_ROOT / "Assets"), "Assets"),
     (str(PROJECT_ROOT / "config.json"), "."),
     (str(PROJECT_ROOT / "Assets_math_live"), "Assets_math_live"),
+    (str(PROJECT_ROOT / "Assets_Ketcher"), "Assets_Ketcher"),
 ]
 binaries = []
 hiddenimports = [
@@ -49,7 +50,7 @@ for pkg in COLLECT_PACKAGES:
         print(f"[build.spec] warning: could not collect {pkg}: {e}")
 
 a = Analysis(
-    [str(SRC / "gui.py")],
+    [str(SRC / "main.py")],
     pathex=[str(SRC)],
     binaries=binaries,
     datas=datas,

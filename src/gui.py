@@ -68,6 +68,7 @@ from PySide6.QtCore import (
     QParallelAnimationGroup,
     QEvent,
     QTimer,
+    QEventLoop,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -280,21 +281,6 @@ def load_dict_from_settings(key, target):
     if isinstance(data, dict):
         target.clear()
         target.update(data)
-    
-class CarbonApp(QApplication):
-    def __init__(self, argv):
-        super().__init__(argv)
-        self.window = None
-        self.pending_file = None
-
-    def event(self, event):
-        if event.type() == QEvent.FileOpen:
-            if self.window:
-                self.window.load_regneark(event.file())
-            else:
-                self.pending_file = event.file()
-            return True
-        return super().event(event)
 
 def register_crbn():
     import winreg
@@ -1008,7 +994,7 @@ class LicenseWindow(QDialog):
         button_row.addWidget(ok_btn)
 
         cancel_btn = QPushButton("Afbryd")
-        cancel_btn.clicked.connect(self.reject())
+        cancel_btn.clicked.connect(self.reject)
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
@@ -3137,9 +3123,33 @@ def report_error(kind, value, tb):
     log_error(kind, value, tb)
     QTimer.singleShot(0, lambda: QMessageBox.warning(None, "Carbon", f"Der skete en fejl:\n{value}"))
 
-if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    app = CarbonApp(sys.argv)
+def preload(window, splash):
+    pages = [window.interpreter_view.page()]
+    scripts = ["typeof getSheet === 'function'"]
+    if resource_path("Assets_Ketcher/index.html").exists():
+        pages.append(window.molecule_view.page())
+        scripts.append("!!(window.ketcher && ketcher.editor)")
+    views = window.findChildren(MathInput) + window.findChildren(MathOutput)
+    ready = [False] * len(pages)
+    loop = QEventLoop()
+
+    def poll():
+        for i, (page, script) in enumerate(zip(pages, scripts)):
+            if not ready[i]:
+                page.runJavaScript(script, 0, lambda result, i=i: ready.__setitem__(i, bool(result)))
+        done = sum(ready) + sum(v._loaded for v in views)
+        splash.bar.setValue(int(55 + 45 * done / (len(ready) + len(views))))
+        if all(ready) and all(v._loaded for v in views):
+            loop.quit()
+
+    timer = QTimer()
+    timer.timeout.connect(poll)
+    timer.start(100)
+    QTimer.singleShot(30000, loop.quit)
+    loop.exec()
+    timer.stop()
+
+def main(app, splash):
     sys.excepthook = report_error
     threading.excepthook = lambda a: log_error(a.exc_type, a.exc_value, a.exc_traceback)
     if sys.platform == "win32" and getattr(sys, "frozen", False):
@@ -3150,9 +3160,11 @@ if __name__ == "__main__":
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
     if not SKIP_LICENSE_CHECK:
+        splash.close()
         dialog = LicenseWindow()
         if dialog.exec() != QDialog.Accepted:
             sys.exit(0)
+        splash.show()
 
     window = MainWindow()
     app.window = window
@@ -3160,5 +3172,8 @@ if __name__ == "__main__":
     if path:
         window.load_regneark(path, window.interpreter_view)
 
+    splash.progress(55)
+    preload(window, splash)
     window.showMaximized()
+    splash.finish(window)
     app.exec()

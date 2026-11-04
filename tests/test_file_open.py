@@ -14,9 +14,9 @@ SCRIPT = """
 import json
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtGui import QFileOpenEvent
-import gui
+import main
 
-app = gui.CarbonApp([])
+app = main.CarbonApp([])
 QCoreApplication.sendEvent(app, QFileOpenEvent("early.crbn"))
 pending = app.pending_file
 
