@@ -945,12 +945,14 @@ class TextOutput(QTextEdit):
         return self.toPlainText()
 
 class LicenseWindow(QDialog):
+    activated = Signal(bool, str)
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Carbon: Licens manager")
         self.setWindowIcon(QIcon(str(ASSETS_DIR / "Carbon_Round.svg")))
         self.setModal(True)
-        self.setFixedSize(360, 160)
+        self.setFixedSize(360, 180)
         self.setStyleSheet(f"""
             QDialog {{ background-color: {BG}; }}
             QLabel {{ color: {TEXT}; }}
@@ -981,6 +983,10 @@ class LicenseWindow(QDialog):
         self.key_input.setPlaceholderText("Indtast licens her...")
         layout.addWidget(self.key_input)
 
+        self.message = QLabel()
+        self.message.setStyleSheet(f"color: {BUTTON}; background: transparent; padding-left: 10px;")
+        layout.addWidget(self.message)
+
         button_row = QHBoxLayout()
 
         logo = QSvgWidget(str(ASSETS_DIR / "Carbon_Full.svg"))
@@ -989,15 +995,17 @@ class LicenseWindow(QDialog):
         button_row.addWidget(logo)
         button_row.addStretch()
 
-        ok_btn = QPushButton("Ok")
-        ok_btn.clicked.connect(self.try_accept)
-        button_row.addWidget(ok_btn)
+        self.ok_btn = QPushButton("Ok")
+        self.ok_btn.clicked.connect(self.try_accept)
+        button_row.addWidget(self.ok_btn)
 
         cancel_btn = QPushButton("Afbryd")
         cancel_btn.clicked.connect(self.reject)
         button_row.addWidget(cancel_btn)
 
         layout.addLayout(button_row)
+
+        self.activated.connect(self.finish_activation)
 
         self.version_label = QLabel(version, self)
         self.version_label.setStyleSheet(f"color: {BUTTON}; font-size: 10px; background: transparent;")
@@ -1009,24 +1017,34 @@ class LicenseWindow(QDialog):
     
     def try_accept(self):
         key = self.key_input.text().strip()
+        licensed, data = license_manager.check_license(key)
+        if not licensed:
+            self.message.setText(data)
+            return
+        self.pending = key, data
+        self.key_input.setFocus()
+        self.ok_btn.setEnabled(False)
+        self.message.setText("Aktiverer...")
+        threading.Thread(target=self.run_activation, args=(key,), daemon=True).start()
 
+    def run_activation(self, key):
         try:
-            licensed, data = license_manager.check_license(key)
-            if not licensed:
-                self.key_input.setText(data)
-                return
-
             ok, msg = license_manager.activate(key)
-            if not ok:
-                self.key_input.setText(msg)
-                return
-
-            license_manager.save_activation(key, data)
-            self.accept()
-
         except Exception:
-            self.key_input.setText("Fejl")
+            ok, msg = False, "Fejl"
+        self.activated.emit(bool(ok), str(msg))
 
+    def finish_activation(self, ok, msg):
+        self.ok_btn.setEnabled(True)
+        if not ok:
+            self.message.setText(msg)
+            return
+        try:
+            license_manager.save_activation(*self.pending)
+        except OSError:
+            self.message.setText("Licensen kunne ikke gemmes")
+            return
+        self.accept()
 
 
 # For biotek stamtræ
@@ -3159,7 +3177,7 @@ def main(app, splash):
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
-    if not SKIP_LICENSE_CHECK:
+    if SKIP_LICENSE_CHECK:
         splash.close()
         dialog = LicenseWindow()
         if dialog.exec() != QDialog.Accepted:
