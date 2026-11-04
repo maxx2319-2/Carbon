@@ -218,16 +218,10 @@ HELPTEXT = {
         "For eksempel 5.3, 4.1 laver to bjerrumsdiagrammer."
     ),
     "pH": (
-        "Indtast pKs værdi samt dens koncentration.\n"
+        "Indtast enten pKs værdi eller pKb værdi samt koncentrationen.\n"
         "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
-        "Du kan også bruge syrens navn for nogle syrer (se Indstillinger).\n"
+        "Du kan også bruge navnet for nogle syrer og baser (se Indstillinger).\n"
         "Standard enhed for koncentration er mol/l."
-    ),
-    "pOH": (
-            "Indtast pKb værdi samt dens koncentration.\n"
-            "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
-            "Du kan også bruge syrens navn for nogle baser (se Indstillinger).\n"
-            "Standard enhed for koncentration er mol/l."
     ),
     "balance": (
         "Indtast din ubalancerede reaktion i input kassen.\n"
@@ -1240,45 +1234,8 @@ def pH_panel():
     pKs_input = PlainField("Pks eller syrenavn")
     layout.addWidget(pKs_input)
 
-    konc_input = MathInput("Koncentration[Enhed]")
-    layout.addWidget(konc_input)
-
-    calc_btn = QPushButton("Beregn")
-    calc_btn.setStyleSheet(calc_button_style)
-    layout.addWidget(calc_btn)
-
-    output = PlainField("pH", True)
-    layout.addWidget(output)
-
-    second_output = PlainField("pOH", True)
-    layout.addWidget(second_output)
-    layout.addStretch()
-
-    def calc():
-        if clear_if_empty(body):
-            return
-        result = interpreter.EV().ev(f"pH({pKs_input.text()},{konc_input.text()})").get(0, "")
-        output.setText(result)
-        if result.startswith("Error"):
-            second_output.setText("")
-        else:
-            decimals = len(result.split(".")[1]) if "." in result else 0
-            second_output.setText(f"{14 - float(result):.{decimals}f}")
-
-    calc_btn.clicked.connect(calc)
-    pKs_input.returnPressed.connect(calc)
-    konc_input.returnPressed.connect(calc)
-    
-    return body
-
-def pOH_panel():
-    body = QWidget()
-    layout = QVBoxLayout(body)
-    layout.setContentsMargins(6,6,6,6)
-    layout.setSpacing(6)
-
-    pKs_input = PlainField("Pkb eller basenavn")
-    layout.addWidget(pKs_input)
+    pKb_input = PlainField("Pkb eller basenavn")
+    layout.addWidget(pKb_input)
 
     konc_input = MathInput("Koncentration[Enhed]")
     layout.addWidget(konc_input)
@@ -1287,26 +1244,35 @@ def pOH_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = PlainField("pOH", True)
-    layout.addWidget(output)
+    ph_output = PlainField("pH", True)
+    layout.addWidget(ph_output)
 
-    second_output = PlainField("pH", True)
-    layout.addWidget(second_output)
+    poh_output = PlainField("pOH", True)
+    layout.addWidget(poh_output)
     layout.addStretch()
 
     def calc():
         if clear_if_empty(body):
             return
-        result = interpreter.EV().ev(f"pOH({pKs_input.text()},{konc_input.text()})").get(0, "")
-        output.setText(result)
+        acid, base = pKs_input.text(), pKb_input.text()
+        if bool(acid) == bool(base):
+            ph_output.setText("Udfyld enten syre eller base")
+            poh_output.setText("")
+            return
+        result = interpreter.EV().ev(f"{'pH' if acid else 'pOH'}({acid or base},{konc_input.text()})").get(0, "")
         if result.startswith("Error"):
-            second_output.setText("")
-        else:
-            decimals = len(result.split(".")[1]) if "." in result else 0
-            second_output.setText(f"{14 - float(result):.{decimals}f}")
+            ph_output.setText(result)
+            poh_output.setText("")
+            return
+        decimals = len(result.split(".")[1]) if "." in result else 0
+        other = f"{14 - float(result):.{decimals}f}"
+        ph, poh = (result, other) if acid else (other, result)
+        ph_output.setText(f"pH = {ph}")
+        poh_output.setText(f"pOH = {poh}")
 
     calc_btn.clicked.connect(calc)
     pKs_input.returnPressed.connect(calc)
+    pKb_input.returnPressed.connect(calc)
     konc_input.returnPressed.connect(calc)
     
     return body
@@ -1389,8 +1355,8 @@ def analyse_panel():
             masseprocent.setText(result)
             return
         for box, line in zip(outputs, lines):
-            box.setText(line.split(":", 1)[1].strip())
-        masseprocent.setText("\n".join(lines[6:]))
+            box.setText(line.strip())
+        masseprocent.setText("Masseprocent:\n" + "\n".join(lines[6:]))
 
     calc_btn.clicked.connect(calc)
     input.returnPressed.connect(calc)
@@ -1718,7 +1684,7 @@ def ph_konc_panel():
             h3o_output.setText(result)
             oh_output.setText("")
             return
-        h3o, oh = (line.split(":", 1)[1].strip() for line in result.splitlines())
+        h3o, oh = result.splitlines()
         h3o_output.setText(h3o)
         oh_output.setText(oh)
 
@@ -1729,8 +1695,7 @@ def ph_konc_panel():
 
 PANELS = {
     "unit": Panel("Enhed","Enhedsomregner", unit_panel),
-    "pH": Panel("pH","pH Beregning", pH_panel),
-    "pOH": Panel("pOH","pOH Beregning", pOH_panel),
+    "pH": Panel("pH og pOH","pH og pOH Beregning", pH_panel),
     "balance": Panel("Afstemning","Reaktionsafstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
     "bjerrum": Panel("Bjerrumsdiagram","Bjerrumsdiagram",bjerrum_panel, (450,450)),
@@ -2026,7 +1991,6 @@ class MainWindow(QMainWindow):
         self.kemi_page = PanelPage([
             "unit",
             "pH",
-            "pOH",
             "balance",
             "analysis",
             "bjerrum",
