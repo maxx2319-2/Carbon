@@ -1387,7 +1387,7 @@ def bjerrum_panel():
             plot_layout.takeAt(0).widget().deleteLater()
         if not input.text():
             return
-        result = interpreter.EV().ev(f"BjerrumsDiagram({input.text()})").get(0,"")
+        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()})").get(0,"")
         if isinstance(result, Figure):
             plot_layout.addWidget(FigureCanvasQTAgg(result))
         else:
@@ -1397,7 +1397,7 @@ def bjerrum_panel():
             plot_layout.addWidget(error, alignment=Qt.AlignTop)
 
     def export():
-        result = interpreter.EV().ev(f"BjerrumsDiagram({input.text()},export)").get(0, "")
+        result = interpreter.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
         if result:
             calc()
 
@@ -2805,7 +2805,6 @@ class MainWindow(QMainWindow):
             QPushButton:hover {{ background-color: {HOVER}; }}
         """)
         close = msg.addButton("Luk", QMessageBox.AcceptRole)
-        msg.addButton("Annuller", QMessageBox.RejectRole)
         msg.setDefaultButton(msg.addButton("Annuller",QMessageBox.RejectRole))
         msg.exec()
         return msg.clickedButton() is close

@@ -514,19 +514,23 @@ def bjerrum(pks):
 
         }
     )
-    x = np.linspace(0, 14, 400)
+
+    plt.figure(layout="constrained")
+    lo = min(0, min(pks) - 2)
+    hi = max(14, max(pks) + 2)
+    x = np.linspace(lo, hi, 400)
 
     for acid in pks:
         y = 1 / (1 + 10 ** (x - acid))
 
         plt.plot(x, y, label=f"pKs: {acid}")
-    plt.legend()
+    legend = plt.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=min(len(pks), 4), frameon=False, fontsize="small", labelcolor="white")
     plt.grid(True)
     plt.xlabel("pH")
     plt.ylabel("Syrebrøk")
     plt.gcf().canvas.manager.set_window_title("Bjerrum Plot")
 
-    plt.xlim(0, 14)
+    plt.xlim(lo, hi)
     plt.ylim(0, 1)
 
     plt.yticks(np.arange(0, 1.1, 0.1))
@@ -550,6 +554,8 @@ def bjerrum(pks):
         ax.yaxis.label.set_color("black")
         for marker in markers:
             marker.set_color("black")
+        for text in legend.get_texts():
+            text.set_color("black")
         try:
             save(*args, facecolor="white", **kwargs)
         finally:
@@ -559,6 +565,8 @@ def bjerrum(pks):
             ax.yaxis.label.set_color("white")
             for marker in markers:
                 marker.set_color("white")
+            for text in legend.get_texts():
+                text.set_color("white")
 
     fig.savefig = export
 
@@ -583,12 +591,14 @@ def bjerrum_figure(pks):
         "#f78fb3",
     ]
 
-    fig = Figure(figsize=(5, 4))
+    fig = Figure(figsize=(5, 4), layout="constrained")
     fig.patch.set_facecolor("#404040")
     ax = fig.add_subplot(111)
     ax.set_facecolor("#323232")
 
-    x = np.linspace(0, 14, 400)
+    lo = min(0, min(pks) - 2)
+    hi = max(14, max(pks) + 2)
+    x = np.linspace(lo, hi, 400)
 
     for i, acid in enumerate(pks):
         y = 1 / (1 + 10 ** (x - acid))
@@ -602,21 +612,20 @@ def bjerrum_figure(pks):
             acid, 0.5, s=20, color="white", linewidth=0.5, zorder=5, clip_on=False
         )
 
-    legend = ax.legend(facecolor="#1e1e1e", edgecolor="#555566")
+    legend = ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=min(len(pks), 4), frameon=False, fontsize="small")
     for text in legend.get_texts():
         text.set_color("white")
 
     ax.grid(True, color="#1F1F28", alpha=0.5)
     ax.set_xlabel("pH", color="white")
-    ax.set_ylabel("Syre brøk", color="white")
-    ax.set_xlim(0, 14)
+    ax.set_ylabel("Syrebrøk", color="white")
+    ax.set_xlim(lo, hi)
     ax.set_ylim(0, 1)
     ax.set_yticks(np.arange(0, 1.1, 0.1))
     ax.tick_params(colors="white")
     for spine in ax.spines.values():
         spine.set_color("#555566")
 
-    fig.tight_layout()
     return fig
 
 
