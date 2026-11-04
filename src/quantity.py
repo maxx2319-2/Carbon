@@ -65,6 +65,21 @@ def retrive_units():
     _cache["unit_data"] = unit_data
     return unit_data
 
+PREFERRED = {
+    "N":  {"M": 1, "L": 1, "T": -2},
+    "J":  {"M": 1, "L": 2, "T": -2},
+    "W":  {"M": 1, "L": 2, "T": -3},
+    "Pa": {"M": 1, "L": -1, "T": -2},
+    "C":  {"I": 1, "T": 1},
+    "V":  {"M": 1, "L": 2, "T": -3, "I": -1},
+    "Ω":  {"M": 1, "L": 2, "T": -3, "I": -2},
+    "F":  {"M": -1, "L": -2, "T": 4, "I": 2},
+    "T":  {"M": 1, "T": -2, "I": -1},
+    "Wb": {"M": 1, "L": 2, "T": -2, "I": -1},
+    "H":  {"M": 1, "L": 2, "T": -2, "I": -2},
+    "S":  {"M": -1, "L": -2, "T": 3, "I": 2},
+}
+
 
 PREFIXES = {
     "Y": 1e24, "Z": 1e21, "E": 1e18, "P": 1e15, "T": 1e12, "G": 1e9, "M": 1e6,
@@ -235,6 +250,65 @@ class quantity:
             raise ValueError(f"kan ikke omregne {q.current_units} til {unit}")
         value = quantity.si_convert(q).value / quantity.si_convert(target).value
         return quantity(value, q.dimension, target.current_units)
+
+    @staticmethod
+    def cost(d):
+        return sum(abs(p) for p in d.values())
+
+    @staticmethod
+    def merge_units(q):
+        value, units, first = q.value, {}, {}
+        for u, exp in q.current_units.items():
+            info = lookup_unit(u)
+            key = tuple(sorted(info["base_units"].items()))
+            if key in first:
+                keep = first[key]
+                value *= (info["factor"] / lookup_unit(keep)["factor"]) ** exp
+                units[keep] += exp
+            else:
+                first[key] = u
+                units[u] = exp
+        return quantity(value, q.dimension, quantity._clean(units))
+
+    @staticmethod
+    def named_units(q):
+        dim = dict(q.dimension)
+        units = {}
+        while True:
+            best, best_cost = None, quantity.cost(dim)
+            for name, d in PREFERRED.items():
+                if name not in retrive_units():
+                    continue
+                for sign in (1, -1):
+                    rest = quantity._clean({k: dim.get(k, 0) - sign * d.get(k, 0) for k in set(dim) | set(d)})
+                    c = quantity.cost(rest) + 1
+                    if c < best_cost:
+                        best, best_cost = (name, sign, rest), c
+            if best is None:
+                break
+            name, sign, dim = best
+            units[name] = units.get(name, 0) + sign
+
+        own = {}
+        for u in q.current_units:
+            base = lookup_unit(u)["base_units"]
+            if len(base) == 1 and list(base.values())[0] == 1:
+                own.setdefault(list(base)[0], u)
+        named = bool(units)
+        for k, p in dim.items():
+            if named and k not in own:
+                return q
+            u = own.get(k, DIMENSION_TO_SI[k])
+            units[u] = units.get(u, 0) + p
+
+        value = quantity.si_convert(q).value / quantity.si_convert(quantity(1, q.dimension, units)).value
+        return quantity(value, q.dimension, units)
+
+    @staticmethod
+    def simplify_units(q):
+        merged = quantity.merge_units(q)
+        named = quantity.named_units(q)
+        return named if quantity.cost(named.current_units) < quantity.cost(merged.current_units) else merged
 
 
     @staticmethod
