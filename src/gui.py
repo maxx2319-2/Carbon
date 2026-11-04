@@ -135,7 +135,7 @@ HOVER = "#cccccc"
 TEXT = "#000000"
 SCROLL = "#323232"
 
-LINE_HEIGHT = 27
+LINE_HEIGHT = 36
 BOX_HEIGHT = 120
 SIDEBAR_WIDTH = 220
 
@@ -192,7 +192,7 @@ calc_button_style = f"""
             border-radius: 8px;
             padding: 6px;
         }}
-        QPushButton:hover {{ background-color: {SIDEBAR}; }}
+        QPushButton:hover {{ background-color: {BG}; }}
     """
 
 SUB_HELP = (
@@ -838,7 +838,7 @@ class MathInput(QWebEngineView):
         self._channel = QWebChannel(self.page())
         self._channel.registerObject("bridge", self._bridge)
         self.page().setWebChannel(self._channel)
-        self.page().setBackgroundColor(QColor(BG))
+        self.page().setBackgroundColor(QColor(SIDEBAR))
 
         self._bridge.entered.connect(self.returnPressed)
         self.loadFinished.connect(self._on_loaded)
@@ -876,15 +876,22 @@ class MathInput(QWebEngineView):
         if self._bridge.latex:
             self.page().runJavaScript(f"setValue({json.dumps(self._bridge.latex)})")
 
+class PlainField(QLineEdit):
+    def __init__(self, placeholder="", read_only=False):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
+        self.setReadOnly(read_only)
+        self.setFixedHeight(LINE_HEIGHT)
+        self.setStyleSheet(f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; border-radius: 8px; padding: 0 8px; font-family: 'Segoe UI'; font-size: 12px; }}")
 
 class MathOutput(QWebEngineView):
     def __init__(self, placeholder="", parent=None):
         super().__init__(parent)
-        self.setFixedHeight(27)
+        self.setFixedHeight(36)
         self._placeholder = placeholder
         self._raw = ""
         self._loaded = False
-        self.page().setBackgroundColor(QColor(BG))
+        self.page().setBackgroundColor(QColor(SIDEBAR))
         self.loadFinished.connect(self._on_loaded)
         url = QUrl.fromLocalFile(str(resource_path("Assets_math_live/mathfield.html")))
         url.setQuery("readonly=1")
@@ -1176,9 +1183,10 @@ class Panel:
     size: tuple = (280, 280)
 
 def clear_if_empty(body):
-    if any(field.text() for field in body.findChildren(MathInput)):
+    plain = body.findChildren(PlainField)
+    if any(field.text() for field in body.findChildren(MathInput) + [f for f in plain if not f.isReadOnly()]):
         return False
-    for output in body.findChildren(MathOutput) + body.findChildren(TextOutput):
+    for output in body.findChildren(MathOutput) + body.findChildren(TextOutput) + [f for f in plain if f.isReadOnly()]:
         output.setText("")
     return True
 
@@ -1196,7 +1204,7 @@ def unit_panel():
     unit_row.addWidget(unit_input)
 
     si_btn = QPushButton("SI")
-    si_btn.setFixedSize(28,28)
+    si_btn.setFixedSize(36,36)
     si_btn.setToolTip("Konverter til SI")
     si_btn.setStyleSheet(calc_button_style)
     unit_row.addWidget(si_btn)
@@ -1229,7 +1237,7 @@ def pH_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    pKs_input = MathInput("Pks eller syrenavn")
+    pKs_input = PlainField("Pks eller syrenavn")
     layout.addWidget(pKs_input)
 
     konc_input = MathInput("Koncentration[Enhed]")
@@ -1239,10 +1247,10 @@ def pH_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("pH")
+    output = PlainField("pH", True)
     layout.addWidget(output)
 
-    second_output = MathOutput("pOH")
+    second_output = PlainField("pOH", True)
     layout.addWidget(second_output)
     layout.addStretch()
 
@@ -1269,7 +1277,7 @@ def pOH_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    pKs_input = MathInput("Pkb eller basenavn")
+    pKs_input = PlainField("Pkb eller basenavn")
     layout.addWidget(pKs_input)
 
     konc_input = MathInput("Koncentration[Enhed]")
@@ -1279,10 +1287,10 @@ def pOH_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("pOH")
+    output = PlainField("pOH", True)
     layout.addWidget(output)
 
-    second_output = MathOutput("pH")
+    second_output = PlainField("pH", True)
     layout.addWidget(second_output)
     layout.addStretch()
 
@@ -1312,7 +1320,7 @@ def afstemning_panel():
     reaktion_input = MathInput("Reaktant->Produkt")
     layout.addWidget(reaktion_input)
 
-    solution_input = MathInput("Opløsning (syre/base)")
+    solution_input = PlainField("Opløsning (syre/base)")
     layout.addWidget(solution_input)
 
     calc_btn = QPushButton("Beregn")
@@ -1358,10 +1366,10 @@ def analyse_panel():
     molarmasse = MathOutput("Molarmasse")
     layout.addWidget(molarmasse)
 
-    dbe = MathOutput("DBE")
+    dbe = PlainField("DBE", True)
     layout.addWidget(dbe)
 
-    antal = MathOutput("Antal atomer")
+    antal = PlainField("Antal atomer", True)
     layout.addWidget(antal)
 
     masseprocent = TextOutput("Masseprocent:")
@@ -1395,7 +1403,7 @@ def bjerrum_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    input = MathInput("pKs Værdier")
+    input = PlainField("pKs Værdier")
     layout.addWidget(input)
 
     calc_btn = QPushButton("Beregn")
@@ -1450,7 +1458,7 @@ def udbytte_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Resultat")
+    output = PlainField("Resultat", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1482,7 +1490,7 @@ def volumen_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Resultat")
+    output = PlainField("Resultat", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1514,7 +1522,7 @@ def masse_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Resultat")
+    output = PlainField("Resultat", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1596,14 +1604,14 @@ def dna_peptid_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    DNA_input = MathInput("DNA Streng")
+    DNA_input = PlainField("DNA Streng")
     layout.addWidget(DNA_input)
 
     calc_btn = QPushButton("Beregn")
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Peptidkæde")
+    output = PlainField("Peptidkæde", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1624,14 +1632,14 @@ def rna_peptid_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    RNA_input = MathInput("RNA Streng")
+    RNA_input = PlainField("RNA Streng")
     layout.addWidget(RNA_input)
 
     calc_btn = QPushButton("Beregn")
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("Peptidkæde")
+    output = PlainField("Peptidkæde", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1658,14 +1666,14 @@ def puffer_panel():
     base_konc_input = MathInput("Koncentration af base")
     layout.addWidget(base_konc_input)
 
-    pks_input = MathInput("pKs")
+    pks_input = PlainField("pKs")
     layout.addWidget(pks_input)
 
     calc_btn = QPushButton("Beregn")
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    output = MathOutput("pH")
+    output = PlainField("pH", True)
     layout.addWidget(output)
     layout.addStretch()
 
@@ -1688,7 +1696,7 @@ def ph_konc_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    ph_input = MathInput("pH")
+    ph_input = PlainField("pH")
     layout.addWidget(ph_input)
 
     calc_btn = QPushButton("Beregn")
@@ -2817,6 +2825,8 @@ class MainWindow(QMainWindow):
 
     def close_interpreter_tab(self, index):
         view = self.interpreter_stack.widget(index)
+        if view is None:
+            return
         self.remove_interpreter_tab(view, bool(view.property("dirty")))
 
     def ask_close(self, title, text):

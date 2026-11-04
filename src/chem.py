@@ -250,12 +250,12 @@ def reaction_parser(reaction):
     products = []
     compund = 0
     for side, out in ((reactant, reactants), (product, products)):
-        for formula in re.findall(r"([A-Z][a-z]?)(\d*)", expand_groups(body)):
+        for formula in re.findall(r"[A-Za-z0-9()]+(?:\^\d*[+-])?", side):
             compund +=1
             body,charge = split_charge(formula)
-            for part, amount in re.findall(r"([A-Z][a-z]?)(\d*)", body):
+            for part, amount in re.findall(r"([A-Z][a-z]?)(\d*)", expand_groups(body)):
                 if part not in atoms:
-                    raise ValueError(f"{part} is not a valid atom")
+                    raise ValueError(f"{part} er ikke et gyldigt grundstof")
                 out.append((part,int(amount) if amount else 1, compund))
             if charge:
                 out.append(("charge",charge,compund))
@@ -294,7 +294,7 @@ def build_matrix(reactants, products):
 def get_coefficients(matrix):
     ns = null_space(matrix)
     if ns.shape[1] != 1:
-        raise ValueError("Reaction cannot be balanced uniquely")
+        raise ValueError("Reaktionen kan ikke afstemmes entydigt")
 
     vec = ns[:, 0]
     vec = vec / np.min(abs(vec[np.abs(vec) > 1e-8]))
@@ -318,7 +318,7 @@ def balance_reaction(reaction, medium=None):
         arrow = "equlibrium"
     elif "->" in reaction:
         arrow = "one way"
-    else: raise ValueError("Ukendt eller ingen reaktionpil")
+    else: raise ValueError("Ukendt eller ingen reaktionspil")
 
     reactant_side, product_side = re.split(r"<?->",reaction.replace(" ", ""))
     reactant = re.findall(r"[A-Za-z0-9()]+(?:\^\d*[+-])?", reactant_side)
