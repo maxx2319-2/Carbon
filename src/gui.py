@@ -3177,7 +3177,7 @@ def main(app, splash):
     threading.Thread(target=quantity.update_unit_file, daemon=True).start()
     SKIP_LICENSE_CHECK = license_manager.start_check()
 
-    if SKIP_LICENSE_CHECK:
+    if not SKIP_LICENSE_CHECK:
         splash.close()
         dialog = LicenseWindow()
         if dialog.exec() != QDialog.Accepted:
