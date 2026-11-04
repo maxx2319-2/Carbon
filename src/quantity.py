@@ -2,15 +2,15 @@ import pandas as pd
 import utils
 import ast
 import re
+import math
 import requests
 from pathlib import Path
 from path import resource_path
 from platformdirs import user_data_dir
 
 SHEET_ID = "1sGcaYTae8MoDOXOcbRd5Tvq8V5aVnvtHgwUt3cDfXng"
-GID = "0"
 
-url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
+url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
 
 _cache = {"df": None, "unit_data": None}
@@ -72,6 +72,18 @@ PREFIXES = {
     "µ": 1e-6, "μ": 1e-6, "n": 1e-9, "p": 1e-12, "f": 1e-15, "a": 1e-18, "z": 1e-21, "y": 1e-24,
 }
 
+SI_TO_DIMENSION = {
+    "m": "L",
+    "kg": "M",
+    "s": "T",
+    "A": "I",
+    "K": "Θ",
+    "mol": "N",
+    "cd": "J",
+}
+
+DIMENSION_TO_SI = {v: k for k, v in SI_TO_DIMENSION.items()}
+
 
 def lookup_unit(name):
     unit_data = retrive_units()
@@ -93,186 +105,142 @@ def known_unit_names():
     return list(names)
 
 class quantity:
-    def __init__(self, value, units):
+    def __init__(self, value, dimension, current_units):
+        self.dimension = dimension
         self.value = value
-        self.units = units
+        self.current_units = current_units
+
+
+    @staticmethod
+    def create_quantity(value, unit):
+        current_units = {}
+        flip = 1
+        for op, u, exp in re.findall(r"(/?)([^\W\d]+)(?:\^(-?[\d.]+))?", unit):
+            if op:
+                flip = -1
+            current_units[u] = current_units.get(u, 0) + float(exp or 1) * flip
+
+        dimension = {}
+        for u, exp in current_units.items():
+            for dim, power in lookup_unit(u)["base_units"].items():
+                dimension[dim] = dimension.get(dim, 0) + power * exp
+
+        return quantity(value, quantity._clean(dimension), current_units)
+
+
 
     # mulitiplication for  quantities
     def __mul__(self, other):
-        new_value = self.value * other.value
-        new_units = self.units.copy()
+        value = self.value*other.value
 
-        for unit, power in other.units.items():
-            if unit in new_units:
-                new_units[unit] += power
+        dimension = dict(self.dimension)
+        units = dict(self.current_units)
+        for dim,exp in other.dimension.items():
+            if dim in dimension:
+                dimension[dim] = dimension[dim] + exp
             else:
-                new_units[unit] = power
-        return quantity(new_value, self._clean(new_units))
+                dimension[dim] = exp
 
+        for unit,exp in other.current_units.items():
+            if unit in units:
+                units[unit] = units[unit] + exp
+            else:
+                units[unit] = exp
+
+        return quantity(value,quantity._clean(dimension),quantity._clean(units))
+       
     # divides quantities
     def __truediv__(self, other):
-        new_value = self.value / other.value
-        new_units = self.units.copy()
-
-        for unit, power in other.units.items():
-            if unit in new_units:
-                new_units[unit] -= power
+        value = self.value/other.value
+        dimension = dict(self.dimension)
+        units = dict(self.current_units)
+        for dim,exp in other.dimension.items():
+            if dim in dimension:
+                dimension[dim] = dimension[dim] - exp
             else:
-                new_units[unit] = 0 - power
-        return quantity(new_value, self._clean(new_units))
+                dimension[dim] = -exp
+
+        for unit,exp in other.current_units.items():
+            if unit in units:
+                units[unit] = units[unit] - exp
+            else:
+                units[unit] = -exp
+
+        return quantity(value,quantity._clean(dimension),quantity._clean(units))
+       
 
     # expoents for quanteties
     def __pow__(self, power):
-        if isinstance(power, quantity):
-            if power.units:  # has units → invalid
-                raise ValueError("Exponent must be unitless")
-            power = power.value  # extract scalar
-
-        new_value = self.value**power
-
-        new_units = {}
-        for unit, exp in self.units.items():
-            new_units[unit] = exp * power
-
-        return quantity(new_value, self._clean(new_units))
-
+        dimension = {dim: exp * power for dim, exp in self.dimension.items()}
+        units = {unit: exp * power for unit, exp in self.current_units.items()}
+        return quantity(self.value ** power, quantity._clean(dimension), quantity._clean(units))
     # addition for quanteties
     def __add__(self, other):
-        self = self.si_convert(self)
-        other = self.si_convert(other)
-        if self.units == other.units:
-            new_value = self.value + other.value
-            return quantity(new_value, self._clean(self.units))
-        else:
-            raise ValueError("Error cant add diffrent units")
+        if self.dimension != other.dimension:
+            raise ValueError(f"man kan ikke lægge {self.current_units} sammen med {other.current_units}")
+        other_value = (quantity.si_convert(other).value)/(quantity.si_convert(quantity(1, self.dimension, self.current_units)).value)
+        value = self.value + other_value
+
+        return quantity(value, self.dimension, self.current_units)
 
     # subtraction for quantities
     def __sub__(self, other):
-        if self.units == other.units:
-            new_value = self.value - other.value
-            return quantity(new_value, self._clean(self.units))
-        else:
-            raise ValueError("Error cant subtract diffrent units")
+        if self.dimension != other.dimension:
+            raise ValueError(f"man kan ikke lægge {self.current_units} sammen med {other.current_units}")
+        other_value = (quantity.si_convert(other).value)/(quantity.si_convert(quantity(1, self.dimension, self.current_units)).value)
+        value = self.value - other_value
 
+        return quantity(value, self.dimension, self.current_units)
     # returns quantities as readeble data
     def __str__(self):
-        units = self.units
-
         numerator = []
         denominator = []
+        for unit, power in (self.current_units or {}).items():
+            if power > 0:
+                numerator.append(unit if power == 1 else f"{unit}^{power:g}")
+            else:
+                denominator.append(unit if power == -1 else f"{unit}^{-power:g}")
 
-        for name, power in units.items():
-            if utils.is_positive(power):
-                if power == 1:
-                    numerator.append(f"{name}")
-                else:
-                    numerator.append(f"{name}^{power:g}")
-
-            if not utils.is_positive(power):
-                if power == -1:
-                    denominator.append(f"{name}")
-                else:
-                    denominator.append(f"{name}^{-power:g}")
-
-        if len(numerator) > 0 and len(denominator) > 0:
+        if numerator and denominator:
             unit = f'{"*".join(numerator)}/{"*".join(denominator)}'
-        elif len(numerator) > 0 and len(denominator) == 0:
-            unit = f'{"*".join(numerator)}'
-        elif len(numerator) == 0 and len(denominator) > 0:
+        elif numerator:
+            unit = "*".join(numerator)
+        elif denominator:
             unit = f'1/{"*".join(denominator)}'
         else:
-            unit = ""
-        if unit == "":
             return f"{self.value}"
-        else:
-            return f"{self.value} {unit}"
+        return f"{self.value} {unit}"
 
     def __repr__(self):
-        return f"value: {self.value} unit: {self.units}"
+        return f"quantity(value={self.value!r}, dimension={self.dimension!r}, current_units={self.current_units!r})"
 
     def __eq__(self, other):
-
         if not isinstance(other, quantity):
             return NotImplemented
-        return (self.value, self.units) == (other.value, other.units)
-
-    # converts a quantity to si units
+        if self.dimension != other.dimension:
+            return False
+        return math.isclose(quantity.si_convert(self).value, quantity.si_convert(other).value)
     @staticmethod
     def si_convert(q):
         value = q.value
-        new_units = {}
-
-        for unit_name, power in q.units.items():
-            
-            try:
-                data = lookup_unit(unit_name)
-            except ValueError: 
-                raise ValueError(f'Ukendt enhed: {unit_name}')
-
-            value *= data["factor"] ** power
-
-            for base_unit, base_pow in data["base_units"].items():
-                if base_unit in new_units:
-                    new_units[base_unit] += base_pow * power
-                else:
-                    new_units[base_unit] = base_pow * power
-        result = quantity(value, quantity._clean(new_units))
-        return result
-
+        for u, exp in q.current_units.items():
+            value *= lookup_unit(u)["factor"] ** exp
+        si_units = {DIMENSION_TO_SI[d]: p for d, p in q.dimension.items()}
+        return quantity(value, q.dimension, si_units)
+        
     @staticmethod
     def unit_convert(q, unit):
-          
-        target = quantity.quantity_convert(1, unit)
-
-        if not target.units:
-            raise ValueError(f"kan ikke parse unit: {unit}")
-
-        source_si = quantity.si_convert(q)
-        target_si = quantity.si_convert(target)
-
-        if source_si.units != target_si.units:
-            raise ValueError(
-                f"cannot convert {q.units} to {unit}"
-            )
-
-        new_value = source_si.value / target_si.value
-
-        return quantity(new_value, target.units)
-
-
-
-
-
+        target = quantity.create_quantity(1, unit)
+        if q.dimension != target.dimension:
+            raise ValueError(f"kan ikke omregne {q.current_units} til {unit}")
+        value = quantity.si_convert(q).value / quantity.si_convert(target).value
+        return quantity(value, q.dimension, target.current_units)
 
 
     @staticmethod
-    def quantity_convert(value, unit):
-        units = known_unit_names()
-        delims = sorted(units, key=len, reverse=True)
-        pattern = "|".join(re.escape(d) for d in delims)
+    def _clean(d):
+        return {k: p for k, p in d.items() if p != 0}
 
-        power_flip = 1
-
-        unit_list = re.split(f"({pattern}|[*/^])", unit)
-        unit_list = [part for part in unit_list if part != ""]
-
-        unit_dict = {}
-        for i, part in enumerate(unit_list):
-            if part in units:
-                if i < len(unit_list)- 1 and   unit_list[i + 1] == "^":
-                    unit_dict[part] = float(unit_list[i + 2]) * power_flip
-                else:
-                    unit_dict[part] = power_flip
-            elif part == "/":
-                power_flip = -1
-            else:
-                continue
-
-        return quantity(value,unit_dict)
-
-    @staticmethod
-    def _clean(units):
-        return {u: p for u, p in units.items() if p != 0}
 
 
 
