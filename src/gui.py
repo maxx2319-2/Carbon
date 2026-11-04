@@ -887,7 +887,10 @@ class MathOutput(QWebEngineView):
         self._push()
 
     def _push(self):
-        latex = calc_to_latex(self._raw.replace("%", r"\%")) if self._raw else ""
+        if self._raw.startswith("Error"):
+            latex = latex_text(self._raw)
+        else:
+            latex = calc_to_latex(self._raw.replace("%", r"\%")) if self._raw else ""
         self.page().runJavaScript(f"setValue({json.dumps(latex)})")
 
     def setText(self, s):
@@ -1121,8 +1124,22 @@ class DraggablePanel(QWidget):
 
         self.body = body_widget
         self.body.setStyleSheet("background-color: transparent")
+        self.body.setMinimumHeight(self.body.sizeHint().height())
 
-        layout.addWidget(self.body)
+        scroll = QScrollArea()
+        scroll.setWidget(self.body)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background: transparent; }}
+            #qt_scrollarea_vcontainer {{ background: transparent; }}
+            QScrollBar:vertical {{ background: transparent; width: 8px; }}
+            QScrollBar::handle:vertical {{ background: {SCROLL}; border-radius: 4px; min-height: 30px; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+        """)
+        layout.addWidget(scroll)
         point_cursor(self)
 
     def show_help(self):
@@ -1164,6 +1181,11 @@ class DraggablePanel(QWidget):
                 self._drag_offset = None
                 return True
         return super().eventFilter(obj, event)
+
+    def fit_to_parent(self):
+        height = self.header.height() + self.body.minimumHeight()
+        self.resize(self.width(), min(height, self.parent().height()))
+        self.move(self._clamp_to_parent(self.pos()))
 
     def _clamp_to_parent(self, pos):
         if not self.parent():
@@ -1942,10 +1964,11 @@ class PanelPage(QWidget):
             spec = PANELS[key]
             help_text = HELPTEXT[key] + SUB_HELP if key in HELPTEXT else None
             panel = DraggablePanel(spec.title, spec.build(), self.canvas, help_text)
-            panel.resize(spec.size[0], panel.sizeHint().height())
+            panel.resize(spec.size[0], panel.height())
             offset = 20 * len(self.panels)
             panel.move(20 + offset, 20 + offset)
             self.panels[key] = panel
+            panel.fit_to_parent()
 
         panel.show()
         panel.raise_()
@@ -1953,7 +1976,7 @@ class PanelPage(QWidget):
     def eventFilter(self, obj, event):
         if obj is self.canvas and event.type() == QEvent.Resize:
             for panel in self.panels.values():
-                panel.move(panel._clamp_to_parent(panel.pos()))
+                panel.fit_to_parent()
         if obj is self.canvas and event.type() == QEvent.Paint:
             margin = min(self.canvas.width(), self.canvas.height()) // 4
             painter = QPainter(self.canvas)
