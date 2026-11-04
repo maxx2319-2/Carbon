@@ -617,7 +617,9 @@ class EV:
 
                             
 
-                            result = chem.pH(x, self.input_prep(c).value)
+                            q = parser.evaluate(self.prep_ev(c))
+                            con = q.value if not q.dimension else quantity.unit_convert(q, "mol/l").value
+                            result = chem.pH(x, con)
                             result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
@@ -629,7 +631,9 @@ class EV:
                             if x == "" or c == "":
                                 raise ValueError(self.error_text["pOH"])
 
-                            result = chem.pOH(x, self.input_prep(c).value)
+                            q = parser.evaluate(self.prep_ev(c))
+                            con = q.value if not q.dimension else quantity.unit_convert(q, "mol/l").value
+                            result = chem.pOH(x, con)
                             result = utils.round_pH(result, [self.prep_ev(c)])
                             output[pc] = result
                             pc += 1
@@ -872,7 +876,7 @@ class EV:
                                 raise ValueError(f'Ukendt variabel {a}')
 
                             self.variables[a] = Variables(
-                                parser.evaluate(self.prep_ev(f"{a}+({b})")), "Quantity"
+                                quantity.simplify_units(parser.evaluate(self.prep_ev(f"{a}+({b})"))), "Quantity"
                             )
                             output[pc] = self.variables[a].value
                             pc +=1
@@ -883,7 +887,7 @@ class EV:
                                 raise ValueError(f'Ukendt variabel {a}')
 
                             self.variables[a] = Variables(
-                                parser.evaluate(self.prep_ev(f"{a}-({b})")), "Quantity"
+                                quantity.simplify_units(parser.evaluate(self.prep_ev(f"{a}-({b})"))), "Quantity"
                             )
                             output[pc] = self.variables[a].value
                             pc +=1
@@ -928,7 +932,7 @@ class EV:
 
                             else:
                                 self.variables[a] = Variables(
-                                    parser.evaluate(self.prep_ev(b)), "Quantity"
+                                    quantity.simplify_units(parser.evaluate(self.prep_ev(b))), "Quantity"
                                 )
                             self._invalidate_pattern()
                             output[pc] = self.variables[a].value
@@ -939,7 +943,7 @@ class EV:
                             pc += 1
 
                         else:
-                            output[pc] = parser.evaluate(self.prep_ev(line))
+                            output[pc] = quantity.simplify_units(parser.evaluate(self.prep_ev(line)))
                             pc += 1
                     except Exception as e:
                         raise ValueError(e)
