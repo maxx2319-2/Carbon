@@ -6,7 +6,6 @@ from math import gcd
 import math
 import json
 from types import SimpleNamespace
-from mendeleev import element
 import matplotlib.pyplot as plt
 from cycler import cycler
 from path import resource_path
@@ -225,6 +224,17 @@ pKb_values = {
 
 }
 
+_atomic_weights = {}
+
+def atomic_weight(symbol):
+    if not _atomic_weights:
+        from mendeleev.fetch import fetch_table
+        table = fetch_table("elements")
+        _atomic_weights.update(zip(table["symbol"], table["atomic_weight"]))
+    if symbol not in _atomic_weights:
+        raise ValueError(f"{symbol} er ikke et gyldigt grundstof")
+    return _atomic_weights[symbol]
+
 def split_charge(formula):
     m = re.match(r'^(.*?)\^(\d*)([+-])$', formula)
     if not m:
@@ -420,7 +430,7 @@ def elemental_analasis(x):
     atom_sumcount = 0
 
     for atom in parsed:
-        molar_mass += atom[1] * element(atom[0]).atomic_weight
+        molar_mass += atom[1] * atomic_weight(atom[0])
         atom_count = atom_count + (atom[1],)
         atom_sumcount += atom[1]
 
@@ -442,7 +452,7 @@ def elemental_analasis(x):
     atom_procent = {}
 
     for part in parsed:
-        atom_procent[part[0]] = round(((part[1]*element(part[0]).atomic_weight)/molar_mass)*100,config.rounding_decimals)
+        atom_procent[part[0]] = round(((part[1]*atomic_weight(part[0]))/molar_mass)*100,config.rounding_decimals)
 
     procent = []
     for part in atom_procent:
@@ -729,7 +739,7 @@ def emperical_analysis(atom_procent):
     atom_procents = dict(re.findall(r"([A-Z][a-z]?)\s*(\d+(?:[.,]\d+)?)", atom_procent))
 
     for atom in atom_procents:
-        M = element(atom).atomic_weight
+        M = atomic_weight(atom)
         n[atom] = float(atom_procents[atom].replace("%", "").replace(",", ".")) / M
 
     divider = min(n.values())
