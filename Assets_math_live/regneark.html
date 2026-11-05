@@ -323,7 +323,8 @@
         while (isOut(mf.nextElementSibling)) mf.nextElementSibling.remove();
     }
 
-    const LOOP = /^Loop\\left\((\d+),(\d+),(.+)\\right\)$/;
+    const GAP = String.raw`(?:\s|\\[:, ])*`;
+    const LOOP = new RegExp(String.raw`^Loop(?:\\left)?\(${GAP}(\d+)${GAP},${GAP}(\d+)${GAP},(.+?)(?:\\right)?\)$`);
 
     function rember(mf) {
         const m = strip(mf.value).match(LOOP);
