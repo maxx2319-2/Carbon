@@ -206,7 +206,7 @@ def mutation_analyse(rask, muteret, dr):
     divergence = None
     mutations = {}
     if len(rask) != len(muteret):
-        raise ValueError("Sequences must be the same length")
+        raise ValueError("Sekvenser skal være samme længde")
 
     output = []
 
@@ -220,7 +220,7 @@ def mutation_analyse(rask, muteret, dr):
                 divergence = i
 
     if divergence is None:
-        return ["Ingen mutation begge strenge er det samme"]
+        return ["Ingen mutation, begge strenge er det samme"]
 
     max_shift = 12
     best_shift = None
@@ -275,8 +275,8 @@ def mutation_analyse(rask, muteret, dr):
             if amino_healthy == amino_sick:
                 output.append(f"Tavs mutation ved base nr {i + 1}")
             elif amino_sick == "Stop":
-                output.append(f"Nonsense mutation ved base nr {i + 1}")
+                output.append(f"Nonsensmutation ved base nr {i + 1}")
             else:
-                output.append(f"Missense mutation ved base nr {i + 1}")
+                output.append(f"Missensmutation ved base nr {i + 1}")
 
     return output

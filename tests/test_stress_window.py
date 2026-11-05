@@ -333,7 +333,6 @@ def test_changelog_handles_an_unreadable_reply(window):
     window.show_changelog(FakeReply(b"\xe6\xf8\xe5 nyheder"))
 
 
-@pytest.mark.xfail(reason="M-08: Esc doesn't close the changelog overlay, which grabs the keyboard", strict=True)
 def test_escape_closes_the_changelog(window):
     window.show_changelog(FakeReply("# Bv 2.0\n- Nyt".encode()))
     settle(200)

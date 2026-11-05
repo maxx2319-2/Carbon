@@ -218,24 +218,24 @@ HELPTEXT = {
         "Derefter indtast den ønskede enhed uden firkantede parenteser."
     ),
     "analysis": (
-        "Indtast molekylet i input feltet.\n"
+        "Indtast molekylet i inputfeltet.\n"
         "Husk at grundstoffer med navne der er længere end et bogstav kun har det første bogstav stort.\n"
-        "Eksempelvis Fe3O4, Jernoxid.\n"
-        "DBE formel kan kun anvendes til organiske molekyler."
+        "Eksempelvis Fe3O4, jernoxid.\n"
+        "DBE-formel kan kun anvendes til organiske molekyler."
     ),
     "bjerrum": (
-        "Indtast pKs værdi for at opstille et bjerrumsdiagram.\n"
+        "Indtast pKs-værdi for at opstille et bjerrumdiagram.\n"
         "Brug . for at skrive decimaler og brug , for at lave endnu et diagram.\n"
-        "For eksempel 5.3, 4.1 laver to bjerrumsdiagrammer."
+        "For eksempel 5.3, 4.1 laver to bjerrumdiagrammer."
     ),
     "pH": (
-        "Indtast enten pKs værdi eller pKb værdi samt koncentrationen.\n"
+        "Indtast enten pKs-værdi eller pKb-værdi samt koncentrationen.\n"
         "Husk . for decimaltal og angiv koncentrationens enhed i firkantede parenteser [].\n"
         "Du kan også bruge navnet for nogle syrer og baser (se Indstillinger).\n"
-        "Standard enhed for koncentration er mol/l."
+        "Standardenhed for koncentration er mol/l."
     ),
     "balance": (
-        "Indtast din ubalancerede reaktion i input kassen.\n"
+        "Indtast din ubalancerede reaktion i inputfeltet.\n"
         "Brug pil mellem reaktanter og produkter ->.\n"
         "For eksempel H2O -> H2 + O2.\n"
         "Ved redoxreaktioner bruges opløsningsboksen hvor der skrives syre eller base."
@@ -243,15 +243,15 @@ HELPTEXT = {
     "udbytteprocent": (
         "Indtast praktisk udbytte i det første input og teoretisk udbytte i det andet.\n"
         "Husk . for decimal og enheder inde i firkantet parentes [].\n"
-        "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
+        "Eksempelvis 4[kg] 300[g]. Standardenheden er kg."
     ),
     "volumenprocent": (
         "Indtast samlet volumen i det første input og specifik volumen i det andet.\n"
-        "Eksempelvis 4[l] 300[dl]. Standard enheden er l."
+        "Eksempelvis 4[l] 300[dl]. Standardenheden er l."
     ),
     "masseprocent": (
         "Indtast samlet masse i det første input og specifik masse i det andet.\n"
-        "Eksempelvis 4[kg] 300[g]. Standard enheden er kg."
+        "Eksempelvis 4[kg] 300[g]. Standardenheden er kg."
     ),
     "mængdeberegning": (
         "Indtast din tilgængelige data i deres respektive input.\n"
@@ -260,24 +260,24 @@ HELPTEXT = {
     ),
     "puffer": (
         "Input stofmængden eller koncentrationen af syren og af basen samt syrens pKs.\n"
-        "Standard enhed for stofmængde er mol, for koncentration mol/l."
+        "Standardenheden for stofmængde er mol, for koncentration mol/l."
     ),
     "h3o": "Input enten pH eller pOH.\nHusk . for decimaler.",
     "dna_mut": (
-        "Indtast den raske DNA streng øverst og derefter den muterede.\n"
+        "Indtast den raske DNA-streng øverst og derefter den muterede.\n"
         "Mellemrum og store/små bogstaver er ligegyldige.\nFor eksempel AAT gcc TTG."
     ),
     "rna_mut": (
-        "Indtast den raske RNA streng øverst og derefter den muterede.\n"
+        "Indtast den raske RNA-streng øverst og derefter den muterede.\n"
         "Mellemrum og store/små bogstaver er ligegyldige.\nFor eksempel AAU gcc UUG."
     ),
     "dna_peptid": (
-        "Indtast DNA streng.\n"
+        "Indtast DNA-streng.\n"
         "Mellemrum og store/små bogstaver er ligegyldige.\n"
         "For eksempel AAT gcc TTG eller AATGCCTTT."
     ),
     "rna_peptid": (
-            "Indtast RNA streng.\n"
+            "Indtast RNA-streng.\n"
             "Mellemrum og store/små bogstaver er ligegyldige.\n"
             "For eksempel AAU gcc UUG eller AAUGCCUUU."
         ),
@@ -1303,10 +1303,10 @@ def pH_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    pKs_input = PlainField("Pks eller syrenavn")
+    pKs_input = PlainField("pKs eller syrenavn")
     layout.addWidget(pKs_input)
 
-    pKb_input = PlainField("Pkb eller basenavn")
+    pKb_input = PlainField("pKb eller basenavn")
     layout.addWidget(pKb_input)
 
     konc_input = MathInput("Koncentration[Enhed]")
@@ -1441,7 +1441,7 @@ def bjerrum_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    input = PlainField("pKs Værdier")
+    input = PlainField("pKs-værdier")
     layout.addWidget(input)
 
     calc_btn = QPushButton("Beregn")
@@ -1642,7 +1642,7 @@ def dna_peptid_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    DNA_input = PlainField("DNA Streng")
+    DNA_input = PlainField("DNA-streng")
     layout.addWidget(DNA_input)
 
     calc_btn = QPushButton("Beregn")
@@ -1670,7 +1670,7 @@ def rna_peptid_panel():
     layout.setContentsMargins(6,6,6,6)
     layout.setSpacing(6)
 
-    RNA_input = PlainField("RNA Streng")
+    RNA_input = PlainField("RNA-streng")
     layout.addWidget(RNA_input)
 
     calc_btn = QPushButton("Beregn")
@@ -1741,10 +1741,10 @@ def ph_konc_panel():
     calc_btn.setStyleSheet(calc_button_style)
     layout.addWidget(calc_btn)
 
-    h3o_output = MathOutput("Oxonium koncentration")
+    h3o_output = MathOutput("Oxoniumkoncentration")
     layout.addWidget(h3o_output)
 
-    oh_output = MathOutput("Hydroxid koncentration")
+    oh_output = MathOutput("Hydroxidkoncentration")
     layout.addWidget(oh_output) 
     layout.addStretch()
 
@@ -1770,7 +1770,7 @@ PANELS = {
     "pH": Panel("pH og pOH","pH og pOH Beregning", pH_panel),
     "balance": Panel("Afstemning","Reaktionsafstemning",afstemning_panel),
     "analysis": Panel("Analyse","Molekylær Analyse",analyse_panel),
-    "bjerrum": Panel("Bjerrumsdiagram","Bjerrumsdiagram",bjerrum_panel, (450,450)),
+    "bjerrum": Panel("Bjerrumdiagram","Bjerrumdiagram",bjerrum_panel, (450,450)),
     "udbytteprocent": Panel("Udbytteprocent","Udbytteprocent",udbytte_panel),
     "volumenprocent": Panel("Volumenprocent","Volumenprocent",volumen_panel),
     "masseprocent": Panel("Masseprocent", "Masseprocent",masse_panel),
@@ -2101,7 +2101,7 @@ class MainWindow(QMainWindow):
 
         self.create_changelog()
         if _settings.value("changelog_seen") != version:
-            self.open_changelog()
+            self.open_changelog(quiet=True)
 
         point_cursor(self)
 
@@ -2141,6 +2141,7 @@ class MainWindow(QMainWindow):
             QPushButton:hover {{ color: {HOVER}; }}
         """)
         close_btn.clicked.connect(self.close_changelog)
+        QShortcut(QKeySequence(Qt.Key_Escape), self.changelog, self.close_changelog, Qt.WidgetWithChildrenShortcut)
         header_layout.addWidget(close_btn)
         layout.addWidget(header)
 
@@ -2152,23 +2153,27 @@ class MainWindow(QMainWindow):
 
         self.network = QNetworkAccessManager(self)
 
-    def open_changelog(self):
+    def open_changelog(self, quiet=False):
         reply = self.network.get(QNetworkRequest(QUrl(CHANGELOG_URL)))
-        reply.finished.connect(lambda: self.show_changelog(reply))
+        reply.finished.connect(lambda: self.show_changelog(reply, quiet))
 
-    def show_changelog(self, reply):
-        if reply.error() == QNetworkReply.NoError:
-            self.changelog_text.setMarkdown(bytes(reply.readAll()).decode("utf-8", "replace"))
-            self.changelog.setGeometry(self.rect())
-            self.changelog.show()
-            self.changelog.raise_()
-            self.changelog.grabKeyboard()
+    def show_changelog(self, reply, quiet=False):
+        text = bytes(reply.readAll()).decode("utf-8", "replace")
         reply.deleteLater()
+        self.changelog_ok = reply.error() == QNetworkReply.NoError and text.lstrip().startswith(("#", "-"))
+        if quiet and not self.changelog_ok:
+            return
+        self.changelog_text.setMarkdown(text if self.changelog_ok else "Kunne ikke hente nyheder")
+        self.changelog.setGeometry(self.rect())
+        self.changelog.show()
+        self.changelog.raise_()
+        self.changelog.grabKeyboard()
 
     def close_changelog(self):
         self.changelog.releaseKeyboard()
         self.changelog.hide()
-        _settings.setValue("changelog_seen", version)
+        if self.changelog_ok:
+            _settings.setValue("changelog_seen", version)
 
     def create_drawer(self):
         self.drawer_max_width = 270

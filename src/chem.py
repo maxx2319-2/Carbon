@@ -544,7 +544,7 @@ def bjerrum(pks):
     plt.grid(True)
     plt.xlabel("pH")
     plt.ylabel("Syrebrøk")
-    plt.gcf().canvas.manager.set_window_title("Bjerrum Plot")
+    plt.gcf().canvas.manager.set_window_title("Bjerrumdiagram")
 
     plt.xlim(lo, hi)
     plt.ylim(0, 1)
@@ -647,7 +647,7 @@ def bjerrum_figure(pks):
 
 def procent(top,bottom):
     if top.dimension != bottom.dimension:
-        raise ValueError(f"Tæller og nævner skal have samme type enhed Tæller: {top.current_units} Nævner: {bottom.current_units}")
+        raise ValueError(f"Tæller og nævner skal have samme type enhed. Tæller: {top.current_units} Nævner: {bottom.current_units}")
     
     
     result = f"({top} / {bottom}) * 100"

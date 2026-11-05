@@ -138,19 +138,19 @@ class EV:
         self.error_text = {
             "Help" : "Help() or Help(function)",
             "Afstem": "Afstem(reaktion,opløsning(syre,base eller ingenting))",
-            "pH": "pH(pKs eller syre/base navn,Koncentration)",
-            "pOH": "pOH(pBs eller syre/base navn,Koncentration)",
-            "EnhedKonvertering": 'EnhedKonvertering(Quantity,ny Enhed eller "SI" for SI enhed)',
-            "Loop": "Loop(start linje,slut linje,antal gange)",
+            "pH": "pH(pKs eller syre/basenavn,Koncentration)",
+            "pOH": "pOH(pKb eller syre/base navn,Koncentration)",
+            "EnhedKonvertering": 'EnhedKonvertering(Mængde,ny Enhed eller "SI" for SI-enhed)',
+            "Loop": "Loop(startlinje,slutlinje,antal gange)",
             "Analyse": "Analyse(molekyle)",
             "BjerrumDiagram": "Bjerrumdiagram(pKs1,pKs2,...)",
             "UdbytteProcent":"UdbytteProcent(Praktisk,Teoretisk)" ,
             "VolumenProcent":"VolumenProcent(Praktisk,Teoretisk)",
             "MasseProcent":"MasseProcent(Praktisk,Teoretisk)",
-            "DNATilPeptid":"DNATilPeptid(DNA streng)",
-            "RNATilPeptid":"RNATilPeptid(DNA streng)",
+            "DNATilPeptid":"DNATilPeptid(DNA-streng)",
+            "RNATilPeptid":"RNATilPeptid(RNA-streng)",
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)",
-            "Puffer" : "Puffer(Syre concentration,Base concentration, pKs)",
+            "Puffer" : "Puffer(Syre koncentration,Base koncentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
             "Løs" : "Løs(ligning, evt Interval = (start, slut))",
             "Plot" : "Plot(function 1,function 2,...,Interval = (x start , x slut) )",
@@ -169,19 +169,19 @@ class EV:
         self.help_text = {
             "Help": "Help() eller Help(funktion)\nViser alle funktioner, eller hjælp til én funktion.\nEks: Help(pH) ",
             "Afstem": "Afstem(reaktion, opløsning)\nAfstemmer en reaktion. Opløsning er syre, base eller udeladt.\nEks: Afstem(H2 + O2 -> H2O) ",
-            "pH": "pH(pKs eller syre navn eller base navm, koncentration)\nBeregner pH for en syre eller base.\nEks: pH(4.76, 0.10) ",
-            "pOH": "pOH(pKb eller base navn eller syre navn, koncentration)\nBeregner pOH for en base eller syre.\nEks: pOH(4.75, 0.10) ",
-            "EnhedKonvertering": 'EnhedKonvertering(størrelse, ny enhed eller "SI")\nKonverterer en størrelse til en ny enhed eller til SI enhed.\nEks: EnhedKonvertering(4[km],SI) ',
-            "Loop": "Loop(start linje, slut linje, antal gange)\nKører linjerne fra start til slut flere gange. Variablen i tæller fra 0.\nEks: Loop(1, 3, 5) ",
+            "pH": "pH(pKs eller syrenavn eller basenavn, koncentration)\nBeregner pH for en syre eller base.\nEks: pH(4.76, 0.10) ",
+            "pOH": "pOH(pKb eller basenavn eller syrenavn, koncentration)\nBeregner pOH for en base eller syre.\nEks: pOH(4.75, 0.10) ",
+            "EnhedKonvertering": 'EnhedKonvertering(størrelse, ny enhed eller "SI")\nKonverterer en størrelse til en ny enhed eller til SI-enhed.\nEks: EnhedKonvertering(4[km],SI) ',
+            "Loop": "Loop(startlinje, slutlinje, antal gange)\nKører linjerne fra start til slut flere gange. Variablen i tæller fra 0.\nEks: Loop(1, 3, 5) ",
             "Analyse": "Analyse(molekyle)\nViser empirisk formel, molar masse, DBE, antal atomer og masseprocent.\nEks: Analyse(C6H12O6) ",
-            "BjerrumDiagram": "BjerrumDiagram(pKs1, pKs2, ..., export)\nTegner et Bjerrumdiagram ud fra pKs værdier eller syre navne. Skriv export for at åbne det i et nyt vindue.\nEks: BjerrumDiagram(2.15, 7.20, 12.35) ",
+            "BjerrumDiagram": "BjerrumDiagram(pKs1, pKs2, ..., export)\nTegner et Bjerrumdiagram ud fra pKs-værdier eller syrenavne. Skriv export for at åbne det i et nyt vindue.\nEks: BjerrumDiagram(2.15, 7.20, 12.35) ",
             "UdbytteProcent": "UdbytteProcent(praktisk, teoretisk)\nBeregner udbyttet i procent.\nEks: UdbytteProcent(4.5[g], 5[g]) ",
             "VolumenProcent": "VolumenProcent(praktisk, teoretisk)\nBeregner volumenprocent.\nEks: VolumenProcent(40[ml], 100[ml]) ",
             "MasseProcent": "MasseProcent(praktisk, teoretisk)\nBeregner masseprocent.\nEks: MasseProcent(12[g], 50[g]) ",
-            "DNATilPeptid": "DNATilPeptid(DNA streng)\nOversætter en DNA streng til et peptid.\nEks: DNATilPeptid(ATGGCCTAA) ",
-            "RNATilPeptid": "RNATilPeptid(RNA streng)\nOversætter en RNA streng til et peptid.\nEks: RNATilPeptid(AUGGCCUAA) ",
+            "DNATilPeptid": "DNATilPeptid(DNA-streng)\nOversætter en DNA-streng til et peptid.\nEks: DNATilPeptid(ATGGCCTAA) ",
+            "RNATilPeptid": "RNATilPeptid(RNA-streng)\nOversætter en RNA-streng til et peptid.\nEks: RNATilPeptid(AUGGCCUAA) ",
             "MængdeBeregning": "MængdeBeregning(m=.., n=.., ...)\nBeregner de manglende størrelser ud fra m, n, M, c, V og p .\nEks: MængdeBeregning(m=10[g], M=58.44[g/mol], V=0.5[l]) ",
-            "Puffer": "Puffer(syre koncentration, base koncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76) ",
+            "Puffer": "Puffer(syrekoncentration, basekoncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76) ",
             "pHTilKoncentration": "pHTilKoncentration(pH)\nBeregner [H3O+] og [OH-] ud fra pH.\nEks: pHTilKoncentration(3.5) ",
             "Løs": "Løs(ligning, Interval = (start, slut))\nLøser en ligning. Kan ikke tage imod enheder. Interval er valgfrit og finder alle løsninger i intervallet numerisk.\nEks: Løs(x^2 = 4) ",
             "Plot": "Plot(funktion 1, funktion 2, ..., Interval = (x start, x slut))\nTegner en eller flere funktioner. Interval er valgfrit.\nEks: PlotFunktion(x^2, Sin(x), Interval=(-5,5)) ",
@@ -667,7 +667,7 @@ class EV:
                             molecule, emp, mol, count, procent, dbe = (
                                 chem.elemental_analasis(input)
                             )
-                            indhold = f"Masse procent:\n{'\n'.join(procent)}"
+                            indhold = f"Masseprocent:\n{'\n'.join(procent)}"
                             output[pc] = (
                                 f"Molekyle: {molecule}\nEmpirisk formel: {emp}\nMolar masse: {quantity.create_quantity(round(mol,config.rounding_decimals),"g/mol")}\nDBE: {dbe} \nAntal atomer: {count} \n{indhold}"
                             )
@@ -690,7 +690,7 @@ class EV:
                                     pks_values.append(self.input_prep(part).value)
 
                             if len(pks_values) == 0:
-                                raise ValueError(f"ingen pKs værdier: {self.error_text["BjerrumDiagram"]}")
+                                raise ValueError(f"ingen pKs-værdier: {self.error_text["BjerrumDiagram"]}")
 
                             pks_values = [float(x) for x in pks_values]
 
@@ -861,7 +861,7 @@ class EV:
                             else:
                                 if input not in self.help_text:
                                     raise ValueError(
-                                        f"Ukendt function {input}, eller ingen hjælpe text til functionen"
+                                        f"Ukendt funktion {input}, eller ingen hjælpetext til funktionen"
                                     )
                                 output[pc] = self.help_text[input]
 
@@ -908,14 +908,14 @@ class EV:
                                 elif "'" in b:
                                     if b.count("'") != 2:
                                         raise ValueError(
-                                            "Du skal slutte og starte din text med enten: '  eller "
+                                            "Du skal slutte og starte din tekst med enten: '  eller "
                                             + '"'
                                         )
 
                                 elif '"' in b:
                                     if b.count('"') != 2:
                                         raise ValueError(
-                                            "Du skal slutte og starte din text med enten: '  eller "
+                                            "Du skal slutte og starte din tekst med enten: '  eller "
                                             + '"'
                                         )
 
@@ -1054,7 +1054,7 @@ class EV:
     def unit_bracket_strip(self, val):
         match = re.match(r"([^\[]+)\[([^\]]+)\]", val)
         if not match:
-            raise ValueError(f"could not parse value/unit: {val!r}")
+            raise ValueError(f"Kunne ikke læse værdi/enhed: {val!r}")
 
         num_str, unit = match.group(1), match.group(2)
 

@@ -155,7 +155,7 @@ class _Parser:
             self.take()
             result.append(self.expr())
         if self.take() != ("op", ")"):
-            raise ValueError(f'magler ")" i {self.text}')
+            raise ValueError(f'mangler ")" i {self.text}')
         return result
 
     def atom(self):
@@ -179,7 +179,7 @@ class _Parser:
         if kind == "unit":
             return quantity.create_quantity(1.0, value)
         if kind is None:
-            raise ValueError(f'udtrykket sluter for tidligt: "{self.text}"')
+            raise ValueError(f'udtrykket slutter for tidligt: "{self.text}"')
         raise ValueError(f'uventet "{value}" i {self.text}')
 
 def evaluate(equation):
