@@ -707,21 +707,24 @@ def latex_text(s):
 
 
 
+MAX_LOOP_ROWS = 50
 
-class _InterpreterBridge(QObject):    
+class _InterpreterBridge(QObject):
     finished = Signal(int, str)
     modeChanged = Signal(str)
     escaped = Signal()
     dirtyChanged = Signal(bool)
     historyChanged = Signal(bool, bool)
     leaked = Signal()
+    bjerrumExported = Signal(str)
 
 
     def __init__(self,parent = None):
         super().__init__(parent)
-        self.pool = multiprocessing.Pool(1)
+        self.pool = multiprocessing.Pool(1, _InterpreterBridge.evaluate_in_worker, ("[]",))
         self.job = None
         self.leaked.connect(self.restart)
+        self.bjerrumExported.connect(self.export_bjerrum)
 
     @staticmethod
     def evaluate_in_worker(data):
@@ -745,9 +748,17 @@ class _InterpreterBridge(QObject):
         self.escaped.emit()
 
     def done(self, run_id,rows, leaked):
-        self.finished.emit(run_id,rows)
+        rows = json.loads(rows)
+        for kind, pks in rows:
+            if kind == "bjerrum":
+                self.bjerrumExported.emit(pks)
+        self.finished.emit(run_id, json.dumps([row for row in rows if row[0] != "bjerrum"]))
         if leaked:
             self.leaked.emit()
+
+    @Slot(str)
+    def export_bjerrum(self, pks):
+        chem.bjerrum(json.loads(pks))
 
     @Slot()
     def restart(self):
@@ -774,44 +785,51 @@ class _InterpreterBridge(QObject):
             rows.append(["code", latex])
             value = result.get(i, "")
             values = value if isinstance(value, list) else [value]
+            if len(values) > MAX_LOOP_ROWS:
+                rows.append(["result", r"\Rightarrow\:" + latex_text(f"... {len(values) - MAX_LOOP_ROWS} resultater skjult")])
+                values = values[-MAX_LOOP_ROWS:]
             for value in values:
-                if isinstance(value, dict):
-                    rows.append(["result", r"\Rightarrow\:" + r",\ ".join(f"{sympy.latex(k)} = {calc_to_latex(v) if isinstance(v, sympy.Float) else sympy.latex(v)}" for k, v in value.items())])
-                    continue
+                try:
+                    if isinstance(value, chem.BjerrumExport):
+                        rows.append(["bjerrum", json.dumps(value.pks)])
+                        continue
 
-                if isinstance(value, sympy.Basic) and not isinstance(value, sympy.Float):
-                    rows.append(["result", r"\Rightarrow\:" + sympy.latex(value)])
-                    continue
+                    if isinstance(value, dict):
+                        rows.append(["result", r"\Rightarrow\:" + r",\ ".join(f"{sympy.latex(k)} = {calc_to_latex(v) if isinstance(v, sympy.Float) else sympy.latex(v)}" for k, v in value.items())])
+                        continue
 
-                if isinstance(value, utils.FunctionPlot):
-                    rows.append(["plot", json.dumps({"functions": value.functions, "start": value.start, "end": value.end})])
-                    continue
+                    if isinstance(value, sympy.Basic) and not isinstance(value, sympy.Float):
+                        rows.append(["result", r"\Rightarrow\:" + sympy.latex(value)])
+                        continue
 
-                if isinstance(value, Figure):
-                    buf = io.BytesIO()
-                    value.savefig(buf, format = "png")
-                    rows.append(["image","data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()])
-                    continue
-                for res in str(value).splitlines():
-                    if res.startswith("Error"):
-                        rows.append(["error", r"\Rightarrow\:" + latex_text(res)])
-                    else:
-                        rows.append(
-                            [
-                                "result",
-                                r"\Rightarrow\:"
-                                + calc_to_latex(
-                                    res.replace("_", r"\_").replace("%", r"\%")
-                                ),
-                            ]
-                        )
+                    if isinstance(value, utils.FunctionPlot):
+                        rows.append(["plot", json.dumps({"functions": value.functions, "start": value.start, "end": value.end})])
+                        continue
+
+                    if isinstance(value, Figure):
+                        buf = io.BytesIO()
+                        value.savefig(buf, format = "png")
+                        rows.append(["image","data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()])
+                        continue
+                    for res in str(value).splitlines():
+                        if res.startswith("Error"):
+                            rows.append(["error", r"\Rightarrow\:" + latex_text(res)])
+                        else:
+                            rows.append(
+                                [
+                                    "result",
+                                    r"\Rightarrow\:"
+                                    + calc_to_latex(
+                                        res.replace("_", r"\_").replace("%", r"\%")
+                                    ),
+                                ]
+                            )
+                except Exception as e:
+                    rows.append(["error", r"\Rightarrow\:" + latex_text(f"Error: {e}")])
         return json.dumps(rows)
 
     @Slot(int, str)
     def run(self,run_id,data):
-        if 'export' in data.lower():
-            self.finished.emit(run_id, self.evaluate(data))
-            return
         if self.job and not self.job.ready():
             self.cancel()
         self.job = self.pool.apply_async(_InterpreterBridge.evaluate_in_worker,(data,),
@@ -822,7 +840,7 @@ class _InterpreterBridge(QObject):
     def cancel(self):
         if self.pool:
             self.pool.terminate()
-        self.pool = multiprocessing.Pool(1)
+        self.pool = multiprocessing.Pool(1, _InterpreterBridge.evaluate_in_worker, ("[]",))
         self.job = None
 
 
@@ -1470,7 +1488,9 @@ def bjerrum_panel():
 
     def export():
         result = interpreter.EV().ev(f"BjerrumDiagram({input.text()},export)").get(0, "")
-        if result:
+        if isinstance(result, chem.BjerrumExport):
+            chem.bjerrum(result.pks)
+        elif result:
             calc()
 
     calc_btn.clicked.connect(calc)
@@ -2838,7 +2858,8 @@ class MainWindow(QMainWindow):
         pill.editingFinished.connect(lambda: self.finish_rename(pill))
         pill.returnPressed.connect(self.focus_interpreter)
 
-        QShortcut(QKeySequence(Qt.Key_Escape), pill, lambda: (pill.setText(self.renaming), self.focus_interpreter()), Qt.WidgetShortcut)
+        escape = QShortcut(QKeySequence(Qt.Key_Escape), pill, lambda: (pill.setText(self.renaming), self.focus_interpreter()))
+        escape.setContext(Qt.WidgetShortcut)
 
         close = QToolButton()
         close.setIcon(hover_icon("Close.svg"))

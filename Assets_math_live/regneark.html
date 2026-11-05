@@ -459,6 +459,7 @@
         e.preventDefault();
         e.stopPropagation();
         e.clipboardData.setData("text/plain", selectedText());
+        e.clipboardData.setData("application/x-carbon", "1");
         if (cut) { deleteSel(); record(); }
     }
 
@@ -468,7 +469,9 @@
         e.preventDefault();
         e.stopPropagation();
         const mf = sel ? deleteSel() : e.currentTarget;
-        const [head, ...rest] = text.split("\n");
+        const fix = e.clipboardData.types.includes("application/x-carbon") ? raw => raw : raw => raw.replace(/[\\%#&$\{\}]/g, c => c === "\\" ? "\\backslash " : "\\" + c);
+        const [head, ...rest] = text.split("\n").map(fix);
+
         clearOutput(mf);
         if (!rest.length) { mf.insert(head); record(); return; }
         const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));

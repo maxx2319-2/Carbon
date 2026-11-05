@@ -110,7 +110,7 @@ def lookup_unit(name):
         if name.startswith(prefix) and base in unit_data and "^" not in base:
             data = unit_data[base]
             return {"factor": PREFIXES[prefix]*data["factor"],"base_units": data["base_units"]}
-    raise ValueError(f"unknown unit {name}")
+    raise ValueError(f"ukendt enhed {name}")
 
 
 def known_unit_names():
@@ -201,7 +201,7 @@ class quantity:
     # subtraction for quantities
     def __sub__(self, other):
         if self.dimension != other.dimension:
-            raise ValueError(f"man kan ikke lægge {self.current_units} sammen med {other.current_units}")
+            raise ValueError(f"man kan ikke trække {other.current_units} fra {self.current_units}")
         other_value = (quantity.si_convert(other).value)/(quantity.si_convert(quantity(1, self.dimension, self.current_units)).value)
         value = self.value - other_value
 
