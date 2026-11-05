@@ -307,7 +307,8 @@ class EV:
                             l1 = int(l1)
                             l2 = int(l2)
                             count = int(count)
-                            if count > 10000: raise ValueError("Loop kan højst køre 10000 gange")
+                            if count == 0: raise ValueError("do kan ikke loop 0 gange")
+                            if count > 10000: raise ValueError("loop kan højst køre 10000 gange")
 
 
                             if l1 < 1 or l1 > l2 or l1 - 1 <= pc < l2:
@@ -681,7 +682,7 @@ class EV:
 
 
                             for part in args:
-                                value = chem.find_pk(pKa_values, part)
+                                value = chem.find_pk(pKa_values, part.strip())
                                 if value is not None:
                                     pks_values.append(value)
                                 elif "export" in part.lower():
@@ -697,7 +698,7 @@ class EV:
                             if inline:
                                 output[pc] = chem.bjerrum_figure(pks_values)
 
-                            else: chem.bjerrum(pks_values)
+                            else: output[pc] = chem.BjerrumExport(pks_values)
                             pc += 1
 
                         case (
@@ -712,8 +713,8 @@ class EV:
                                 raise ValueError(self.error_text[procent_type])
 
 
-                            top_preped = self.input_prep(top)
-                            bottom_preped = self.input_prep(bottom)
+                            top_preped = quantity.si_convert(self.input_prep(top))
+                            bottom_preped = quantity.si_convert(self.input_prep(bottom))
 
                             result = chem.procent(top_preped, bottom_preped)
                             

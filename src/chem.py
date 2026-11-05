@@ -202,12 +202,11 @@ atoms = [
 
 
 pKa_values = {
-    "svolsyre": -3,
-    "Salpetersyre": -1.35,
+    "svovlsyre": -3,
+    "salpetersyre": -1.35,
     "saltsyre": -7,
     "hydrogeniodid": -9.5,
     "hydrogenbromid": -8,
-    "svovlsyre": -3,
     "bromsyre": -1,
     "oxonium": 0,
     "chlorsyre": -1.58,
@@ -221,7 +220,21 @@ pKa_values = {
 }
 
 pKb_values = {
-
+    "hydrogensulfat": 17,
+    "nitrat": 15.35,
+    "chlorid": 21,
+    "iodid": 23.5,
+    "bromid": 22,
+    "bromat": 15,
+    "hydroxid": 0,
+    "chlorat": 15.58,
+    "iodat": 13.18,
+    "dihydrogenphosphat": 11.88,
+    "fluorid": 11.83,
+    "ethanoat": 9.24,
+    "hydrogencarbonat": 7.63,
+    "borat": 4.76,
+    "ammoniak": 4.75,
 }
 
 _atomic_weights = {}
@@ -403,7 +416,11 @@ def pOH(x, con):
 
 def molecule_formula(x):
     molecule_dict = {}
-    matches = re.findall(r"([A-Z][a-z]?)(\d*)", expand_groups(x))
+    expanded = expand_groups(x.replace(" ", ""))
+    if not re.fullmatch(r"(?:[A-Z][a-z]?\d*)+", expanded):
+        raise ValueError(f'"{x.strip()}" er ikke en gyldig molekyleformel')
+    matches = re.findall(r"([A-Z][a-z]?)(\d*)", expanded)
+
     matches = [(atom, amount) for atom, amount in matches if atom]
     parsed = [(atom, int(amount) if amount else 1) for atom, amount in matches]
 
@@ -491,6 +508,11 @@ def elemental_analasis(x):
     dbe = ((2 * C_count) + 2 + N_count - H_count - x_count) / 2
 
     return x, empirical_formula, molar_mass, atom_sumcount, procent, dbe
+
+
+class BjerrumExport:
+    def __init__(self, pks):
+        self.pks = pks
 
 
 def bjerrum(pks):
@@ -648,9 +670,9 @@ def bjerrum_figure(pks):
 def procent(top,bottom):
     if top.dimension != bottom.dimension:
         raise ValueError(f"Tæller og nævner skal have samme type enhed. Tæller: {top.current_units} Nævner: {bottom.current_units}")
+
     
-    
-    result = f"({top} / {bottom}) * 100"
+    result = f"({top.value} / {bottom.value}) * 100"
     result = parser.evaluate(result)
    
     return result
