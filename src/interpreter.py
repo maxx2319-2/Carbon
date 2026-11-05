@@ -452,7 +452,7 @@ class EV:
                             output[pc] = sympy.N(simplify(self.prep_sympy(args[0])))
                             pc +=1
 
-                        case 'PlotFunktion':
+                        case 'Plot':
                             start = None
                             end = None
                             functions = []
@@ -461,14 +461,14 @@ class EV:
                                 if "Interval" in part:
                                     _,interval = part.split("=")
                                     if "(" not in interval or ")" not in interval:
-                                        raise ValueError(self.error_text["PlotFunktion"])
+                                        raise ValueError(self.error_text["Plot"])
                                     interval = interval.strip().strip("(").strip(")")
 
                                     if interval.count(",") != 1:
-                                        raise ValueError(self.error_text["PlotFunktion"])
+                                        raise ValueError(self.error_text["Plot"])
                                     start,end = interval.split(",")
                                     if start == "" or end == "":
-                                        raise ValueError(self.error_text["PlotFunktion"])
+                                        raise ValueError(self.error_text["PlotF"])
                                     start = self.input_prep(start).value
                                     end = self.input_prep(end).value
                                 else: 
@@ -537,7 +537,12 @@ class EV:
 
                             f = sympy.lambdify((x, *params), expr, "numpy")
 
-                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            p0 = None
+                            if min(ys) > 0:
+                                slope, intercept = np.polyfit(xs, np.log(ys), 1)
+                                p0 = [np.exp(intercept), np.exp(slope)]
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys,p0)
                             pc += 1
 
                         case 'KvadReg':
@@ -567,7 +572,13 @@ class EV:
 
                             f = sympy.lambdify((x, *params), expr, "numpy")
 
-                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            p0 = None
+                            if min(ys) > 0:
+                                c = 1.05 * max(ys)
+                                slope, intercept = np.polyfit(xs, np.log(c / np.array(ys) - 1), 1)
+                                p0 = [np.exp(intercept), -slope, c]
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys,p0)
                             pc += 1 
 
                         case 'HarmReg':
@@ -582,7 +593,16 @@ class EV:
 
                             f = sympy.lambdify((x, *params), expr, "numpy")
 
-                            output[pc] = utils.regretion(f,expr,params,xs,ys)
+                            order = np.argsort(xs)
+                            sx, sy = np.array(xs)[order], np.array(ys)[order]
+                            grid = np.linspace(sx[0], sx[-1], len(sx))
+                            spectrum = np.fft.rfft(np.interp(grid, sx, sy) - np.mean(sy))
+                            k = np.argmax(np.abs(spectrum[1:])) + 1
+                            omega = 2 * np.pi * k / (grid[-1] - grid[0]) * (len(sx) - 1) / len(sx)
+                            phase = np.angle(spectrum[k]) + np.pi / 2 - omega * grid[0]
+                            p0 = [(max(ys) - min(ys)) / 2, omega, phase, np.mean(ys)]
+
+                            output[pc] = utils.regretion(f,expr,params,xs,ys,p0)
                             pc += 1  
 
                                               

@@ -195,7 +195,6 @@ def test_function_results_keep_their_precision(text, expected):
     assert ev(text)[0].value == pytest.approx(expected, rel=1e-4)
 
 
-@pytest.mark.xfail(reason="B-19: Round uses Python's round half to even", strict=True)
 def test_round_rounds_halves_up():
     assert ev("Round(2.5)")[0].value == 3
 
@@ -254,7 +253,6 @@ def test_afstem_with_parentheses_is_right_or_an_error():
     assert out.startswith("Error") or out.startswith("10K4Fe(CN)6 + 122KMnO4 + 299H2SO4")
 
 
-@pytest.mark.xfail(reason="B-20: the non-linear regressions start curve_fit from all ones", strict=True)
 def test_harmonic_regression_finds_a_clean_sine():
     import math
     xs = [i * 0.25 for i in range(40)]

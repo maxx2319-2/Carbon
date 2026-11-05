@@ -4,6 +4,7 @@ import math
 from path import resource_path
 import json
 from types import SimpleNamespace
+from decimal import Decimal, ROUND_HALF_UP
 
 with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
@@ -35,7 +36,7 @@ FUNCTIONS = {
     "Abs": math.fabs,
     "Floor": math.floor,
     "Ceil": math.ceil,
-    "Round": lambda x, n=0: round(x, int(n)),
+    "Round": lambda x, n=0: float(Decimal(str(x)).quantize(Decimal(1).scaleb(-int(n)), rounding=ROUND_HALF_UP)),
     "Degrees": math.degrees,
     "Radians": math.radians,
     "Gamma": math.gamma,

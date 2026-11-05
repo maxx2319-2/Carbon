@@ -179,9 +179,9 @@ class FunctionPlot:
 
 
 
-def regretion(f,freturn,params,xs,ys):
+def regretion(f,freturn,params,xs,ys,p0 = None):
     fit = {}
-    popt, pcov = curve_fit(f,xs,ys,maxfev = 100000)
+    popt, pcov = curve_fit(f,xs,ys,p0 = p0,maxfev = 100000)
     for i,part in enumerate(params): fit[part] = popt[i]
     result = freturn.subs(fit)
     rounded = result.xreplace({n: sympy.Float(n, 4) for n in result.atoms(sympy.Float)})

@@ -883,6 +883,7 @@
 
     // rows: [["code" | "result" | "error", latex], ...] in document order
     function showOutput(rows,all) {
+        
         lines().forEach(clearOutput)
         let k = 0, anchor = lines().at(-1);
         for (const [kind, latex] of rows) {
@@ -902,6 +903,7 @@
                 el.classList.add(kind);
             }
             el.classList.add("out");
+            el.readOnly = true
             anchor.after(el);
             if (isField(el)) { setupField(el); el.value = latex; }
             anchor = el;
