@@ -365,13 +365,18 @@ def balance_reaction(reaction, medium=None):
 
 
 
-
+def find_pk(table, name):
+    for key, value in table.items():
+        if key.lower() == name.lower():
+            return value
+    return None
 
 def pH(x, con):
     if x[0].isalpha():
-        if x not in pKa_values:
+        value = find_pk(pKa_values, x)
+        if value is None:
             raise ValueError(f'ukendt syre "{x}"')
-        k = 10 ** -float(pKa_values[x])
+        k = 10 ** -float(value)
     else:
         k = 10 ** -float(x)
 
@@ -383,9 +388,10 @@ def pH(x, con):
 
 def pOH(x, con):
     if x[0].isalpha():
-        if x not in pKb_values:
-                    raise ValueError(f'ukendt base "{x}"')
-        k = 10 ** -float(pKb_values[x])
+        value = find_pk(pKb_values, x)
+        if value is None:
+            raise ValueError(f'ukendt base "{x}"')
+        k = 10 ** -float(value)
     else:
         k = 10 ** -float(x)
 

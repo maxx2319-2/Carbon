@@ -372,7 +372,6 @@ def test_bjerrum_decimal_comma_is_one_value(window):
     assert len(labels) <= 1
 
 
-@pytest.mark.xfail(reason="B-29: the same .crbn can be opened in two tabs, and each save overwrites the other", strict=True)
 def test_opening_an_open_file_reuses_its_tab(window, tmp_path):
     path = tmp_path / "ark.crbn"
     path.write_text(json.dumps({"rows": [["code", "1"]]}), encoding="utf-8")
@@ -383,11 +382,15 @@ def test_opening_an_open_file_reuses_its_tab(window, tmp_path):
     assert paths.count(str(path)) == 1
 
 
-@pytest.mark.xfail(reason="B-30: acid names are looked up case-sensitively", strict=True)
 def test_acid_names_ignore_case(window, monkeypatch):
     monkeypatch.setitem(chem.pKa_values, "testsyre", 4.0)
-    body, fields, outputs = calc(window, "pH", "Testsyre", "0.1")
-    assert not outputs[0].text().startswith("Error")
+    body, fields, outputs, button = open_panel(window, "pH")
+    acid, base, ph, poh = sorted(body.findChildren(gui.PlainField), key=lambda f: f.mapTo(body, QPoint(0, 0)).y())
+    acid.setText("Testsyre")
+    fields[0].setText("0.1")
+    button.click()
+    settle(300)
+    assert ph.text().startswith("pH =")
 
 
 @pytest.mark.xfail(reason="U-01: the close prompts check 'not empty' instead of the unsaved dot, so saved sheets still ask", strict=True)
@@ -544,7 +547,6 @@ def test_gui_imports_in_under_a_second():
     assert float(proc.stdout.strip().splitlines()[-1]) < 1.0
 
 
-@pytest.mark.xfail(reason="P-09: every add/remove in the pK table rebuilds all rows, so the cost grows with the square of the size", strict=True)
 def test_pk_table_add_stays_fast_with_200_entries(window):
     saved = dict(chem.pKa_values)
     try:

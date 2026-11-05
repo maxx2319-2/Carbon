@@ -1,6 +1,7 @@
 import os
 import certifi
 import json
+import math
 from chem import pKa_values
 from chem import pKb_values
 import threading
@@ -291,6 +292,8 @@ def load_dict_from_settings(key, target):
         target.clear()
         target.update(data)
 
+PK_DEFAULTS = {"pKa_values": dict(pKa_values), "pKb_values": dict(pKb_values)}
+
 def register_crbn():
     import winreg
     exe = sys.executable
@@ -431,34 +434,47 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
     def save():
         _settings.setValue(settings_key, json.dumps(data_dict))
 
+    items = {}
+
+    def insert_row(name, value):
+        index = sum(1 for n in items if n.lower() < name.lower())
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(6,2,6,2)
+        label = QLabel(f"{name}: {value}")
+        label.setStyleSheet(f"color: {TEXT}; background: transparent;")
+        row_layout.addWidget(label)
+        row_layout.addStretch()
+        del_btn = QPushButton("x")
+        del_btn.setFixedSize(20,20)
+        del_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
+            QPushButton:hover {{ color: #da373c; }}
+        """)
+        del_btn.clicked.connect(lambda _=False, n=name: remove(n))
+        row_layout.addWidget(del_btn)
+        item = QListWidgetItem()
+        item.setSizeHint(QSize(200, 26))
+        list_widget.insertItem(index, item)
+        list_widget.setItemWidget(item, row)
+        items[name] = item
+
+    def remove_row(name):
+        item = items.pop(name, None)
+        if item:
+            list_widget.takeItem(list_widget.row(item))
+
     def refresh():
         list_widget.clear()
-        for name, value in sorted(data_dict.items(), key=lambda kv: kv[0].lower()):
-            row = QWidget()
-            row.setStyleSheet("background: transparent;")
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(6,2,6,2)
-            label = QLabel(f"{name}: {value}")
-            label.setStyleSheet(f"color: {TEXT}; background: transparent;")
-            row_layout.addWidget(label)
-            row_layout.addStretch()
-            del_btn = QPushButton("x")
-            del_btn.setFixedSize(20,20)
-            del_btn.setStyleSheet(f"""
-                QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
-                QPushButton:hover {{ color: #da373c; }}
-            """)
-            del_btn.clicked.connect(lambda _=False, n=name: remove(n))
-            row_layout.addWidget(del_btn)
-            item = QListWidgetItem()
-            item.setSizeHint(QSize(200, 26))
-            list_widget.addItem(item)
-            list_widget.setItemWidget(item, row)
+        items.clear()
+        for name, value in data_dict.items():
+            insert_row(name, value)
 
     def remove(name):
         del data_dict[name]
         save()
-        refresh()
+        remove_row(name)
 
     def add():
         name = name_input.text().strip()
@@ -466,13 +482,16 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
             value = float(value_input.text().strip().replace(",", "."))
         except ValueError:
             return
-        if not name:
+        if not name or not math.isfinite(value):
             return
+        for key in [k for k in data_dict if k.lower() == name.lower()]:
+            del data_dict[key]
+            remove_row(key)
         data_dict[name] = value
         save()
         name_input.clear()
         value_input.clear()
-        refresh()
+        insert_row(name, value)
 
     add_btn.clicked.connect(add)
     name_input.returnPressed.connect(add)
@@ -483,6 +502,19 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
     add_row.addWidget(value_input)
     add_row.addWidget(add_btn)
     layout.addLayout(add_row)
+
+    def reset():
+        if not container.window().ask_close("Nulstil tabel", "Er du sikker?\nDine egne værdier bliver slettet.", "Nulstil"):
+            return
+        data_dict.clear()
+        data_dict.update(PK_DEFAULTS[settings_key])
+        _settings.remove(settings_key)
+        refresh()
+
+    reset_btn = QPushButton("Nulstil")
+    reset_btn.setStyleSheet(button_style)
+    reset_btn.clicked.connect(reset)
+    layout.addWidget(reset_btn)
 
     refresh()
     return container
@@ -2851,7 +2883,7 @@ class MainWindow(QMainWindow):
             return
         self.remove_interpreter_tab(view, bool(view.property("dirty")))
 
-    def ask_close(self, title, text):
+    def ask_close(self, title, text, accept="Luk"):
         msg = QMessageBox(self)
         msg.setWindowTitle(title)
         msg.setText(text)
@@ -2862,7 +2894,7 @@ class MainWindow(QMainWindow):
             QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
             QPushButton:hover {{ background-color: {HOVER}; }}
         """)
-        close = msg.addButton("Luk", QMessageBox.AcceptRole)
+        close = msg.addButton(accept, QMessageBox.AcceptRole)
         msg.setDefaultButton(msg.addButton("Annuller",QMessageBox.RejectRole))
         msg.exec()
         return msg.clickedButton() is close
@@ -3078,6 +3110,10 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Gem regneark", self.tab_name(self.interpreter_tabs.currentIndex()) + ".crbn", "Regneark (*.crbn)")
         if not path:
             return
+        index = self.tab_for_path(path)
+        if index >= 0 and index != self.interpreter_tabs.currentIndex():
+            QMessageBox.warning(self, "Gem regneark", f"{Path(path).name} er allerede åben i en anden fane.\nLuk den først, eller vælg et andet navn.")
+            return
         self.set_tab_name(self.interpreter_view, Path(path).stem)
         self.interpreter_view.setProperty("path", path)
         self.save_regneark()
@@ -3155,6 +3191,11 @@ class MainWindow(QMainWindow):
             self.load_regneark(path)
 
     def load_regneark(self, path, view=None):
+        index = self.tab_for_path(path)
+        if view is None and index >= 0:
+            self.interpreter_tabs.setCurrentIndex(index)
+            self.open_interpreter()
+            return
         try:
             rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
             if not isinstance(rows, list) or not all(isinstance(r, list) and 2 <= len(r) <= 3 and all(isinstance(x, str) for x in r) for r in rows):
@@ -3167,6 +3208,14 @@ class MainWindow(QMainWindow):
         view.setProperty("path", path)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setSheet({json.dumps(rows)})"))
         self.open_interpreter()
+
+    def tab_for_path(self, path):
+        key = os.path.normcase(os.path.abspath(path))
+        for i in range(self.interpreter_stack.count()):
+            other = self.interpreter_stack.widget(i).property("path")
+            if other and os.path.normcase(os.path.abspath(other)) == key:
+                return i
+        return -1
     
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:

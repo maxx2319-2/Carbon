@@ -681,8 +681,9 @@ class EV:
 
 
                             for part in args:
-                                if part in pKa_values:
-                                    pks_values.append(pKa_values[part])
+                                value = chem.find_pk(pKa_values, part)
+                                if value is not None:
+                                    pks_values.append(value)
                                 elif "export" in part.lower():
                                     inline = False
                                 else:
