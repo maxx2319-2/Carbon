@@ -3260,9 +3260,11 @@ def report_error(kind, value, tb):
 def preload(window, splash):
     pages = [window.interpreter_view.page()]
     scripts = ["typeof getSheet === 'function'"]
+    names = ["regneark"]
     if resource_path("Assets_Ketcher/index.html").exists():
         pages.append(window.molecule_view.page())
         scripts.append("!!(window.ketcher && ketcher.editor)")
+        names.append("molekyletegner")
     views = window.findChildren(MathInput) + window.findChildren(MathOutput)
     ready = [False] * len(pages)
     loop = QEventLoop()
@@ -3273,6 +3275,8 @@ def preload(window, splash):
                 page.runJavaScript(script, 0, lambda result, i=i: ready.__setitem__(i, bool(result)))
         done = sum(ready) + sum(v._loaded for v in views)
         splash.bar.setValue(int(55 + 45 * done / (len(ready) + len(views))))
+        waiting = [name for name, r in zip(names, ready) if not r]
+        splash.status("Indlæser " + " og ".join(waiting) if waiting else "Næsten færdig")
         if all(ready) and all(v._loaded for v in views):
             loop.quit()
 
@@ -3300,6 +3304,7 @@ def main(app, splash):
             sys.exit(0)
         splash.show()
 
+    splash.status("Bygger GUI")
     window = MainWindow()
     app.window = window
     path = sys.argv[1] if len(sys.argv) > 1 else app.pending_file

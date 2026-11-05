@@ -1,9 +1,10 @@
 import multiprocessing
 import sys
 import importlib
+import threading
 
-from PySide6.QtCore import QEvent, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtCore import QEvent, QEventLoop, QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QSplashScreen, QProgressBar
 
@@ -35,6 +36,9 @@ class Splash(QSplashScreen):
         QSvgRenderer(str(resource_path("Assets/Carbon_Full.svg"))).render(painter, QRectF(30, 15, 360, 160))
         painter.end()
         super().__init__(pixmap)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setWindowTitle("Carbon")
+        self.setWindowIcon(QIcon(str(resource_path("Assets/Carbon_Round.svg"))))
         self.bar = QProgressBar(self)
         self.bar.setGeometry(40, 192, 340, 8)
         self.bar.setTextVisible(False)
@@ -44,16 +48,42 @@ class Splash(QSplashScreen):
         self.bar.setValue(int(value))
         QApplication.processEvents()
 
+    def status(self, text):
+        self.showMessage(text, Qt.AlignBottom | Qt.AlignHCenter, QColor("#b4b4b4"))
+
+    def mousePressEvent(self, event):
+        pass
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = CarbonApp(sys.argv)
     splash = Splash(app)
     splash.show()
-    splash.progress(0)
-    modules = ["quantity", "utils", "matplotlib.pyplot", "scipy.linalg", "chem", "interpreter", "gui"]
-    for i, name in enumerate(modules, 1):
-        importlib.import_module(name)
-        splash.progress(50 * i / len(modules))
+    modules = ["pandas", "sympy", "scipy.optimize", "matplotlib.pyplot"]
+    done = []
+
+    def load():
+        for name in modules:
+            importlib.import_module(name)
+            done.append(name)
+
+    def tick():
+        if not loader.is_alive():
+            loop.quit()
+        cap = 50 * (len(done) + 1) // len(modules) - 1
+        splash.bar.setValue(max(50 * len(done) // len(modules), min(splash.bar.value() + 1, cap)))
+        splash.status(f"Indlæser {list(sys.modules)[-1]}")
+
+    loader = threading.Thread(target=load, daemon=True)
+    loop = QEventLoop()
+    timer = QTimer(interval=50)
+    timer.timeout.connect(tick)
+    loader.start()
+    timer.start()
+    loop.exec()
+    timer.stop()
+    splash.status("Indlæser Carbon")
     import gui
+    splash.progress(50)
     gui.main(app, splash)
