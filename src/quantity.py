@@ -201,7 +201,7 @@ class quantity:
     # subtraction for quantities
     def __sub__(self, other):
         if self.dimension != other.dimension:
-            raise ValueError(f"man kan ikke trække {self.current_units} fra {other.current_units}")
+            raise ValueError(f"man kan ikke lægge {self.current_units} sammen med {other.current_units}")
         other_value = (quantity.si_convert(other).value)/(quantity.si_convert(quantity(1, self.dimension, self.current_units)).value)
         value = self.value - other_value
 

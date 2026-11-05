@@ -861,7 +861,7 @@ class EV:
                             else:
                                 if input not in self.help_text:
                                     raise ValueError(
-                                        f"Ukendt funktion {input}, eller ingen hjælpetext til funktionen"
+                                        f"Ukendt funktion {input}, eller ingen hjælpetekst til funktionen"
                                     )
                                 output[pc] = self.help_text[input]
 
