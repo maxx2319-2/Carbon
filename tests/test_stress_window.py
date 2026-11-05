@@ -457,7 +457,6 @@ def test_license_error_keeps_the_typed_key(monkeypatch):
     assert text == "MIN-NØGLE-123"
 
 
-@pytest.mark.xfail(reason="U-06: Esc doesn't cancel renaming a tab", strict=True)
 def test_escape_cancels_a_tab_rename(window):
     window.open_interpreter()
     settle(400)
@@ -466,7 +465,7 @@ def test_escape_cancels_a_tab_rename(window):
     QTest.keyClicks(pill, "abc")
     QTest.keyClick(pill, Qt.Key_Escape)
     settle(200)
-    assert window.tab_name(0) == "Ny Fil"
+    assert window.tab_name(0) == "Ny fil"
 
 
 @pytest.mark.xfail(reason="R-10: long results shrink to 7 px and are cut off in the 27 px output box", strict=True)

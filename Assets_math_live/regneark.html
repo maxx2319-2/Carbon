@@ -534,6 +534,7 @@
     }
 
     const undoStack = [];
+    const redoStack = [];
     let current = null;
 
     function snapshot () {
@@ -544,10 +545,13 @@
 
     function record() {
         const next = snapshot();
-        if (current && JSON.stringify([current.raws, current.modes]) !== JSON.stringify([next.raws, next.modes])) undoStack.push(current);
+        if (current && JSON.stringify([current.raws, current.modes]) !== JSON.stringify([next.raws, next.modes])) { undoStack.push(current); redoStack.length = 0; }
         current = next;
         reportDirty();
+        reportHistory();
     }
+
+    function reportHistory() { bridge?.reportHistory?.(undoStack.length > 0, redoStack.length > 0); }
 
     let savedSheet = "", wasDirty = false;
 
@@ -563,9 +567,13 @@
         reportDirty();
     }
 
-    function undo() {
-        const s = undoStack.pop();
+    function undo() { step(undoStack, redoStack); }
+    function redo() { step(redoStack, undoStack); }
+
+    function step(from, to) {
+        const s = from.pop();
         if (!s) return;
+        to.push(snapshot());
         hideSuggest();
         const all = lines();
         while (all.length > s.raws.length) {
@@ -589,6 +597,7 @@
         current = snapshot();
         updateHint();
         reportDirty();
+        reportHistory();
     }
 
 
@@ -597,6 +606,7 @@
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
         const text = modeOf(mf) === "text";
         mf.mode = text ? "text" : "math";
+        if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) { stop(); clearSel(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); clearSel(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") { stop(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && MODES[e.key]) { stop(); setMode(MODES[e.key], mf); return; }
@@ -967,10 +977,12 @@
         showOutput(rows, lines());
         lines().forEach(rember);
         undoStack.length = 0;
+        redoStack.length = 0;
         current = snapshot();
         updateHint();
         focusLine(first);
         markSaved();
+        reportHistory();
     }
 
 

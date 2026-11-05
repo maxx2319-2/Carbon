@@ -120,6 +120,15 @@ def hover_icon(file):
         icon.addFile(str(hover), QSize(), QIcon.Active)
     return icon
 
+def nav_icon(mirror):
+    icon = QIcon()
+    for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Hover.svg", QIcon.Disabled)):
+        pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(10,10)
+        if mirror:
+            pixmap = pixmap.transformed(QTransform().scale(-1,1))
+        icon.addPixmap(pixmap, mode)
+    return icon
+
 def point_cursor(root):
     for widget in root.findChildren(QAbstractButton) + root.findChildren(QComboBox):
         if not widget.testAttribute(Qt.WA_SetCursor):
@@ -672,6 +681,7 @@ class _InterpreterBridge(QObject):
     modeChanged = Signal(str)
     escaped = Signal()
     dirtyChanged = Signal(bool)
+    historyChanged = Signal(bool, bool)
     leaked = Signal()
 
 
@@ -689,6 +699,10 @@ class _InterpreterBridge(QObject):
     @Slot(bool)
     def reportDirty(self, dirty):
         self.dirtyChanged.emit(dirty)
+
+    @Slot(bool, bool)
+    def reportHistory(self, can_undo, can_redo):
+        self.historyChanged.emit(can_undo, can_redo)
 
     @Slot(str)
     def reportMode(self, mode):
@@ -2373,15 +2387,6 @@ class MainWindow(QMainWindow):
                 self.page_buttons.addButton(btn, page)
             return btn
 
-        def nav_icon(mirror):
-            icon = QIcon()
-            for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Hover.svg", QIcon.Disabled)):
-                pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(10,10)
-                if mirror:
-                    pixmap = pixmap.transformed(QTransform().scale(-1,1))
-                icon.addPixmap(pixmap, mode)
-            return icon
-        
         self.back_btn = make_button("Pointer.svg", "Tilbage", lambda: self.go_history(-1))
         self.forward_btn = make_button("Pointer.svg", "Frem", lambda: self.go_history(1))
         self.back_btn.setIcon(nav_icon(False))
@@ -2655,6 +2660,21 @@ class MainWindow(QMainWindow):
             ("Formel", "formula", "Regnes ikke (Ctrl+3)"),
         ])
         self.line_type.changed.connect(lambda mode: self.interpreter_view.page().runJavaScript(f"setMode({json.dumps(mode)})"))
+        self.undo_btn = QToolButton()
+        self.redo_btn = QToolButton()
+        for btn, mirror, tip, js in ((self.undo_btn, False, "Fortryd (Ctrl+Z)", "undo()"), (self.redo_btn, True, "Gentag (Ctrl+Y)", "redo()")):
+            btn.setIcon(nav_icon(mirror))
+            btn.setIconSize(QSize(14, 14))
+            btn.setToolTip(tip)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setEnabled(False)
+            btn.setStyleSheet(f"""
+                QToolButton {{ border: none; padding: 4px; }}
+                QToolButton:hover {{ background: {SIDEBAR}; border-radius: 3px; }}
+                QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+            """)
+            btn.clicked.connect(lambda _=False, js=js: self.interpreter_view.page().runJavaScript(js))
+            bar_layout.addWidget(btn)
         bar_layout.addWidget(self.line_type)
         bar_layout.addStretch()
 
@@ -2668,7 +2688,15 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Åbn", self.open_regneark)
         file_menu.addAction("Gem", self.save_regneark)
         file_menu.addAction("Gem som", self.save_regneark_as)
+
         QShortcut(QKeySequence.Save, page, self.save_regneark, Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.SaveAs, page, self.save_regneark_as, Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.Open, page, self.open_regneark, Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.AddTab, page, self.new_interpreter_tab, Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.Close, page, lambda: self.close_interpreter_tab(self.interpreter_tabs.currentIndex()), Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.NextChild, page, lambda: self.switch_tab(1), Qt.WidgetWithChildrenShortcut)
+        QShortcut(QKeySequence.PreviousChild, page, lambda: self.switch_tab(-1), Qt.WidgetWithChildrenShortcut)
+        
         file_btn.setIcon(hover_icon("Save.svg"))
         file_btn.setIconSize(QSize(24,24))
         file_btn.setToolTip("Fil")
@@ -2739,6 +2767,7 @@ class MainWindow(QMainWindow):
         bridge.modeChanged.connect(lambda mode: self.line_type.setCurrent(mode) if view is self.interpreter_view else None)
         bridge.escaped.connect(self.restore_window)
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
+        bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
@@ -2771,6 +2800,8 @@ class MainWindow(QMainWindow):
         pill.textEdited.connect(lambda: self.resize_tab(pill))
         pill.editingFinished.connect(lambda: self.finish_rename(pill))
         pill.returnPressed.connect(self.focus_interpreter)
+
+        QShortcut(QKeySequence(Qt.Key_Escape), pill, lambda: (pill.setText(self.renaming), self.focus_interpreter()), Qt.WidgetShortcut)
 
         close = QToolButton()
         close.setIcon(hover_icon("Close.svg"))
@@ -2886,6 +2917,14 @@ class MainWindow(QMainWindow):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:
                 tab.layout().setContentsMargins(6, 0 if i == index else 4, 0, 0)
+        self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
+
+    def update_history_buttons(self, can_undo, can_redo):
+        self.undo_btn.setEnabled(can_undo)
+        self.redo_btn.setEnabled(can_redo)
+
+    def switch_tab(self, step):
+        self.interpreter_tabs.setCurrentIndex((self.interpreter_tabs.currentIndex() + step) % self.interpreter_tabs.count())
 
     def focus_interpreter(self):
         self.interpreter_view.setFocus()
@@ -3149,7 +3188,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         views = [self.interpreter_stack.widget(i) for i in range(self.interpreter_stack.count())]
         text = "Vil du lukke Carbon?\nDet, der ikke er gemt, går tabt."
-        if any(v.property("dirty") for v in views) and not self.ask_close("Luk Carbon", text):
+        if not self.close_confirmed and any(v.property("dirty") for v in views) and not self.ask_close("Luk Carbon", text):
             event.ignore()
             return
         super().closeEvent(event)
