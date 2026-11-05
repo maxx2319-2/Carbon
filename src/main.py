@@ -58,6 +58,7 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = CarbonApp(sys.argv)
+    app.setWindowIcon(QIcon(str(resource_path("Assets/Carbon_Round.svg"))))
     splash = Splash(app)
     splash.show()
     modules = ["pandas", "sympy", "scipy.optimize", "matplotlib.pyplot"]
