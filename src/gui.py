@@ -124,7 +124,7 @@ def hover_icon(file):
 
 def nav_icon(mirror):
     icon = QIcon()
-    for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Hover.svg", QIcon.Disabled)):
+    for file, mode in (("Pointer.svg", QIcon.Normal), ("Pointer_Disabled.svg", QIcon.Disabled)):
         pixmap = QIcon(str(ASSETS_DIR / file)).pixmap(10,10)
         if mirror:
             pixmap = pixmap.transformed(QTransform().scale(-1,1))
@@ -718,7 +718,7 @@ class _InterpreterBridge(QObject):
     historyChanged = Signal(bool, bool)
     leaked = Signal()
     bjerrumExported = Signal(str)
-
+    styleChanged = Signal(bool, bool)
 
     def __init__(self,parent = None):
         super().__init__(parent)
@@ -731,6 +731,9 @@ class _InterpreterBridge(QObject):
     def evaluate_in_worker(data):
         return _InterpreterBridge.evaluate(None, data), threading.active_count() > 1
 
+    @Slot(bool,bool)
+    def setStyle(self, bold, italic):
+        self.styleChanged.emit(bold, italic)
 
     @Slot(bool)
     def reportDirty(self, dirty):
@@ -2742,7 +2745,9 @@ class MainWindow(QMainWindow):
         js = lambda code: self.interpreter_view.page().runJavaScript(code)
         tool_style = f"""
             QToolButton {{ border: none; padding: 2px 6px; color: {BUTTON}; font-size: 14px; }}
-            QToolButton:hover {{ background: {SIDEBAR}; border-radius: 3px; }}
+            QToolButton:hover {{ background: {BG}; border-radius: 3px; }}
+            QToolButton:checked {{ background: {SIDEBAR}; border-radius: 3px; }}
+            QToolButton:disabled {{ color: {SIDEBAR}; }}
             QToolButton::menu-indicator {{ image: none; }}
             QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
         """
@@ -2756,7 +2761,10 @@ class MainWindow(QMainWindow):
         self.size_box.setFixedWidth(30)
         self.size_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.size_box.setValidator(QIntValidator(8, 48, self.size_box))
-        self.size_box.setStyleSheet(f"color: {BUTTON}; background: transparent; border: 1px solid {BUTTON}; border-radius: 3px;")
+        self.size_box.setStyleSheet(f"""
+            QLineEdit {{ color: {BUTTON}; background: transparent; border: 1px solid {BUTTON}; border-radius: 3px; }}
+            QLineEdit:disabled {{ color: {SIDEBAR}; border-color: {SIDEBAR}; }}
+        """)
 
         def set_size(size):
             self.interpreter_view.page().runJavaScript(f"setSize({size})", 0, lambda size: self.size_box.setText(str(int(size))))
@@ -2792,11 +2800,17 @@ class MainWindow(QMainWindow):
         tool("−", "Mindre tekst").clicked.connect(lambda: set_size(int(self.size_box.text() or 18) - 1))
         tools.addWidget(self.size_box)
         tool("+", "Større tekst").clicked.connect(lambda: set_size(int(self.size_box.text() or 18) + 1))
-        tool("B", "Fed (Ctrl+B)", "font-weight: bold;").clicked.connect(lambda: js("format({fontSeries: 'b'}, 'toggle')"))
-        tool("I", "Kursiv (Ctrl+I)", "font-style: italic;").clicked.connect(lambda: js("format({fontShape: 'it'}, 'toggle')"))
+        self.bold_btn = tool("B", "Fed (Ctrl+B)", "font-weight: bold;")
+        self.bold_btn.setCheckable(True)
+        self.bold_btn.clicked.connect(lambda: js("format({fontSeries: 'b'}, 'toggle')"))
+        self.italic_btn = tool("I", "Kursiv (Ctrl+I)", "font-style: italic;")
+        self.italic_btn.setCheckable(True)
+        self.italic_btn.clicked.connect(lambda: js("format({fontShape: 'it'}, 'toggle')"))
         color_menu(tool("A", "Tekstfarve", "font-weight: bold;"), "color", "Tekstfarve")
         marker = tool("", "Fremhævning")
-        marker.setIcon(QIcon(str(ASSETS_DIR / "Highlighter.svg")))
+        marker_icon = QIcon(str(ASSETS_DIR / "Highlighter.svg"))
+        marker_icon.addFile(str(ASSETS_DIR / "Highlighter_Disabled.svg"), QSize(), QIcon.Disabled)
+        marker.setIcon(marker_icon)
         marker.setIconSize(QSize(16, 16))
         color_menu(marker, "backgroundColor", "Fremhævningsfarve")
         bar_layout.addWidget(self.text_tools)
@@ -2889,6 +2903,7 @@ class MainWindow(QMainWindow):
         channel = QWebChannel(view.page())
         bridge = _InterpreterBridge(view)
         bridge.modeChanged.connect(lambda mode: self.show_line_mode(mode) if view is self.interpreter_view else None)
+        bridge.styleChanged.connect(lambda b, i: self.show_style(b, i) if view is self.interpreter_view else None)
         bridge.escaped.connect(self.restore_window)
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
@@ -3036,7 +3051,9 @@ class MainWindow(QMainWindow):
 
     def show_line_mode(self, mode):
         self.line_type.setCurrent(mode)
-        self.size_box.setEnabled(mode == "text")
+        self.text_tools.setEnabled(mode == "text")
+        if mode != "text":
+            self.show_style(False, False)
         self.interpreter_view.page().runJavaScript("sizeOf(lastField ?? first)", 0, lambda size: self.size_box.setText(str(int(size))) if size else None)
 
     def show_interpreter_tab(self, index):
@@ -3048,10 +3065,15 @@ class MainWindow(QMainWindow):
             if tab:
                 tab.layout().setContentsMargins(6, 0 if i == index else 4, 0, 0)
         self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
+        self.interpreter_view.page().runJavaScript("sendStyle(lastField ?? first)")
 
     def update_history_buttons(self, can_undo, can_redo):
         self.undo_btn.setEnabled(can_undo)
         self.redo_btn.setEnabled(can_redo)
+
+    def show_style(self, bold, italic):
+        self.bold_btn.setChecked(bold)
+        self.italic_btn.setChecked(italic)
 
     def switch_tab(self, step):
         self.interpreter_tabs.setCurrentIndex((self.interpreter_tabs.currentIndex() + step) % self.interpreter_tabs.count())

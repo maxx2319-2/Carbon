@@ -517,7 +517,7 @@
         mf.inlineShortcuts = {"*": "\\cdot", "->": "\\to","<->": "\\rightleftharpoons"};
         mf.mathVirtualKeyboardPolicy = "manual";
         mf.addEventListener("keydown", onKey, true);
-        mf.addEventListener("selection-change", () => followCaret(mf));
+        mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
         mf.addEventListener("focusin", () => followCaret(mf));
         mf.addEventListener("copy", e => copySel(e, false), true);
         mf.addEventListener("cut", e => copySel(e, true), true);
@@ -954,8 +954,18 @@
         const mf = lastField ?? first;
         if (modeOf(mf) !== "text") return;
         mf.focus();
-        mf.applyStyle(style, { operation });
+        if (operation === "toggle" && mf.selectionIsCollapsed && mf.queryStyle(style) === "all")
+            mf.applyStyle(Object.fromEntries(Object.keys(style).map(k => [k, "auto"])));
+        else mf.applyStyle(style, { operation });
         record();
+        sendStyle(mf);
+    }
+
+    function sendStyle(mf) {
+        if (!bridge) return;
+        const text = modeOf(mf) === "text";
+        bridge.setStyle(text && mf.queryStyle({fontSeries: "b"}) === "all",
+                        text && mf.queryStyle({fontShape: "it"}) === "all");
     }
 
     const sizeOf = mf => parseInt(mf.style.fontSize) || 18;
