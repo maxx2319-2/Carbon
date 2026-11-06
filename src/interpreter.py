@@ -75,7 +75,7 @@ SAFE_GLOBALS = {
     "__builtins__": {},
     "Symbol": sympy.Symbol, "Integer": sympy.Integer, "Float": sympy.Float, "Rational": sympy.Rational, "Number": sympy.Number, "Function": sympy.Function,
     "integrate": sympy.integrate, "diff": sympy.diff, "limit": sympy.limit, "summation": sympy.summation,
-    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "E": sympy.E,
+    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "e": sympy.E,
 }
 
 def safe_parse(text, local_dict):
