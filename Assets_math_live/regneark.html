@@ -116,7 +116,7 @@
 
     // remove the colours and bold that highlight() adds, keeping everything inside them
     function strip(latex) {
-        for (const [cmd, args] of [["\\textcolor", 2], ["\\mathbf", 1], ["\\bm", 1]]) {
+        for (const [cmd, args] of [["\\textcolor", 2], ["\\colorbox", 2], ["\\mathbf", 1], ["\\bm", 1]]) {
             let i;
             while ((i = latex.indexOf(cmd + "{")) !== -1) {
                 let j = i + cmd.length;
@@ -148,7 +148,8 @@
     const MODES = {"1":"math","2":"text","3": "formula"};
     const modeOf = mf => mf.dataset.mode ?? "math";
     const reportMode = mf => bridge?.reportMode(modeOf(mf));
-    const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(raw) : raw;
+    const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(strip(raw)) : raw;
+    const clean = (mf, latex) => modeOf(mf) === "text" ? latex : strip(latex);
 
 
     function applyMode(mf,mode) {
@@ -166,7 +167,7 @@
     // recolour after every keystroke, keeping the cursor where it was
     function recolour(mf) {
         if (mf.recolouring) return;
-        const raw = strip(mf.value);
+        const raw = clean(mf, mf.value);
         if (styled(mf, raw) !== mf.value) setLine(mf, raw, mf.position);
     }
 
@@ -438,13 +439,13 @@
     function selectedText() {
         const [a, b] = ordered(), all = lines();
         return all.slice(all.indexOf(a.mf), all.indexOf(b.mf) + 1)
-            .map(mf => strip(mf.getValue(mf === a.mf ? a.offset : 0, mf === b.mf ? b.offset : mf.lastOffset, "latex")))
+            .map(mf => clean(mf, mf.getValue(mf === a.mf ? a.offset : 0, mf === b.mf ? b.offset : mf.lastOffset, "latex")))
             .join("\n");
     }
 
     function deleteSel() {
         const [a, b] = ordered(), all = lines();
-        const raw = strip(a.mf.getValue(0, a.offset, "latex")) + strip(b.mf.getValue(b.offset, b.mf.lastOffset, "latex"));
+        const raw = clean(a.mf, a.mf.getValue(0, a.offset, "latex")) + clean(b.mf, b.mf.getValue(b.offset, b.mf.lastOffset, "latex"));
         clearSel();
         for (const mf of all.slice(all.indexOf(a.mf), all.indexOf(b.mf) + 1)) {
             clearOutput(mf);
@@ -475,12 +476,12 @@
 
         clearOutput(mf);
         if (!rest.length) { mf.insert(head); record(); return; }
-        const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
-        setLine(mf, strip(mf.getValue(0, mf.position, "latex")) + head);
+        const after = clean(mf, mf.getValue(mf.position, mf.lastOffset, "latex"));
+        setLine(mf, clean(mf, mf.getValue(0, mf.position, "latex")) + head);
         let last = mf;
         for (const raw of rest) last = newLine(last, raw, modeOf(mf));
         const end = last.lastOffset;
-        setLine(last, strip(last.value) + after, end);
+        setLine(last, clean(last, last.value) + after, end);
         last.focus();
         last.position = end;
         record();
@@ -526,11 +527,12 @@
         mf.shadowRoot.append(style);
     }
 
-    function newLine(after = null, raw = "", mode = "math") {
+    function newLine(after = null, raw = "", mode = "math", size = "") {
         const mf = new MathfieldElement();
         if (after) after.after(mf); else editor.append(mf);
         setupField(mf);
         applyMode(mf, mode);
+        mf.style.fontSize = size;
         setLine(mf, raw);
         mf.addEventListener("input", () => { const text = modeOf(mf) === "text"; clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (!text) updateSuggest(mf); record(); });
         mf.addEventListener("blur",hideSuggest);
@@ -544,12 +546,12 @@
     function snapshot () {
         const all = lines();
         const mf = document.activeElement;
-        return {raws: all.map(l => strip(l.value)), modes: all.map(modeOf), line: all.indexOf(mf), position: mf?.position ?? 0};
+        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), line: all.indexOf(mf), position: mf?.position ?? 0};
     }
 
     function record() {
         const next = snapshot();
-        if (current && JSON.stringify([current.raws, current.modes]) !== JSON.stringify([next.raws, next.modes])) { undoStack.push(current); redoStack.length = 0; }
+        if (current && JSON.stringify([current.raws, current.modes, current.sizes]) !== JSON.stringify([next.raws, next.modes, next.sizes])) { undoStack.push(current); redoStack.length = 0; }
         current = next;
         reportDirty();
         reportHistory();
@@ -587,9 +589,10 @@
         }
         while (all.length < s.raws.length) all.push(newLine());
         all.forEach((mf,i) =>{
-            if (strip(mf.value) === s.raws[i] && modeOf(mf) === s.modes[i]) return;
+            if (clean(mf, mf.value) === s.raws[i] && modeOf(mf) === s.modes[i] && mf.style.fontSize === s.sizes[i]) return;
             clearOutput(mf);
             applyMode(mf, s.modes[i]);
+            mf.style.fontSize = s.sizes[i];
             setLine(mf,s.raws[i]);
             rember(mf);
 
@@ -609,11 +612,13 @@
         const mf = e.currentTarget;
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
         const text = modeOf(mf) === "text";
-        mf.mode = text ? "text" : "math";
+        if (mf.selectionIsCollapsed || (e.key.length === 1 && !e.ctrlKey && !e.metaKey)) mf.mode = text ? "text" : "math";
         if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) { stop(); clearSel(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); clearSel(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") { stop(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && MODES[e.key]) { stop(); setMode(MODES[e.key], mf); return; }
+        if (text && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { stop(); format({fontSeries: "b"}, "toggle"); return; }
+        if (text && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i") { stop(); format({fontShape: "it"}, "toggle"); return; }
         if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.startsWith("Arrow") && !isOut(mf)) {
             const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
             const edge = e.key === "ArrowLeft" ? mf.position === 0 && prevLine(mf) : mf.position === mf.lastOffset && nextLine(mf);
@@ -681,10 +686,10 @@
             // split the line at the cursor, like a normal text editor
             stop();
             clearOutput(mf);
-            const before = strip(mf.getValue(0, mf.position, "latex"));
-            const after = strip(mf.getValue(mf.position, mf.lastOffset, "latex"));
+            const before = clean(mf, mf.getValue(0, mf.position, "latex"));
+            const after = clean(mf, mf.getValue(mf.position, mf.lastOffset, "latex"));
             setLine(mf, before);
-            focusLine(newLine(mf, after, modeOf(mf)), "start");
+            focusLine(newLine(mf, after, modeOf(mf), mf.style.fontSize), "start");
             record();
             return;
         }
@@ -694,7 +699,7 @@
             clearOutput(prev);
             clearOutput(mf);
             const join = prev.lastOffset;
-            setLine(prev, strip(prev.value) + strip(mf.value));
+            setLine(prev, clean(prev, prev.value) + clean(mf, mf.value));
             mf.remove();
             prev.focus();
             prev.position = join;
@@ -706,7 +711,7 @@
             clearOutput(mf);
             clearOutput(next);
             const join = mf.lastOffset;
-            setLine(mf, strip(mf.value) + strip(next.value), join);
+            setLine(mf, clean(mf, mf.value) + clean(next, next.value), join);
             next.remove();
             record();
             return;
@@ -937,11 +942,32 @@
             if (isOut(line) || modeOf(line) === mode || modeOf(line) === "section") continue;
             clearOutput(line);
             applyMode(line, mode);
+            if (mode !== "text") line.style.fontSize = "";
             setLine(line, strip(line.value), line.position);
         }
         if (sel) paint(); else mf.focus();
         reportMode(mf);
         record();
+    }
+
+    function format(style, operation = "set") {
+        const mf = lastField ?? first;
+        if (modeOf(mf) !== "text") return;
+        mf.focus();
+        mf.applyStyle(style, { operation });
+        record();
+    }
+
+    const sizeOf = mf => parseInt(mf.style.fontSize) || 18;
+
+    function setSize(size) {
+        const mf = lastField ?? first;
+        if (modeOf(mf) !== "text") return sizeOf(mf);
+        size = Math.min(Math.max(size, 8), 48);
+        mf.style.fontSize = size === 18 ? "" : size + "px";
+        mf.focus();
+        record();
+        return size;
     }
 
     function setAccent(c) { document.documentElement.style.setProperty("--accent", c); }
@@ -963,7 +989,7 @@
 
     function getSheet(){
         return [...editor.children].map(el => {
-            if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", strip(el.value), modeOf(el)];
+            if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", clean(el, el.value), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
             if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
             if (el.querySelector("img")) return ["image", el.querySelector("img").src];
             return [el.classList.contains("error") ? "error" : "result", el.value];
@@ -976,9 +1002,10 @@
         for (const el of [...editor.children]) if (el !== first) el.remove();
         const code = rows.filter(([kind]) => kind === "code");
         applyMode(first, code[0]?.[2] ?? "math");
+        first.style.fontSize = code[0]?.[3] ?? "";
         setLine(first, code[0]?.[1] ?? "");
         let last = first;
-        for (const [, raw, mode] of code.slice(1)) last = newLine(last, raw, mode);
+        for (const [, raw, mode, size] of code.slice(1)) last = newLine(last, raw, mode, size);
         rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
         showOutput(rows, lines());
         lines().forEach(rember);

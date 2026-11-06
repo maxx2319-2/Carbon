@@ -90,6 +90,7 @@ from PySide6.QtGui import (
     QCursor,
     QShortcut,
     QKeySequence,
+    QIntValidator,
 )
 import re
 import interpreter
@@ -2733,6 +2734,72 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda _=False, js=js: self.interpreter_view.page().runJavaScript(js))
             bar_layout.addWidget(btn)
         bar_layout.addWidget(self.line_type)
+
+        self.text_tools = QWidget()
+        tools = QHBoxLayout(self.text_tools)
+        tools.setContentsMargins(12, 0, 0, 0)
+        tools.setSpacing(2)
+        js = lambda code: self.interpreter_view.page().runJavaScript(code)
+        tool_style = f"""
+            QToolButton {{ border: none; padding: 2px 6px; color: {BUTTON}; font-size: 14px; }}
+            QToolButton:hover {{ background: {SIDEBAR}; border-radius: 3px; }}
+            QToolButton::menu-indicator {{ image: none; }}
+            QToolTip {{ background-color: {BUTTON}; color: {TEXT}; border: 1px solid {HEADER}; }}
+        """
+        menu_style = f"""
+            QMenu {{ background-color: {BUTTON}; color: {TEXT}; border: none; }}
+            QMenu::item {{ padding: 6px 20px; }}
+            QMenu::item:selected {{ background-color: {HOVER}; }}
+        """
+        self.size_box = QLineEdit("18")
+        self.size_box.setAlignment(Qt.AlignCenter)
+        self.size_box.setFixedWidth(30)
+        self.size_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.size_box.setValidator(QIntValidator(8, 48, self.size_box))
+        self.size_box.setStyleSheet(f"color: {BUTTON}; background: transparent; border: 1px solid {BUTTON}; border-radius: 3px;")
+
+        def set_size(size):
+            self.interpreter_view.page().runJavaScript(f"setSize({size})", 0, lambda size: self.size_box.setText(str(int(size))))
+
+        def type_size():
+            set_size(int(self.size_box.text()))
+            self.focus_interpreter()
+
+        self.size_box.returnPressed.connect(type_size)
+
+        def pick_color(prop, title):
+            color = QColorDialog.getColor(Qt.white, self, title)
+            if color.isValid():
+                js(f"format({json.dumps({prop: color.name()})})")
+
+        def tool(text, tip, style=""):
+            btn = QToolButton()
+            btn.setText(text)
+            btn.setToolTip(tip)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setStyleSheet(tool_style + f"QToolButton {{ {style} }}")
+            tools.addWidget(btn)
+            return btn
+
+        def color_menu(btn, prop, title):
+            menu = QMenu(btn)
+            menu.setStyleSheet(menu_style)
+            menu.addAction("Vælg farve…", lambda: pick_color(prop, title))
+            menu.addAction("Ingen farve", lambda: js(f"format({json.dumps({prop: 'none'})})"))
+            btn.setMenu(menu)
+            btn.setPopupMode(QToolButton.InstantPopup)
+
+        tool("−", "Mindre tekst").clicked.connect(lambda: set_size(int(self.size_box.text() or 18) - 1))
+        tools.addWidget(self.size_box)
+        tool("+", "Større tekst").clicked.connect(lambda: set_size(int(self.size_box.text() or 18) + 1))
+        tool("B", "Fed (Ctrl+B)", "font-weight: bold;").clicked.connect(lambda: js("format({fontSeries: 'b'}, 'toggle')"))
+        tool("I", "Kursiv (Ctrl+I)", "font-style: italic;").clicked.connect(lambda: js("format({fontShape: 'it'}, 'toggle')"))
+        color_menu(tool("A", "Tekstfarve", "font-weight: bold;"), "color", "Tekstfarve")
+        marker = tool("", "Fremhævning")
+        marker.setIcon(QIcon(str(ASSETS_DIR / "Highlighter.svg")))
+        marker.setIconSize(QSize(16, 16))
+        color_menu(marker, "backgroundColor", "Fremhævningsfarve")
+        bar_layout.addWidget(self.text_tools)
         bar_layout.addStretch()
 
         file_btn = QToolButton()
@@ -2821,7 +2888,7 @@ class MainWindow(QMainWindow):
         view.page().setBackgroundColor(QColor(BG))
         channel = QWebChannel(view.page())
         bridge = _InterpreterBridge(view)
-        bridge.modeChanged.connect(lambda mode: self.line_type.setCurrent(mode) if view is self.interpreter_view else None)
+        bridge.modeChanged.connect(lambda mode: self.show_line_mode(mode) if view is self.interpreter_view else None)
         bridge.escaped.connect(self.restore_window)
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
@@ -2967,10 +3034,15 @@ class MainWindow(QMainWindow):
         pill.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.resize_tab(pill)
 
+    def show_line_mode(self, mode):
+        self.line_type.setCurrent(mode)
+        self.size_box.setEnabled(mode == "text")
+        self.interpreter_view.page().runJavaScript("sizeOf(lastField ?? first)", 0, lambda size: self.size_box.setText(str(int(size))) if size else None)
+
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
-        self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.line_type.setCurrent(mode) if mode else None)
+        self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.show_line_mode(mode) if mode else None)
         for i in range(self.interpreter_tabs.count()):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:
