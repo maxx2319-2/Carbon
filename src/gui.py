@@ -3010,6 +3010,8 @@ class MainWindow(QMainWindow):
     def remove_interpreter_tab(self, view, used):
         if self.interpreter_stack.indexOf(view) < 0:
             return
+        if used:
+            self.interpreter_tabs.setCurrentIndex(self.interpreter_stack.indexOf(view))
         if used and not self.ask_close("Luk side", f"Vil du lukke {self.tab_name(self.interpreter_stack.indexOf(view))}?\nDet, der ikke er gemt, går tabt."):
             return
         view.findChild(_InterpreterBridge).pool.terminate()
@@ -3356,10 +3358,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         views = [self.interpreter_stack.widget(i) for i in range(self.interpreter_stack.count())]
-        text = "Vil du lukke Carbon?\nDet, der ikke er gemt, går tabt."
-        if not self.close_confirmed and any(v.property("dirty") for v in views) and not self.ask_close("Luk Carbon", text):
-            event.ignore()
-            return
+        dirty = [v for v in views if v.property("dirty")]
+        if not self.close_confirmed and dirty:
+            self.slide_to(self.stack.widget(1))
+            self.interpreter_tabs.setCurrentIndex(self.interpreter_stack.indexOf(dirty[0]))
+            names = ", ".join(self.tab_name(self.interpreter_stack.indexOf(v)) for v in dirty)
+            if not self.ask_close("Luk Carbon", f"Vil du lukke Carbon?\n{names} er ikke gemt og går tabt."):
+                event.ignore()
+                return
         super().closeEvent(event)
 
 def log_error(kind, value, tb):
