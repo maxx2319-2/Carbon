@@ -122,7 +122,8 @@
                 let j = i + cmd.length;
                 for (let a = 1; a < args; a++) j = groupEnd(latex, j);   // skip the colour argument
                 const end = groupEnd(latex, j);
-                latex = latex.slice(0, i) + latex.slice(j + 1, end - 1) + latex.slice(end);
+                const inner = latex.slice(j + 1, end - 1);
+                latex = latex.slice(0, i) + (cmd === "\\colorbox" ? "\\text{" + inner + "}" : inner) + latex.slice(end);
             }
         }
         return latex;
@@ -159,6 +160,7 @@
 
     function setLine(mf, raw, position) {
         mf.recolouring = true;
+        mf._mathfield.model.at(0).style = {};
         mf.value = styled(mf, raw);
         mf.recolouring = false;
         if (position !== undefined) mf.position = Math.min(position, mf.lastOffset);
@@ -686,10 +688,15 @@
             // split the line at the cursor, like a normal text editor
             stop();
             clearOutput(mf);
+            const style = text ? caretStyle(mf) : mf.textStyle;
             const before = clean(mf, mf.getValue(0, mf.position, "latex"));
             const after = clean(mf, mf.getValue(mf.position, mf.lastOffset, "latex"));
             setLine(mf, before);
-            focusLine(newLine(mf, after, modeOf(mf), mf.style.fontSize), "start");
+            const line = newLine(mf, after, modeOf(mf), mf.style.fontSize);
+            line.textSize = text ? mf.style.fontSize : mf.textSize;
+            line.textStyle = style;
+            focusLine(line, "start");
+            if (text) line.applyStyle(style);
             record();
             return;
         }
@@ -937,13 +944,26 @@
         return all.slice(all.indexOf(a.mf), all.indexOf(b.mf) + 1);
     }
 
+    function caretStyle(mf) {
+        const { color, backgroundColor, fontSeries, fontShape } = { ...mf._mathfield.model.at(mf.position).style, ...mf._mathfield.defaultStyle };
+        return { color, backgroundColor, fontSeries, fontShape };
+    }
+
     function setMode(mode, mf = lastField ?? first) {
         for (const line of sel ? selectedLines() : [mf]) {
             if (isOut(line) || modeOf(line) === mode || modeOf(line) === "section") continue;
             clearOutput(line);
+            if (modeOf(line) === "text") {
+                line.textLatex = line.value;
+                line.textSize = line.style.fontSize;
+                line.textStyle = caretStyle(line);
+            }
+            const raw = strip(line.value);
             applyMode(line, mode);
-            if (mode !== "text") line.style.fontSize = "";
-            setLine(line, strip(line.value), line.position);
+            line.style.fontSize = mode === "text" ? line.textSize ?? "" : "";
+            setLine(line, mode === "text" && line.textLatex && strip(line.textLatex) === raw ? line.textLatex : raw, line.position);
+            if (mode !== "text") line.applyStyle({color: "none", backgroundColor: "none"});
+            else if (line.textStyle) line.applyStyle(line.textStyle);
         }
         if (sel) paint(); else mf.focus();
         reportMode(mf);
@@ -968,7 +988,7 @@
                         text && mf.queryStyle({fontShape: "it"}) === "all");
     }
 
-    const sizeOf = mf => parseInt(mf.style.fontSize) || 18;
+    const sizeOf = mf => parseInt(modeOf(mf) === "text" ? mf.style.fontSize : mf.textSize) || 18;
 
     function setSize(size) {
         const mf = lastField ?? first;
@@ -1012,6 +1032,8 @@
         for (const el of [...editor.children]) if (el !== first) el.remove();
         const code = rows.filter(([kind]) => kind === "code");
         applyMode(first, code[0]?.[2] ?? "math");
+        delete first.textLatex;
+        delete first.textSize;
         first.style.fontSize = code[0]?.[3] ?? "";
         setLine(first, code[0]?.[1] ?? "");
         let last = first;
