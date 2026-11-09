@@ -1789,6 +1789,40 @@ def ph_konc_panel():
 
     return body
 
+def mut_panel():
+    body = QWidget()
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(6,6,6,6)
+    layout.setSpacing(6)
+
+    rask_input = PlainField("Rask kæde")
+    layout.addWidget(rask_input)
+
+    mut_input = PlainField("Muteret kæde")
+    layout.addWidget(mut_input)
+
+    calc_btn = QPushButton("Beregn")
+    calc_btn.setStyleSheet(calc_button_style)
+    layout.addWidget(calc_btn)
+
+    output = TextOutput("Mutationstype")
+    output.ensurePolished()
+    output.setFixedHeight(output.fontMetrics().lineSpacing() * 3 + 16)
+    layout.addWidget(output)
+    layout.addStretch()
+
+    def calc():
+        if clear_if_empty(body):
+            return
+        result = interpreter.EV().ev(f"MutationsAnalyse({rask_input.text()}, {mut_input.text()})").get(0, "")
+        output.setText(result)
+
+    calc_btn.clicked.connect(calc)
+    rask_input.returnPressed.connect(calc)
+    mut_input.returnPressed.connect(calc)
+
+    return body
+
 PANELS = {
     "unit": Panel("Enhed","Enhedsomregner", unit_panel),
     "pH": Panel("pH og pOH","pH og pOH Beregning", pH_panel),
@@ -1802,7 +1836,8 @@ PANELS = {
     "dna_peptid": Panel("DNA Translation","DNA Translation",dna_peptid_panel),
     "rna_peptid": Panel("RNA Translation","RNA Translation",rna_peptid_panel),
     "puffer": Panel("Puffer", "pH i Puffer",puffer_panel),
-    "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel)
+    "h3o": Panel("H3O+ og OH-", "H3O+ og OH- koncentration fra pH",ph_konc_panel),
+    "mutation": Panel("Mutation", "Mutationsanalyse", mut_panel),
 }
 
 class SegmentedControl(QWidget):
@@ -2104,7 +2139,8 @@ class MainWindow(QMainWindow):
         self.biotek_page = PanelPage([
             "unit",
             "dna_peptid",
-            "rna_peptid"],
+            "rna_peptid",
+            "mutation"],
             "Biotek_Icon.svg")
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)

@@ -117,6 +117,7 @@ class EV:
             "MasseProcent",
             "DNATilPeptid",
             "RNATilPeptid",
+            "MutationsAnalyse",
             "MængdeBeregning",
             "Puffer",
             "pHTilKoncentration",
@@ -149,6 +150,7 @@ class EV:
             "MasseProcent":"MasseProcent(Praktisk,Teoretisk)",
             "DNATilPeptid":"DNATilPeptid(DNA-streng)",
             "RNATilPeptid":"RNATilPeptid(RNA-streng)",
+            "MutationsAnalyse":"MutationsAnalyse(rask streng, muteret streng)",
             "MængdeBeregning": "MængdeBeregning(m=..,n=..,etc)",
             "Puffer" : "Puffer(Syre koncentration,Base koncentration, pKs)",
             "pHTilKoncentration" : "pHTilKoncentration(pH)",
@@ -180,6 +182,7 @@ class EV:
             "MasseProcent": "MasseProcent(praktisk, teoretisk)\nBeregner masseprocent.\nEks: MasseProcent(12[g], 50[g]) ",
             "DNATilPeptid": "DNATilPeptid(DNA-streng)\nOversætter en DNA-streng til et peptid.\nEks: DNATilPeptid(ATGGCCTAA) ",
             "RNATilPeptid": "RNATilPeptid(RNA-streng)\nOversætter en RNA-streng til et peptid.\nEks: RNATilPeptid(AUGGCCUAA) ",
+            "MutationsAnalyse": "MutationsAnalyse(rask streng, muteret streng)\nSammenligner en rask og en muteret streng og finder mutationstypen.\nEks: MutationsAnalyse(ATGGCCTAA, ATGTCCTAA) ",
             "MængdeBeregning": "MængdeBeregning(m=.., n=.., ...)\nBeregner de manglende størrelser ud fra m, n, M, c, V og p .\nEks: MængdeBeregning(m=10[g], M=58.44[g/mol], V=0.5[l]) ",
             "Puffer": "Puffer(syrekoncentration, basekoncentration, pKs)\nBeregner pH i en puffer med pufferligningen.\nEks: Puffer(0.10, 0.10, 4.76) ",
             "pHTilKoncentration": "pHTilKoncentration(pH)\nBeregner [H3O+] og [OH-] ud fra pH.\nEks: pHTilKoncentration(3.5) ",
@@ -760,6 +763,20 @@ class EV:
                             output[pc] = biotek.RNA_to_peptide(input)
                             pc +=1
 
+                        case 'MutationsAnalyse':
+                            if len(args) !=2:
+                                raise ValueError(self.error_text["MutationsAnalyse"])
+                            rask, muteret = (arg.replace(" ", "").upper() for arg in args)
+                            if rask == "" or muteret == "":
+                                raise ValueError(self.error_text["MutationsAnalyse"])
+                            baser = set(rask + muteret)
+                            if baser - set("ATGC") and baser - set("AUGC"):
+                                raise ValueError("Ugyldig base. Brug kun A, T, G, C (DNA) eller A, U, G, C (RNA)")
+                            if any(len(part) % 3 for arg in args for part in arg.split()[:-1]):
+                                raise ValueError("Mellemrum må kun stå mellem kodoner")
+                            output[pc] = "\n".join(biotek.mutation_analyse(rask, muteret))
+                            pc +=1
+                            
                         case "MængdeBeregning":
                             if len(args) > 6:
                                 raise ValueError(self.error_text["MængdeBeregning"])

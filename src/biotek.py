@@ -201,82 +201,45 @@ def RNA_to_peptide(rna_seq):
         return "Error Antal baser skal gå op i 3"
 
 
-def mutation_analyse(rask, muteret, dr):
-    compared = []
-    divergence = None
-    mutations = {}
-    if len(rask) != len(muteret):
-        raise ValueError("Sekvenser skal være samme længde")
-
-    output = []
-
-    for i, (a, b) in enumerate(zip(rask, muteret)):
-        if a == b:
-            compared.append("I")
-        else:
-            compared.append("M")
-            mutations[i] = [a, b]
-            if divergence is None:
-                divergence = i
-
-    if divergence is None:
+def mutation_analyse(rask, muteret):
+    if rask == muteret:
         return ["Ingen mutation, begge strenge er det samme"]
 
-    max_shift = 12
-    best_shift = None
-    for shift in list(range(1, max_shift + 1)) + list(range(-1, -max_shift - 1, -1)):
-        a_tail = rask[divergence:]
-        b_tail = muteret[divergence + shift :] if shift > 0 else muteret[divergence:]
-        a_cmp = rask[divergence - shift :] if shift < 0 else a_tail
-        b_cmp = b_tail if shift > 0 else muteret[divergence:]
+    start = 0
+    while start < min(len(rask), len(muteret)) and rask[start] == muteret[start]:
+        start += 1
+    end = len(rask)
+    end_mut = len(muteret)
+    while end > start and end_mut > start and rask[end - 1] == muteret[end_mut -1]:
+        end -= 1
+        end_mut -= 1
 
-        n = min(len(a_cmp), len(b_cmp))
-        if n < 4:
+    diff = len(muteret) - len(rask)
+    if diff != 0:
+        n = abs(diff)
+        kind = "Insertion" if diff > 0 else "Deletion"
+        bases = "base" if n == 1 else "baser"
+        shift = "In frame mutation" if n % 3 == 0 else "Frameshift mutation"
+        return [f"{kind} af {n} {bases} ved base nr {start + 1}. {shift}"]
+
+    if len(rask) % 3 != 0:
+        raise ValueError("Kodon længderne går ikke op i 3")
+
+    to_peptide = RNA_to_peptide if "U" in rask + muteret else DNA_to_peptide
+    peptide_sick = [p.strip() for p in to_peptide(muteret).split(",")]
+    peptide_healthy = [p.strip() for p in to_peptide(rask).split(",")]
+
+    output = []
+    for i in range(start, end):
+        if rask[i] == muteret[i]:
             continue
-        matches = sum(1 for x, y in zip(a_cmp[:n], b_cmp[:n]) if x == y)
-        if matches / n > 0.8:
-            best_shift = shift
-            break
-
-    if best_shift is not None and best_shift % 3 != 0:
-        total_gramatik_død = ""
-        if best_shift == 1:
-            total_gramatik_død = "base"
+        amino_sick = peptide_sick[i // 3]
+        amino_healthy = peptide_healthy[i // 3]
+        if amino_healthy == amino_sick:
+            output.append(f"Tavs mutation ved base nr {i + 1}")
+        elif amino_sick == "Stop":
+            output.append(f"Nonsensmutation ved base nr {i + 1}")
         else:
-            total_gramatik_død = "baser"
-        return [
-            f"Frameshift mutation. Forskydning på {best_shift} {total_gramatik_død} ved base nr {divergence + 1}"
-        ]
-    elif best_shift is not None:
-        return [
-            f"In frame mutation. Forskydning på {best_shift} baser ved base nr {divergence + 1}"
-        ]
-
-    if dr == "DNA":
-        peptide_sick = [
-            p.strip() for p in DNA_to_peptide(muteret).split(",") if p.strip()
-        ]
-        peptide_healthy = [
-            p.strip() for p in DNA_to_peptide(rask).split(",") if p.strip()
-        ]
-    elif dr == "RNA":
-        peptide_sick = [
-            p.strip() for p in RNA_to_peptide(muteret).split(",") if p.strip()
-        ]
-        peptide_healthy = [
-            p.strip() for p in RNA_to_peptide(rask).split(",") if p.strip()
-        ]
-
-    for i, part in enumerate(compared):
-        if part == "M":
-            amino_sick = peptide_sick[i // 3]
-            amino_healthy = peptide_healthy[i // 3]
-
-            if amino_healthy == amino_sick:
-                output.append(f"Tavs mutation ved base nr {i + 1}")
-            elif amino_sick == "Stop":
-                output.append(f"Nonsensmutation ved base nr {i + 1}")
-            else:
-                output.append(f"Missensmutation ved base nr {i + 1}")
+            output.append(f"Missensmutation ved base nr {i + 1}")
 
     return output
