@@ -415,6 +415,7 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
 
     list_widget = QListWidget()
     list_widget.setFixedHeight(140)
+    list_widget.setSelectionMode(QListWidget.NoSelection)
     list_widget.setStyleSheet(f"""
         QListWidget {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 12px; }}
         QScrollBar:vertical {{ background: {BUTTON}; }}
@@ -2813,9 +2814,14 @@ class MainWindow(QMainWindow):
         self.size_box.returnPressed.connect(type_size)
 
         def pick_color(prop, title):
-            color = QColorDialog.getColor(Qt.white, self, title)
-            if color.isValid():
-                js(f"format({json.dumps({prop: color.name()})})")
+            dialog = QColorDialog(Qt.white, self)
+            dialog.setWindowTitle(title)
+            dialog.setStyleSheet(f"""
+                QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
+                QPushButton:hover {{ background-color: {HOVER}; }}
+            """)
+            if dialog.exec():
+                js(f"format({json.dumps({prop: dialog.selectedColor().name()})})")
 
         def tool(text, tip, style=""):
             btn = QToolButton()
