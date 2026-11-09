@@ -61,7 +61,7 @@ if __name__ == "__main__":
     app.setWindowIcon(QIcon(str(resource_path("Assets/Carbon_Round.svg"))))
     splash = Splash(app)
     splash.show()
-    modules = ["pandas", "sympy", "scipy.optimize", "matplotlib.pyplot"]
+    modules = ["pandas", "sympy", "scipy.optimize", "matplotlib.pyplot", "mendeleev.fetch"]
     done = []
 
     def load():

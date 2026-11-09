@@ -530,6 +530,49 @@ GREEK = {
     "Upsilon": "Υ", "Phi": "Φ", "Psi": "Ψ", "Omega": "Ω",
 }
 
+ELEMENT_NAMES = """Brint Helium Lithium Beryllium Bor Carbon Kvælstof Ilt Fluor Neon Natrium Magnesium Aluminium Silicium Fosfor
+Svovl Klor Argon Kalium Calcium Scandium Titan Vanadium Krom Mangan Jern Kobolt Nikkel Kobber Zink Gallium Germanium Arsen Selen
+Brom Krypton Rubidium Strontium Yttrium Zirconium Niobium Molybdæn Technetium Ruthenium Rhodium Palladium Sølv Cadmium Indium Tin
+Antimon Tellur Jod Xenon Cæsium Barium Lanthan Cerium Praseodym Neodym Promethium Samarium Europium Gadolinium Terbium Dysprosium
+Holmium Erbium Thulium Ytterbium Lutetium Hafnium Tantal Wolfram Rhenium Osmium Iridium Platin Guld Kviksølv Thallium Bly Bismuth
+Polonium Astat Radon Francium Radium Actinium Thorium Protactinium Uran Neptunium Plutonium Americium Curium Berkelium Californium
+Einsteinium Fermium Mendelevium Nobelium Lawrencium Rutherfordium Dubnium Seaborgium Bohrium Hassium Meitnerium Darmstadtium
+Røntgenium Copernicium Nihonium Flerovium Moscovium Livermorium Tennessin Oganesson""".split()
+
+ELEMENT_SERIES = {
+    1: ("Andre ikkemetaller", "#a8d5a2"), 2: ("Ædelgas", "#c3b1e1"), 3: ("Alkalimetal", "#f4a6a6"),
+    4: ("Jordalkalimetal", "#f6c89f"), 5: ("Halvmetal", "#9fd3c7"), 6: ("Halogen", "#f7e39c"),
+    7: ("Andre metaller", "#c9c9c9"), 8: ("Overgangsmetal", "#a9c8f0"), 9: ("Lanthanid", "#e5b3d6"),
+    10: ("Actinid", "#e0b8a0"),
+}
+
+def element_mass(e):
+    if e.is_radioactive and e.atomic_number not in (90, 91, 92):
+        return f"({e.atomic_weight:.0f})"
+    return f"{e.atomic_weight:.5g}".replace(".", ",")
+
+class VerticalLabel(QWidget):
+    def __init__(self, text, color):
+        super().__init__()
+        self.text, self.color = text, color
+        self.setFixedWidth(24)
+        self.setMinimumHeight(self.fontMetrics().horizontalAdvance(text) + 12)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(self.color))
+        painter.drawRoundedRect(self.rect(), 3, 3)
+        painter.setPen(QColor(TEXT))
+        painter.rotate(90)
+        painter.drawText(QRectF(6, -self.width(), self.height() - 12, self.width()), Qt.AlignLeft | Qt.AlignVCenter, self.text)
+
+class FitView(QGraphicsView):
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fitInView(self.sceneRect(), Qt.KeepAspectRatio)
+
 CALCULUS = re.compile(r"\\(int|sum|lim)(?![A-Za-z])|\\frac\{\\differentialD\}")
 INTEGRAL_PARTS = re.compile(r"\\frac\{\\differentialD\}\{\\differentialD|\\int(?![A-Za-z])|\\differentialD")
 
@@ -2150,6 +2193,7 @@ class MainWindow(QMainWindow):
         self.create_drawer()
         self.create_search()
         self.create_settings_page()
+        self.create_periodic_page()
 
         self.history = [self.stack.currentWidget()]
         self.history_index = 0
@@ -2278,6 +2322,7 @@ class MainWindow(QMainWindow):
             ("Kemi", self.open_kemi, self.kemi_page),
             ("Fysik", self.open_fysik, self.fysik_page),
             ("Biotek", self.open_biotek, self.biotek_page),
+            ("Periodisk system", self.open_periodic, None),
             ("Indstillinger", self.open_settings, None),
             ("Nyheder", self.open_changelog, None),
             ("Afslut", self.close_app, None),
@@ -3171,6 +3216,115 @@ class MainWindow(QMainWindow):
         self.settings_page.setWindowIcon(QIcon(str(ASSETS_DIR / "Settings_Icon.svg")))
         self.stack.addWidget(self.settings_page)
 
+    def create_periodic_page(self):
+        from mendeleev.fetch import fetch_table
+        table = QWidget()
+        table.setStyleSheet("background: transparent;")
+        grid = QGridLayout(table)
+        grid.setContentsMargins(16, 16, 16, 16)
+        grid.setSpacing(3)
+        grid.setRowMinimumHeight(8, 16)
+        number_style = f"color: {HOVER}; font-size: 15px; padding: 0px 6px;"
+        for group in range (1, 19):
+            label = QLabel(str(group))
+            label.setStyleSheet(number_style)
+            grid.addWidget(label, 0, group, Qt.AlignCenter)
+        for row, period in [(p, p) for p in range(1, 8)] + [(9, 6), (10, 7)]:
+            label = QLabel(str(period))
+            label.setStyleSheet(number_style)
+            grid.addWidget(label, row, 0 if row < 8 else 3, Qt.AlignRight | Qt.AlignVCenter)
+
+        self.element_info = QLabel()
+        self.element_info.setStyleSheet(f"color: {BUTTON}; font-size: 13px; padding-left: 12px;")
+        self.element_info.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        grid.addWidget(self.element_info, 1, 3, 3, 5)
+
+        legend = QGridLayout()
+        legend.setSpacing(4)
+        legend.setRowStretch(1, 1)
+        for text, col, span in (("Metal", 0, 5), ("Ikkemetal", 6, 3)):
+            header = QLabel(text)
+            header.setAlignment(Qt.AlignCenter)
+            header.setStyleSheet(f"color: {BUTTON}; font-weight: bold; border: 1px solid {BUTTON}; border-bottom: none; border-top-left-radius: 6px; border-top-right-radius: 6px; padding: 2px;")
+            legend.addWidget(header, 0, col, 1, span)
+        for col, series in ((0, 3), (1, 4), (3, 8), (4, 7), (6, 1), (7, 6), (8, 2)):
+            legend.addWidget(VerticalLabel(*ELEMENT_SERIES[series]), 1, col)
+        legend.addWidget(VerticalLabel(*ELEMENT_SERIES[5]), 0, 5, 2, 1)
+        f_block = QVBoxLayout()
+        f_block.setSpacing(4)
+        for series in (9, 10):
+            name, color = ELEMENT_SERIES[series]
+            box = QLabel(name)
+            box.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            box.setStyleSheet(f"background-color: {color}; color: {TEXT}; border-radius: 3px; padding: 4px;")
+            f_block.addWidget(box)
+        legend.addLayout(f_block, 1, 2)
+        grid.addLayout(legend, 1, 8, 3, 5)
+
+        self.elements = {}
+        for e in fetch_table("elements").itertuples():
+            if math.isnan(e.group_id):
+                row, col = e.period + 3, e.atomic_number - (58 if e.period == 6 else 90) + 4
+            else:
+                row, col = e.period, int(e.group_id)
+            btn = QPushButton()
+            btn.setFixedSize(66, 66)
+            btn.setCheckable(True)
+            btn.setAutoExclusive(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet(f"""
+                QPushButton {{ background-color: {ELEMENT_SERIES[e.series_id][1]}; border: 2px solid transparent; border-radius: 4px; }}
+                QPushButton:hover, QPushButton:checked {{ border-color: {BUTTON}; }}
+            """)
+            cell = QVBoxLayout(btn)
+            cell.setContentsMargins(4, 2, 2, 3)
+            cell.setSpacing(0)
+            for text, style in (
+                (str(e.atomic_number), "font-size: 10px;"),
+                (e.symbol, "font-size: 18px; font-weight: bold;"),
+                (ELEMENT_NAMES[e.atomic_number - 1], "font-size: 9px;"),
+                (element_mass(e), "font-size: 9px;"),
+            ):
+                label = QLabel(text)
+                label.setStyleSheet(f"color: {TEXT}; background: transparent; {style}")
+                label.setAttribute(Qt.WA_TransparentForMouseEvents)
+                cell.addWidget(label)
+            btn.clicked.connect(lambda _=False, e=e: self.show_element(e))
+            grid.addWidget(btn, row, col)
+            self.elements[e.symbol] = (btn, e)
+
+        self.periodic_page = FitView()
+        self.periodic_page.setScene(QGraphicsScene(self.periodic_page))
+        self.periodic_page.scene().addWidget(table)
+        self.periodic_page.setStyleSheet("background: transparent; border: none;")
+        self.periodic_page.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.periodic_page.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.periodic_page.setRenderHint(QPainter.Antialiasing)
+        self.periodic_page.setWindowTitle("Periodisk system")
+
+        btn, e = self.elements["C"]
+        btn.setChecked(True)
+        self.show_element(e)
+        self.stack.addWidget(self.periodic_page)
+
+    def show_element(self, e):
+        sup = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+        config = re.sub(r"([spdf])(\d*)", lambda m: m[1] + (m[2] or "1").translate(sup), e.electronic_configuration)
+        rows = [
+            ("Atomnummer", e.atomic_number),
+            ("Molarmasse", f"{element_mass(e)} g/mol"),
+            ("Elektronegativitet", "–" if math.isnan(e.en_pauling) else str(e.en_pauling).replace(".", ",")),
+            ("Elektronkonfiguration", config),
+            ("Gruppe", "–" if math.isnan(e.group_id) else int(e.group_id)),
+            ("Periode", e.period),
+            ("Type", ELEMENT_SERIES[e.series_id][0]),
+        ]
+        self.element_info.setText(
+            f"<span style='font-size: 30px; font-weight: bold;'>{e.symbol}</span>&nbsp;&nbsp;"
+            f"<span style='font-size: 20px;'>{ELEMENT_NAMES[e.atomic_number - 1]}</span>"
+            "<table cellspacing=1>" + "".join(f"<tr><td>{k}:&nbsp;&nbsp;</td><td><b>{v}</b></td></tr>" for k, v in rows) + "</table>"
+        )
+
     def create_molecule_page(self):
         self.molecule_page = QWidget()
         layout = QVBoxLayout(self.molecule_page)
@@ -3299,6 +3453,9 @@ class MainWindow(QMainWindow):
         self.set_tab_name(self.interpreter_view, Path(path).stem)
         self.interpreter_view.setProperty("path", path)
         self.save_regneark()
+
+    def open_periodic(self):
+        self.slide_to(self.periodic_page)
 
     def open_molecule(self):
         self.slide_to(self.molecule_page)
