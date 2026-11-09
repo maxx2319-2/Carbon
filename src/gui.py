@@ -3320,7 +3320,7 @@ class MainWindow(QMainWindow):
             return
         try:
             rows = json.loads(Path(path).read_text(encoding="utf-8"))["rows"]
-            if not isinstance(rows, list) or not all(isinstance(r, list) and 2 <= len(r) <= 3 and all(isinstance(x, str) for x in r) for r in rows):
+            if not isinstance(rows, list) or not all(isinstance(r, list) and 2 <= len(r) <= 4 and all(isinstance(x, str) for x in r) for r in rows):
                 raise ValueError
         except(OSError, UnicodeError, ValueError, KeyError, TypeError):
             QMessageBox.warning(self, "åbn regneark","filen kunne ikke åbnes. Den er måske corrupted")

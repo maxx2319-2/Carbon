@@ -18,7 +18,7 @@ class CarbonApp(QApplication):
         self.pending_file = None
 
     def event(self, event):
-        if event.type() == QEvent.FileOpen:
+        if event.type() == QEvent.FileOpen and event.file().endswith(".crbn"):
             if self.window:
                 self.window.load_regneark(event.file())
             else:
