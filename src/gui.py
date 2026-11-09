@@ -2190,10 +2190,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.kemi_page)
         self.stack.addWidget(self.fysik_page)
         self.stack.addWidget(self.biotek_page)
+        self.create_periodic_page()
         self.create_drawer()
         self.create_search()
         self.create_settings_page()
-        self.create_periodic_page()
 
         self.history = [self.stack.currentWidget()]
         self.history_index = 0
@@ -2591,6 +2591,11 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(
             make_button("Biotek_Icon.svg", "Biotek", self.open_biotek, 5)
+        )
+        layout.addStretch()
+
+        layout.addWidget(
+            make_button("Periodisk_Icon.svg", "Periodisk system", self.open_periodic, 6)
         )
         layout.addStretch()
 
