@@ -984,8 +984,10 @@
     function sendStyle(mf) {
         if (!bridge) return;
         const text = modeOf(mf) === "text";
+        const { color, backgroundColor } = text ? caretStyle(mf) : {};
         bridge.setStyle(text && mf.queryStyle({fontSeries: "b"}) === "all",
-                        text && mf.queryStyle({fontShape: "it"}) === "all");
+                        text && mf.queryStyle({fontShape: "it"}) === "all",
+                        color ?? "", backgroundColor ?? "");
     }
 
     const sizeOf = mf => parseInt(modeOf(mf) === "text" ? mf.style.fontSize : mf.textSize) || 18;

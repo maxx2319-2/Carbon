@@ -74,6 +74,7 @@ from PySide6.QtCore import (
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 from PySide6.QtGui import (
@@ -718,7 +719,7 @@ class _InterpreterBridge(QObject):
     historyChanged = Signal(bool, bool)
     leaked = Signal()
     bjerrumExported = Signal(str)
-    styleChanged = Signal(bool, bool)
+    styleChanged = Signal(bool, bool, str, str)
 
     def __init__(self,parent = None):
         super().__init__(parent)
@@ -731,9 +732,9 @@ class _InterpreterBridge(QObject):
     def evaluate_in_worker(data):
         return _InterpreterBridge.evaluate(None, data), threading.active_count() > 1
 
-    @Slot(bool,bool)
-    def setStyle(self, bold, italic):
-        self.styleChanged.emit(bold, italic)
+    @Slot(bool, bool, str, str)
+    def setStyle(self, bold, italic, color, highlight):
+        self.styleChanged.emit(bold, italic, color, highlight)
 
     @Slot(bool)
     def reportDirty(self, dirty):
@@ -2842,13 +2843,19 @@ class MainWindow(QMainWindow):
         self.italic_btn = tool("I", "Kursiv (Ctrl+I)", "font-style: italic;")
         self.italic_btn.setCheckable(True)
         self.italic_btn.clicked.connect(lambda: js("format({fontShape: 'it'}, 'toggle')"))
-        color_menu(tool("A", "Tekstfarve", "font-weight: bold;"), "color", "Tekstfarve")
-        marker = tool("", "Fremhævning")
-        marker_icon = QIcon(str(ASSETS_DIR / "Highlighter.svg"))
-        marker_icon.addFile(str(ASSETS_DIR / "Highlighter_Disabled.svg"), QSize(), QIcon.Disabled)
-        marker.setIcon(marker_icon)
-        marker.setIconSize(QSize(16, 16))
-        color_menu(marker, "backgroundColor", "Fremhævningsfarve")
+        def icon_tool(name, tip):
+            btn = tool("", tip, "padding: 4px 6px 0px 6px;")
+            btn.icon_name = name
+            btn.default_icon = QIcon(str(ASSETS_DIR / f"{name}.svg"))
+            btn.default_icon.addFile(str(ASSETS_DIR / f"{name}_Disabled.svg"), QSize(), QIcon.Disabled)
+            btn.setIcon(btn.default_icon)
+            btn.setIconSize(QSize(16, 16))
+            return btn
+
+        self.color_btn = icon_tool("Text_Color", "Tekstfarve")
+        color_menu(self.color_btn, "color", "Tekstfarve")
+        self.marker_btn = icon_tool("Highlighter", "Fremhævning")
+        color_menu(self.marker_btn, "backgroundColor", "Fremhævningsfarve")
         bar_layout.addWidget(self.text_tools)
         bar_layout.addStretch()
 
@@ -2939,7 +2946,7 @@ class MainWindow(QMainWindow):
         channel = QWebChannel(view.page())
         bridge = _InterpreterBridge(view)
         bridge.modeChanged.connect(lambda mode: self.show_line_mode(mode) if view is self.interpreter_view else None)
-        bridge.styleChanged.connect(lambda b, i: self.show_style(b, i) if view is self.interpreter_view else None)
+        bridge.styleChanged.connect(lambda b, i, c, h: self.show_style(b, i, c, h) if view is self.interpreter_view else None)
         bridge.escaped.connect(self.restore_window)
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
@@ -3109,9 +3116,20 @@ class MainWindow(QMainWindow):
         self.undo_btn.setEnabled(can_undo)
         self.redo_btn.setEnabled(can_redo)
 
-    def show_style(self, bold, italic):
+    def show_style(self, bold, italic, color="", highlight=""):
         self.bold_btn.setChecked(bold)
         self.italic_btn.setChecked(italic)
+        for btn, c in ((self.color_btn, color), (self.marker_btn, highlight)):
+            if not c or c == "none":
+                btn.setIcon(btn.default_icon)
+                continue
+            svg = (ASSETS_DIR / f"{btn.icon_name}.svg").read_text(encoding="utf-8")
+            pix = QPixmap(64, 64)
+            pix.fill(Qt.transparent)
+            painter = QPainter(pix)
+            QSvgRenderer(svg.replace('d="M3 22h18"', f'd="M3 22h18" stroke="{c}"').encode()).render(painter)
+            painter.end()
+            btn.setIcon(QIcon(pix))
 
     def switch_tab(self, step):
         self.interpreter_tabs.setCurrentIndex((self.interpreter_tabs.currentIndex() + step) % self.interpreter_tabs.count())
