@@ -828,13 +828,13 @@
             const sx = niceStep(view.x1 - view.x0), sy = niceStep(view.y1 - view.y0);
             const labelY = Math.min(Math.max(py(0) + 14, 14), h - 4);
             const labelX = Math.min(Math.max(px(0) + 4, 4), w - 40);
-            for (let i = Math.ceil(view.x0 / sx); i * sx <= view.x1 && n<50; i++,n++) {
+            for (let i = Math.ceil(view.x0 / sx),n=0; i * sx <= view.x1 && n<50; i++,n++) {
                 const x = i * sx;
                 ctx.strokeStyle = "#28282e";
                 ctx.beginPath(); ctx.moveTo(px(x), 0); ctx.lineTo(px(x), h); ctx.stroke();
                 ctx.fillText(tidy(x, 12), px(x) + 3, labelY);
             }
-            for (let i = Math.ceil(view.y0 / sy); i * sy <= view.y1 && n <50; i++,n++) {
+            for (let i = Math.ceil(view.y0 / sy), n=0; i * sy <= view.y1 && n <50; i++,n++) {
                 const y = i * sy;
                 ctx.strokeStyle = "#28282e";
                 ctx.beginPath(); ctx.moveTo(0, py(y)); ctx.lineTo(w, py(y)); ctx.stroke();

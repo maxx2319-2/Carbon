@@ -1,0 +1,20 @@
+   1.88s  thread imported pandas in 0.56s
+   2.22s  thread imported sympy in 0.34s
+   2.62s  thread imported scipy.optimize in 0.40s
+   2.87s  thread imported matplotlib.pyplot in 0.25s
+   3.26s  thread imported mendeleev.fetch in 0.39s
+   3.26s  thread finished
+   3.26s  splash loop finished
+   3.26s  status: Indlæser Carbon
+   4.34s  import gui took 1.07s
+   4.34s  main thread was blocked for 1.07s
+   4.34s  status: Bygger GUI
+   4.87s  MainWindow.new_interpreter_tab took 0.48s
+   4.88s  MainWindow.create_interpreter_page took 0.51s
+   5.03s  MainWindow.__init__ took 0.69s
+   5.04s  main thread was blocked for 0.71s
+   5.15s  status: Indlæser regneark og molekyletegner
+   6.06s  status: Indlæser molekyletegner
+   7.96s  status: Næsten færdig
+   7.96s  preload took 2.91s
+   7.97s  window shown, startup done

@@ -3,7 +3,7 @@ import sys
 import importlib
 import threading
 
-from PySide6.QtCore import QEvent, QEventLoop, QRectF, Qt, QTimer
+from PySide6.QtCore import QEvent, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QSplashScreen, QProgressBar
@@ -69,21 +69,14 @@ if __name__ == "__main__":
             importlib.import_module(name)
             done.append(name)
 
-    def tick():
-        if not loader.is_alive():
-            loop.quit()
+    loader = threading.Thread(target=load, daemon=True)
+    loader.start()
+    while loader.is_alive():
         cap = 50 * (len(done) + 1) // len(modules) - 1
         splash.bar.setValue(max(50 * len(done) // len(modules), min(splash.bar.value() + 1, cap)))
         splash.status(f"Indlæser {list(sys.modules)[-1]}")
-
-    loader = threading.Thread(target=load, daemon=True)
-    loop = QEventLoop()
-    timer = QTimer(interval=50)
-    timer.timeout.connect(tick)
-    loader.start()
-    timer.start()
-    loop.exec()
-    timer.stop()
+        app.processEvents()
+        loader.join(0.05)
     splash.status("Indlæser Carbon")
     import gui
     splash.progress(50)
