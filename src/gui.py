@@ -2236,7 +2236,7 @@ class MainWindow(QMainWindow):
         """)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(8, 0, 4, 0)
-        title = QLabel(f"Nyheder i {version}")
+        title = QLabel(f"Nyheder i Carbon {version}")
         title.setStyleSheet(f"color: {BUTTON}; font-weight: bold; border: none;")
         header_layout.addWidget(title)
         header_layout.addStretch()
