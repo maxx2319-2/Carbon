@@ -516,7 +516,7 @@
 
     function setupField(mf) {
         mf.mathModeSpace = "\\:";
-        mf.inlineShortcuts = {"*": "\\cdot", "->": "\\to","<->": "\\rightleftharpoons"};
+        mf.inlineShortcuts = {"*": "\\cdot","xx": "\\times", "->": "\\to","<->": "\\rightleftharpoons"};
         mf.mathVirtualKeyboardPolicy = "manual";
         mf.addEventListener("keydown", onKey, true);
         mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
@@ -725,6 +725,7 @@
         }
         if (!text && e.key === "/") { stop(); mf.executeCommand(["insert", "\\frac{#@}{#?}"]); return; }
         if (!text && e.key === "[") { stop(); mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]); return; }
+        if (!text && e.key === "{") { stop(); mf.executeCommand(["insert", "\\left\\lbrace#?\\right\\rbrace"]); return; }
     }
 
     // clicking the empty space below the text continues at the end, like one big text area

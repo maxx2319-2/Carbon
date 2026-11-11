@@ -291,6 +291,8 @@ class EV:
                 continue
 
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
+            vecs = {k for k, v in self.variables.items() if v.var_type == "list"}
+            line = re.sub(r"(\w*)\s*×\s*(\w*)", lambda m: m[0] if m[1] in vecs and m[2] in vecs else f"{m[1]}*{m[2]}", line)
 
             
             
@@ -1023,6 +1025,12 @@ class EV:
             a, op, b = m.groups()
             if a in vecs and b in vecs:
                 return vecs[a] + vecs[b] if op == "+" else vecs[a] - vecs[b]
+        if m := re.fullmatch(r"(\w+)\s*×\s*(\w+)", expr):
+            if m[1] in vecs and m[2] in vecs:
+                return Vector.cross_product(vecs[m[1]],vecs[m[2]])
+        if m := re.fullmatch(r"(\w+)\s*\*\s*(\w+)", expr):
+            if m[1] in vecs and m[2] in vecs:
+                return Vector.dot_product(vecs[m[1]], vecs[m[2]])
         if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
             if m[1] in vecs:
                 return abs(vecs[m[1]])

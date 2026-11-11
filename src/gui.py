@@ -656,7 +656,7 @@ def Latex_to_calc(s: str) -> str:
     s = s.replace(r"\lbrack", "[").replace(r"\rbrack", "]")
     s = s.replace(r"\lbrace", "\x01").replace(r"\rbrace", "\x02")
     s = s.replace(r"\{", "\x01").replace(r"\}", "\x02")
-    s = s.replace(r"\cdot", "*").replace(r"\times", "*")
+    s = s.replace(r"\cdot", "*").replace(r"\times", "×")
     s = s.replace(r"\#", "#")
     
     s = re.sub(r"\\(ln|log|exp)(?![A-Za-z])", r"\1", s)
@@ -674,6 +674,7 @@ def Latex_to_calc(s: str) -> str:
         prev = s
         s = re.sub(r"\\textcolor\{[^{}]*\}\{([^{}]*)\}", r"\1", s)
         s = re.sub(r"\\(?:mathrm|mathbf|text|operatorname)\{([^{}]*)\}", r"\1", s)
+        s = re.sub(r"\\(?:vec|overrightarrow)\{([^{}]*)\}", lambda m: m.group(1) + "\x00vec", s)
         s = re.sub(r"\\frac\s*([^\s{}\\\[\]])", r"\\frac{\1}", s)  # short form: \frac12
         s = re.sub(
             r"\\frac\{([^{}]*)\}\s*([^\s{}\\])", r"\\frac{\1}{\2}", s
@@ -713,6 +714,7 @@ def Latex_to_calc(s: str) -> str:
 
 def calc_to_latex(s) -> str:
     s = str(s).replace("{", "\x01").replace("}", "\x02")
+    s = re.sub(r"(?<![\w\\])([^\W\d]\w*?)(?:\\_|_)vec(?!\w)", r"\\overrightarrow{\1}", s)
     s = re.sub(r"sqrt\(([^()]*)\)", r"\\sqrt{\1}", s)
 
     s = re.sub(r"\d+\.\d{7,}(?:e[+-]?\d+)?", lambda m: f"{float(m.group()):.6g}", s)
@@ -750,7 +752,13 @@ def latex_text(s):
         "^": r"\^{}",
         "~": r"\~{}",
     }
-    return r"\text{" + "".join(esc.get(c, c) for c in s) + "}"
+    text = lambda p: r"\text{" + "".join(esc.get(c, c) for c in p) + "}"
+    parts = re.split(r"(?<!\w)([^\W\d]\w*?)_vec(?!\w)", s)
+    return "".join(
+        r"\overrightarrow{" + text(p) + "}" if i % 2 else text(p)
+        for i, p in enumerate(parts)
+        if p or len(parts) == 1
+    )
 
 
 
@@ -2801,6 +2809,13 @@ class MainWindow(QMainWindow):
                 ("Σ", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
+            ("Vektorer",symbol_grid([
+                ("v",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
+                ("a×b",r"\overrightarrow{#?}\times\overrightarrow{#?}"),
+                ("a*b",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
+                ("a+b",r"\overrightarrow{#?}+\overrightarrow{#?}"),
+                ("a-b",r"\overrightarrow{#?}-\overrightarrow{#?}"),
+            ],insert))
         ]))
 
         bar = QWidget()

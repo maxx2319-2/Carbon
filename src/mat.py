@@ -62,6 +62,6 @@ class Vector:
             raise ValueError("du kan kun lave kryds product med 3d vektorer")
         a = [float(x) for x in a.cordinates]
         b = [float(x) for x in b.cordinates]
-        return Vector([a[1]*b[2] - a[2]*b[1],
-                a[2]*b[0] - a[0]*b[2],
-                a[0]*b[1] - a[1]*b[0]])
+        return Vector([str(a[1]*b[2] - a[2]*b[1]),
+            str(a[2]*b[0] - a[0]*b[2]),
+            str(a[0]*b[1] - a[1]*b[0])])
