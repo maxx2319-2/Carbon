@@ -96,6 +96,7 @@ from PySide6.QtGui import (
 import re
 import interpreter
 import chem
+from mat import Vector
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import biotek
 import license_manager
@@ -711,7 +712,7 @@ def Latex_to_calc(s: str) -> str:
 
 
 def calc_to_latex(s) -> str:
-    s = str(s)
+    s = str(s).replace("{", "\x01").replace("}", "\x02")
     s = re.sub(r"sqrt\(([^()]*)\)", r"\\sqrt{\1}", s)
 
     s = re.sub(r"\d+\.\d{7,}(?:e[+-]?\d+)?", lambda m: f"{float(m.group()):.6g}", s)
@@ -732,7 +733,7 @@ def calc_to_latex(s) -> str:
         .replace("->", r"\to ")
         .replace("*", r"\cdot ")
     )
-    s = s.replace(" ", r"\ ")
+    s = s.replace(" ", r"\ ").replace("\x01", r"\{").replace("\x02", r"\}")
     return r"\mathrm{" + s + "}"
 
 
@@ -841,6 +842,10 @@ class _InterpreterBridge(QObject):
                 try:
                     if isinstance(value, chem.BjerrumExport):
                         rows.append(["bjerrum", json.dumps(value.pks)])
+                        continue
+
+                    if isinstance(value, Vector):
+                        rows.append(["result", r"\Rightarrow\:\begin{pmatrix}" + r"\\".join(calc_to_latex(c) for c in value.cordinates) + r"\end{pmatrix}"])
                         continue
 
                     if isinstance(value, dict):

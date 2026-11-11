@@ -22,12 +22,16 @@ class Vector:
           return "{" + v + "}"
 
     def __add__(self, other):
+        if len(self) != len(other):
+            raise ValueError("vektorerne skal have samme længde")
         result = []
         for x,y in zip(self.cordinates,other.cordinates):
             result.append(str(float(x) + float(y)))
         return Vector(result)
 
     def __sub__(self, other):
+        if len(self) != len(other):
+            raise ValueError("vektorerne skal have samme længde")
         result = []
         for x,y in zip(self.cordinates,other.cordinates):
             result.append(str(float(x) - float(y)))
@@ -54,10 +58,10 @@ class Vector:
         return v
     @staticmethod
     def cross_product(a, b):
-        if len(a) != 3 and len(b) != 3:
+        if len(a) != 3 or len(b) != 3:
             raise ValueError("du kan kun lave kryds product med 3d vektorer")
         a = [float(x) for x in a.cordinates]
         b = [float(x) for x in b.cordinates]
-        return [a[1]*b[2] - a[2]*b[1],
+        return Vector([a[1]*b[2] - a[2]*b[1],
                 a[2]*b[0] - a[0]*b[2],
-                a[0]*b[1] - a[1]*b[0]]
+                a[0]*b[1] - a[1]*b[0]])

@@ -7,6 +7,7 @@ import biotek
 import json
 import sympy 
 import keyword
+from mat import Vector
 from sympy import simplify
 import numpy as np
 from matplotlib.figure import Figure
@@ -91,8 +92,12 @@ def safe_parse(text, local_dict):
 
 class Variables:
     def __init__(self, value, var_type):
-        self.value = str(value)
-        self.var_type = str(var_type)
+        if var_type != "list":
+            self.value = str(value)
+            self.var_type = str(var_type)
+        else:
+            self.value = value
+            self.var_type = str(var_type)
 
     def __str__(self):
         return f"{self.value} {self.var_type}"
@@ -962,12 +967,10 @@ class EV:
                                 )
 
                             elif '{' in b or '}' in b:
-                                if '{' not in b or not '}' in b:
-                                    raise ValueError("Du skal slutte og starte en liste med { og }")
+                                self.variables[a] = Variables(Vector.create_vector(b),"list")
 
-                               
-                                self.variables[a] = Variables(b,"list")
-
+                            elif (r := self.vector_ev(b)) is not None:
+                                self.variables[a] = Variables(r, "list" if isinstance(r, Vector) else "Quantity")
 
                             else:
                                 self.variables[a] = Variables(
@@ -979,6 +982,10 @@ class EV:
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
                             output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
+                            pc += 1
+
+                        elif (r := self.vector_ev(line)) is not None:
+                            output[pc] = r
                             pc += 1
 
                         else:
@@ -1007,6 +1014,20 @@ class EV:
             self._pattern_dirty = False
         return self._pattern
 
+    def vector_ev(self, expr):
+        vecs = {k: v.value for k, v in self.variables.items() if v.var_type == "list"}
+        expr = expr.strip()
+        if expr in vecs:
+            return vecs[expr]
+        if m := re.fullmatch(r"(\w+)\s*([+-])\s*(\w+)", expr):
+            a, op, b = m.groups()
+            if a in vecs and b in vecs:
+                return vecs[a] + vecs[b] if op == "+" else vecs[a] - vecs[b]
+        if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
+            if m[1] in vecs:
+                return abs(vecs[m[1]])
+        return None
+
     def prep_ev(self, expr):
         expr = str(expr)
         pattern = self._get_pattern()
@@ -1016,7 +1037,7 @@ class EV:
                 parts[i] = pattern.sub(
                     lambda m: "(" + self.variables[m.group(0)].value + ")"
                     if self.variables[m.group(0)].var_type.lower() == "quantity"
-                    else self.variables[m.group(0)].value,
+                    else str(self.variables[m.group(0)].value),
                     parts[i],
                 )
             expr = "".join(parts)
