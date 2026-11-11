@@ -462,6 +462,10 @@ class EV:
                             output[pc] = sympy.N(simplify(self.prep_sympy(args[0])))
                             pc +=1
 
+                        case 'Plot' if args and all(a.strip() in self.variables and self.variables[a.strip()].var_type == "list" for a in args):
+                            output[pc] = Vector.plot(*(self.variables[a.strip()].value for a in args))
+                            pc += 1
+
                         case 'Plot':
                             start = None
                             end = None
