@@ -2822,7 +2822,7 @@ class MainWindow(QMainWindow):
                 ("|v|",r"\lvert\overrightarrow{#?}\rvert"),
                 ("Det(v)",r"Det(\overrightarrow{#?})"),
                 ("enheds vektor",r"EnhedsVektor(\overrightarrow{#?})"),
-                ("vinkel mellem a og b","VinkelVektor(\overrightarrow{#?},\overrightarrow{#?})"),
+                ("vinkel mellem a og b",r"VinkelVektor(\overrightarrow{#?},\overrightarrow{#?})"),
                 ("tværvektor",r"\hat{\overrightarrow{#?}}"),
                 ("Projektion",r"\overrightarrow{#?}_{\text{#?}}"),
 
