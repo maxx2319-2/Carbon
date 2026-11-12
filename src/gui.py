@@ -653,6 +653,8 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\rightleftharpoons(?![A-Za-z])\s*", "<->", s)
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
     s = s.replace(r"\left", "").replace(r"\right", "")
+    s = re.sub(r"\\[lr]?vert(?![A-Za-z])", "|", s)
+    s = re.sub(r"\|([^|]*)\|", r"Abs(\1)", s)
     s = s.replace(r"\lbrack", "[").replace(r"\rbrack", "]")
     s = s.replace(r"\lbrace", "\x01").replace(r"\rbrace", "\x02")
     s = s.replace(r"\{", "\x01").replace(r"\}", "\x02")
@@ -2810,11 +2812,13 @@ class MainWindow(QMainWindow):
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
             ("Vektorer",symbol_grid([
-                ("v",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
+                ("v",r"\overrightarrow{#?}"),
+                ("v =",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
                 ("a×b",r"\overrightarrow{#?}\times\overrightarrow{#?}"),
                 ("a*b",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
                 ("a+b",r"\overrightarrow{#?}+\overrightarrow{#?}"),
                 ("a-b",r"\overrightarrow{#?}-\overrightarrow{#?}"),
+                ("|v|",r"\lvert\overrightarrow{#?}\rvert")
             ],insert))
         ]))
 
