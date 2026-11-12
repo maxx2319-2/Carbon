@@ -800,17 +800,6 @@
 
         }
 
-    function addSection() {
-        clearSel();
-        let at = lastField ?? first;
-        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
-        const header = newLine(at,"","section");
-        newLine(header);
-        focusLine(header);
-        record();
-    }
-
-
         function draw() {
             const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio;
             canvas.width = w*dpr;
@@ -891,6 +880,16 @@
 
         requestAnimationFrame(draw);
         return el;
+    }
+
+    function addSection() {
+        clearSel();
+        let at = lastField ?? first;
+        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
+        const header = newLine(at,"","section");
+        newLine(header);
+        focusLine(header);
+        record();
     }
 
 
