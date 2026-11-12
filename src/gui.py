@@ -3028,7 +3028,7 @@ class MainWindow(QMainWindow):
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
-        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
+        view.loadFinished.connect(lambda ok: self.interpreter_loaded(view))
         view.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
         self.interpreter_stack.addWidget(view)
         index = self.interpreter_tabs.addTab("")
@@ -3180,13 +3180,20 @@ class MainWindow(QMainWindow):
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
-        self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.show_line_mode(mode) if mode else None)
         for i in range(self.interpreter_tabs.count()):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:
                 tab.layout().setContentsMargins(6, 0 if i == index else 4, 0, 0)
-        self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
-        self.interpreter_view.page().runJavaScript("sendStyle(lastField ?? first)")
+        if getattr(self.interpreter_view, "loaded", False):
+            self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.show_line_mode(mode) if mode else None)
+            self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
+            self.interpreter_view.page().runJavaScript("sendStyle(lastField ?? first)")
+
+    def interpreter_loaded(self, view):
+        view.loaded = True
+        view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})")
+        if view is self.interpreter_view:
+            self.show_interpreter_tab(self.interpreter_tabs.currentIndex())
 
     def update_history_buttons(self, can_undo, can_redo):
         self.undo_btn.setEnabled(can_undo)
