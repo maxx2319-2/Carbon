@@ -2818,7 +2818,18 @@ class MainWindow(QMainWindow):
                 ("a*b",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
                 ("a+b",r"\overrightarrow{#?}+\overrightarrow{#?}"),
                 ("a-b",r"\overrightarrow{#?}-\overrightarrow{#?}"),
-                ("|v|",r"\lvert\overrightarrow{#?}\rvert")
+                ("k*v",r"{#?}\cdot\overrightarrow{#?}"),
+                ("|v|",r"\lvert\overrightarrow{#?}\rvert"),
+                ("Det(v)",r"Det(\overrightarrow{#?})"),
+                ("enheds vektor",r"EnhedsVektor(\overrightarrow{#?})"),
+                ("vinkel mellem a og b","VinkelVektor(\overrightarrow{#?},\overrightarrow{#?})"),
+                ("tværvektor",r"\hat{\overrightarrow{#?}}"),
+                ("Projektion",r"\overrightarrow{#?}_{\text{#?}}"),
+
+
+
+             
+
             ],insert))
         ]))
 
