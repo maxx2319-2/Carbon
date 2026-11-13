@@ -4,7 +4,7 @@ import importlib
 import threading
 
 from PySide6.QtCore import QEvent, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon
+from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon, QFontDatabase
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QSplashScreen, QProgressBar
 
@@ -78,6 +78,8 @@ if __name__ == "__main__":
         app.processEvents()
         loader.join(0.05)
     splash.status("Indlæser Carbon")
+    import matplotlib
+    QFontDatabase.addApplicationFont(f"{matplotlib.get_data_path()}/fonts/ttf/DejaVuSans.ttf")
     import gui
     splash.progress(50)
     gui.main(app, splash)

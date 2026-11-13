@@ -670,6 +670,8 @@
         if (e.key === "ArrowDown" && down) { stop(); focusLine(down); return; }
         if (e.key === "ArrowLeft" && atStart && up) { stop(); focusLine(up, "end"); return; }
         if (e.key === "ArrowRight" && atEnd && down) { stop(); focusLine(down, "start"); return; }
+        const atom = mf._mathfield.model.at(mf.position);
+        if (!text && e.key === " " && mf.selectionIsCollapsed && ["\\vec", "\\hat"].includes(atom?.parent?.command) && atom.isLastSibling) mf.executeCommand("moveToNextChar");
         if (!text && e.key === "_") { stop(); mf.executeCommand("moveToSubscript"); return; }
         if (!text && e.shiftKey && e.code === "BracketRight") { stop(); mf.executeCommand("moveToSuperscript"); return; }
         if (isOut(mf)) {

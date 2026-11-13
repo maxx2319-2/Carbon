@@ -653,6 +653,8 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\rightleftharpoons(?![A-Za-z])\s*", "<->", s)
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
     s = s.replace(r"\left", "").replace(r"\right", "")
+    s = re.sub(r"\\angle(?![A-Za-z])\s*", "VinkelVektor", s)
+    s = re.sub(r"\\vec\{\\mathnormal\{e\}\}_\{\\vec\{([^{}]*)\}\}", r"EnhedsVektor(\\vec{\1})", s)
     s = re.sub(r"\\[lr]?vert(?![A-Za-z])", "|", s)
     s = re.sub(r"\|([^|]*)\|", r"Abs(\1)", s)
     s = s.replace(r"\lbrack", "[").replace(r"\rbrack", "]")
@@ -716,7 +718,7 @@ def Latex_to_calc(s: str) -> str:
 
 def calc_to_latex(s) -> str:
     s = str(s).replace("{", "\x01").replace("}", "\x02")
-    s = re.sub(r"(?<![\w\\])([^\W\d]\w*?)(?:\\_|_)vec(?!\w)", r"\\overrightarrow{\1}", s)
+    s = re.sub(r"(?<![\w\\])([^\W\d]\w*?)(?:\\_|_)vec(?!\w)", r"\\vec{\1}", s)
     s = re.sub(r"sqrt\(([^()]*)\)", r"\\sqrt{\1}", s)
 
     s = re.sub(r"\d+\.\d{7,}(?:e[+-]?\d+)?", lambda m: f"{float(m.group()):.6g}", s)
@@ -757,7 +759,7 @@ def latex_text(s):
     text = lambda p: r"\text{" + "".join(esc.get(c, c) for c in p) + "}"
     parts = re.split(r"(?<!\w)([^\W\d]\w*?)_vec(?!\w)", s)
     return "".join(
-        r"\overrightarrow{" + text(p) + "}" if i % 2 else text(p)
+        r"\vec{" + text(p) + "}" if i % 2 else text(p)
         for i, p in enumerate(parts)
         if p or len(parts) == 1
     )
@@ -1986,20 +1988,51 @@ class Dropdown(QWidget):
             self.parentWidget().layout().activate()
 
 
-def symbol_grid(symbols, insert):
+class RichButton(QPushButton):
+    def __init__(self, label):
+        super().__init__()
+        self.source = label
+        self.svg = label.endswith(".svg")
+        self.label = QSvgWidget() if self.svg else QLabel(label)
+        self.label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        layout = QHBoxLayout(self)
+        vertical = 0 if self.svg else 4
+        layout.setContentsMargins(4, vertical, 4, vertical)
+        layout.addWidget(self.label, alignment=Qt.AlignCenter)
+        self.set_hover(False)
+
+    def set_hover(self, hover):
+        if self.svg:
+            self.label.load(str(ASSETS_DIR / (self.source.replace(".svg", "_Hover.svg") if hover else self.source)))
+        else:
+            self.label.setStyleSheet(f"color: {HOVER if hover else BUTTON}; font-size: 18px; font-family: 'DejaVu Sans'; background: transparent;")
+
+    def sizeHint(self):
+        return self.layout().sizeHint()
+
+    def enterEvent(self, event):
+        self.set_hover(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.set_hover(False)
+        super().leaveEvent(event)
+
+
+def symbol_grid(symbols, insert, columns=6):
     grid_widget = QWidget()
     grid = QGridLayout(grid_widget)
     grid.setContentsMargins(0,0,0,0)
     grid.setSpacing(2)
     for i, (label, latex) in enumerate(symbols):
-        btn = QPushButton(label)
+        btn = RichButton(label) if "<" in label or label.endswith(".svg") else QPushButton(label)
         btn.setFocusPolicy(Qt.NoFocus)
         btn.setStyleSheet(f"""
-            QPushButton {{ color: {BUTTON}; font-size: 18px; border: none; padding: 4px; }}
+            QPushButton {{ color: {BUTTON}; font-size: 18px; font-family: 'DejaVu Sans'; border: none; padding: 4px; }}
             QPushButton:hover {{ color: {HOVER}; }}
         """)
         btn.clicked.connect(lambda _=False, l=latex: insert(l))
-        grid.addWidget(btn, i // 6, i % 6)
+        grid.addWidget(btn, i // columns, i % columns)
     return grid_widget
 
 class Sidebar(QWidget):
@@ -2812,25 +2845,25 @@ class MainWindow(QMainWindow):
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
             ("Vektorer",symbol_grid([
-                ("v",r"\overrightarrow{#?}"),
-                ("v =",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
-                ("a×b",r"\overrightarrow{#?}\times\overrightarrow{#?}"),
-                ("a*b",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
-                ("a+b",r"\overrightarrow{#?}+\overrightarrow{#?}"),
-                ("a-b",r"\overrightarrow{#?}-\overrightarrow{#?}"),
-                ("k*v",r"{#?}\cdot\overrightarrow{#?}"),
-                ("|v|",r"\lvert\overrightarrow{#?}\rvert"),
-                ("Det(v)",r"Det(\overrightarrow{#?})"),
-                ("enheds vektor",r"EnhedsVektor(\overrightarrow{#?})"),
-                ("vinkel mellem a og b",r"VinkelVektor(\overrightarrow{#?},\overrightarrow{#?})"),
-                ("tværvektor",r"\hat{\overrightarrow{#?}}"),
-                ("Projektion",r"\overrightarrow{#?}_{\text{#?}}"),
+                ("a\u20D7",r"\vec{#?}"),
+                ("a\u20D7 =",r"\vec{#?}=\left\lbrace#?\right\rbrace"),
+                ("a\u20D7×b\u20D7",r"\vec{#?}\times\vec{#?}"),
+                ("a\u20D7·b\u20D7",r"\vec{#?}\cdot\vec{#?}"),
+                ("a\u20D7+b\u20D7",r"\vec{#?}+\vec{#?}"),
+                ("a\u20D7−b\u20D7",r"\vec{#?}-\vec{#?}"),
+                ("k·a\u20D7",r"{#?}\cdot\vec{#?}"),
+                ("Det(a\u20D7)",r"\operatorname{Det}(\vec{#?})"),
+                ("|a\u20D7|",r"\lvert\vec{#?}\rvert"),
+                ("e\u20D7<sub>a\u20D7</sub>",r"\vec{\mathnormal{e}}_{\vec{#?}}"),
+                ("∠(a\u20D7,b\u20D7)",r"\angle(\vec{#?},\vec{#?})"),
+                ("Tvaervektor.svg",r"\!\vec{\:\hat{#?}}"),
+                ("b\u20D7<sub>a\u20D7</sub>",r"\vec{#?}_{\vec{#?}}"),
 
 
 
-             
 
-            ],insert))
+
+            ],insert,3))
         ]))
 
         bar = QWidget()
