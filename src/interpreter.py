@@ -815,7 +815,7 @@ class EV:
                             }
                             unit_map = {
                                 "m": "g", "V": "l", "n": "mol",
-                                "c": "mol/l", "M": "g/mol", "p": "kg/l",
+                                "c": "mol/l", "M": "g/mol", "p": "g/l",
                             }
                             unit_map2 = {v: unit_map[k] for k, v in key_map.items()}
                             short_key_map = {v: k for k, v in key_map.items()}

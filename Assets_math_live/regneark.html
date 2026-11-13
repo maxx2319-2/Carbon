@@ -536,7 +536,7 @@
         applyMode(mf, mode);
         mf.style.fontSize = size;
         setLine(mf, raw);
-        mf.addEventListener("input", () => { const text = modeOf(mf) === "text"; clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (!text) updateSuggest(mf); record(); });
+        mf.addEventListener("input", () => { const text = modeOf(mf) === "text"; clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
@@ -952,6 +952,7 @@
     }
 
     function setMode(mode, mf = lastField ?? first) {
+        hideSuggest();
         for (const line of sel ? selectedLines() : [mf]) {
             if (isOut(line) || modeOf(line) === mode || modeOf(line) === "section") continue;
             clearOutput(line);
