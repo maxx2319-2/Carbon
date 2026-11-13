@@ -552,6 +552,10 @@ def element_mass(e):
         return f"({e.atomic_weight:.0f})"
     return f"{e.atomic_weight:.5g}".replace(".", ",")
 
+def electron_shells(e):
+    from mendeleev.econf import ElectronicConfiguration
+    return list(ElectronicConfiguration(e.electronic_configuration).electrons_per_shell().values())
+
 class VerticalLabel(QWidget):
     def __init__(self, text, color):
         super().__init__()
@@ -3359,7 +3363,7 @@ class MainWindow(QMainWindow):
             else:
                 row, col = e.period, int(e.group_id)
             btn = QPushButton()
-            btn.setFixedSize(66, 66)
+            btn.setFixedSize(78, 76)
             btn.setCheckable(True)
             btn.setAutoExclusive(True)
             btn.setCursor(Qt.PointingHandCursor)
@@ -3367,9 +3371,13 @@ class MainWindow(QMainWindow):
                 QPushButton {{ background-color: {ELEMENT_SERIES[e.series_id][1]}; border: 2px solid transparent; border-radius: 4px; }}
                 QPushButton:hover, QPushButton:checked {{ border-color: {BUTTON}; }}
             """)
-            cell = QVBoxLayout(btn)
-            cell.setContentsMargins(4, 2, 2, 3)
+            tile = QHBoxLayout(btn)
+            tile.setContentsMargins(4, 2, 3, 3)
+            tile.setSpacing(2)
+            cell = QVBoxLayout()
+            cell.setContentsMargins(0, 0, 0, 0)
             cell.setSpacing(0)
+            tile.addLayout(cell, 1)
             for text, style in (
                 (str(e.atomic_number), "font-size: 10px;"),
                 (e.symbol, "font-size: 18px; font-weight: bold;"),
@@ -3380,6 +3388,11 @@ class MainWindow(QMainWindow):
                 label.setStyleSheet(f"color: {TEXT}; background: transparent; {style}")
                 label.setAttribute(Qt.WA_TransparentForMouseEvents)
                 cell.addWidget(label)
+            shells = QLabel(f"<div style='line-height: 80%;' align='right'>{'<br>'.join(map(str, electron_shells(e)))}</div>")
+            shells.setStyleSheet(f"color: {TEXT}; background: transparent; font-size: 9px;")
+            shells.setContentsMargins(0, 0, 0, 2)
+            shells.setAttribute(Qt.WA_TransparentForMouseEvents)
+            tile.addWidget(shells, 0, Qt.AlignRight | Qt.AlignTop)
             btn.clicked.connect(lambda _=False, e=e: self.show_element(e))
             grid.addWidget(btn, row, col)
             self.elements[e.symbol] = (btn, e)
@@ -3406,6 +3419,7 @@ class MainWindow(QMainWindow):
             ("Molarmasse", f"{element_mass(e)} g/mol"),
             ("Elektronegativitet", "–" if math.isnan(e.en_pauling) else str(e.en_pauling).replace(".", ",")),
             ("Elektronkonfiguration", config),
+            ("Elektronskaller", ", ".join(map(str, electron_shells(e)))),
             ("Gruppe", "–" if math.isnan(e.group_id) else int(e.group_id)),
             ("Periode", e.period),
             ("Type", ELEMENT_SERIES[e.series_id][0]),
