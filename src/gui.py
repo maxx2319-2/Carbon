@@ -2838,8 +2838,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(Sidebar([
             ("Calculus", symbol_grid([
                 ("∫", r"\int #?\,\differentialD #?"),
-                ("∫ₐᵇ", r"\int_{#?}^{#?}#?\,\differentialD #?"),
-                ("d/dx", r"\frac{\differentialD}{\differentialD #?}\left(#?\right)"),
+                ("Integral_ab.svg", r"\int_{#?}^{#?}#?\,\differentialD #?"),
+                ("Ddx.svg", r"\frac{\differentialD}{\differentialD #?}\left(#?\right)"),
                 ("lim", r"\lim_{#?\to#?}\left(#?\right)"),
                 ("Σ", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
             ], insert)),
