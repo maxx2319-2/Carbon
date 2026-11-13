@@ -416,7 +416,7 @@ def pOH(x, con):
 
 def molecule_formula(x):
     molecule_dict = {}
-    expanded = expand_groups(x.replace(" ", ""))
+    expanded = expand_groups(re.sub(r"\*(\d*)([^*]+)", r"(\2)\1", x.replace(" ", "")))
     if not re.fullmatch(r"(?:[A-Z][a-z]?\d*)+", expanded):
         raise ValueError(f'"{x.strip()}" er ikke en gyldig molekyleformel')
     matches = re.findall(r"([A-Z][a-z]?)(\d*)", expanded)
