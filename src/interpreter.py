@@ -7,13 +7,14 @@ import biotek
 import json
 import sympy 
 import keyword
+from mat import Vector
 from sympy import simplify
 import numpy as np
 from matplotlib.figure import Figure
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 
-from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor, split_symbols
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication, convert_xor, split_symbols, split_symbols_custom
 
 from types import SimpleNamespace
 from chem import pKa_values,pKb_values
@@ -71,6 +72,7 @@ SYMPY_FUNCTIONS = {
 
 }
 TRANSFORMATIONS = standard_transformations + (split_symbols, implicit_multiplication, convert_xor)
+REGRESSION_TRANSFORMATIONS = standard_transformations + (split_symbols_custom(lambda n: "x" in n and len(n) > 1), implicit_multiplication, convert_xor)
 SAFE_GLOBALS = {
     "__builtins__": {},
     "Symbol": sympy.Symbol, "Integer": sympy.Integer, "Float": sympy.Float, "Rational": sympy.Rational, "Number": sympy.Number, "Function": sympy.Function,
@@ -78,7 +80,7 @@ SAFE_GLOBALS = {
     "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "e": sympy.E,
 }
 
-def safe_parse(text, local_dict):
+def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
     if re.search(r"_|\.(?!\d)|[^\w\s+\-*/^(),.]", text):
         raise ValueError("Ugyldigt tegn i udtrykket")
     for name in re.findall(r"[^\W\d]\w*", text):
@@ -87,12 +89,16 @@ def safe_parse(text, local_dict):
     for name in re.findall(r"([^\W\d]\w+)\s*\(", text):
         if name not in local_dict and name not in SAFE_GLOBALS:
             raise ValueError(f'Ukendt funktion "{name}"')
-    return parse_expr(text, local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=TRANSFORMATIONS)
+    return parse_expr(text, local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=transformations)
 
 class Variables:
     def __init__(self, value, var_type):
-        self.value = str(value)
-        self.var_type = str(var_type)
+        if var_type != "list":
+            self.value = str(value)
+            self.var_type = str(var_type)
+        else:
+            self.value = value
+            self.var_type = str(var_type)
 
     def __str__(self):
         return f"{self.value} {self.var_type}"
@@ -286,6 +292,8 @@ class EV:
                 continue
 
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
+            vecs = {k for k, v in self.variables.items() if v.var_type == "list"}
+            line = re.sub(r"(\w*)\s*×\s*(\w*)", lambda m: m[0] if m[1] in vecs and m[2] in vecs else f"{m[1]}*{m[2]}", line)
 
             
             
@@ -455,6 +463,10 @@ class EV:
                             output[pc] = sympy.N(simplify(self.prep_sympy(args[0])))
                             pc +=1
 
+                        case 'Plot' if args and all(a.strip() in self.variables and self.variables[a.strip()].var_type == "list" for a in args):
+                            output[pc] = Vector.plot(*(self.variables[a.strip()].value for a in args))
+                            pc += 1
+
                         case 'Plot':
                             start = None
                             end = None
@@ -485,12 +497,12 @@ class EV:
                         case 'Regression':
                             if len(args) != 3:
                                 raise ValueError(self.error_text["Regression"])
-                            xs = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[2]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[2]).strip().strip("{}").split(",")]
                             if len(xs) != len(ys):
                                 raise ValueError("ikke lige mange x og y værdier")
-                            
-                            expr = self.prep_sympy(args[0])
+
+                            expr = safe_parse(args[0], SYMPY_FUNCTIONS, REGRESSION_TRANSFORMATIONS)
                             x = sympy.Symbol("x")
                             params = sorted(expr.free_symbols - {x}, key=str)
                             f = sympy.lambdify((x, *params), expr, "numpy")
@@ -501,8 +513,8 @@ class EV:
                         case 'LinReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["LinReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("ax + b")
                             x = sympy.Symbol("x")
@@ -516,8 +528,8 @@ class EV:
                         case 'PropReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["PropReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("ax")
                             x = sympy.Symbol("x")
@@ -531,8 +543,8 @@ class EV:
                         case 'ExpReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["ExpReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("a*b^x")
                             x = sympy.Symbol("x")
@@ -551,8 +563,8 @@ class EV:
                         case 'KvadReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["KvadReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("a*x^2 + bx + c")
                             x = sympy.Symbol("x")
@@ -566,8 +578,8 @@ class EV:
                         case 'LogistReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["LogistReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("c/(1+aE^(-bx))")
                             x = sympy.Symbol("x")
@@ -587,8 +599,8 @@ class EV:
                         case 'HarmReg':
                             if len(args) != 2:
                                 raise ValueError(self.error_text["HarmReg"])
-                            xs = [float(part) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
-                            ys = [float(part) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
+                            xs = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[0]).strip().strip("{}").split(",")]
+                            ys = [float(safe_parse(part, SYMPY_FUNCTIONS)) for part in self.prep_ev(args[1]).strip().strip("{}").split(",")]
 
                             expr = self.prep_sympy("a*sin(b*x+c)+d")
                             x = sympy.Symbol("x")
@@ -962,12 +974,10 @@ class EV:
                                 )
 
                             elif '{' in b or '}' in b:
-                                if '{' not in b or not '}' in b:
-                                    raise ValueError("Du skal slutte og starte en liste med { og }")
+                                self.variables[a] = Variables(Vector.create_vector(b),"list")
 
-                               
-                                self.variables[a] = Variables(b,"list")
-
+                            elif (r := self.vector_ev(b)) is not None:
+                                self.variables[a] = Variables(r, "list" if isinstance(r, Vector) else "Quantity")
 
                             else:
                                 self.variables[a] = Variables(
@@ -979,6 +989,10 @@ class EV:
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
                             output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
+                            pc += 1
+
+                        elif (r := self.vector_ev(line)) is not None:
+                            output[pc] = r
                             pc += 1
 
                         else:
@@ -1007,6 +1021,26 @@ class EV:
             self._pattern_dirty = False
         return self._pattern
 
+    def vector_ev(self, expr):
+        vecs = {k: v.value for k, v in self.variables.items() if v.var_type == "list"}
+        expr = expr.strip()
+        if expr in vecs:
+            return vecs[expr]
+        if m := re.fullmatch(r"(\w+)\s*([+-])\s*(\w+)", expr):
+            a, op, b = m.groups()
+            if a in vecs and b in vecs:
+                return vecs[a] + vecs[b] if op == "+" else vecs[a] - vecs[b]
+        if m := re.fullmatch(r"(\w+)\s*×\s*(\w+)", expr):
+            if m[1] in vecs and m[2] in vecs:
+                return Vector.cross_product(vecs[m[1]],vecs[m[2]])
+        if m := re.fullmatch(r"(\w+)\s*\*\s*(\w+)", expr):
+            if m[1] in vecs and m[2] in vecs:
+                return Vector.dot_product(vecs[m[1]], vecs[m[2]])
+        if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
+            if m[1] in vecs:
+                return abs(vecs[m[1]])
+        return None
+
     def prep_ev(self, expr):
         expr = str(expr)
         pattern = self._get_pattern()
@@ -1016,7 +1050,7 @@ class EV:
                 parts[i] = pattern.sub(
                     lambda m: "(" + self.variables[m.group(0)].value + ")"
                     if self.variables[m.group(0)].var_type.lower() == "quantity"
-                    else self.variables[m.group(0)].value,
+                    else str(self.variables[m.group(0)].value),
                     parts[i],
                 )
             expr = "".join(parts)

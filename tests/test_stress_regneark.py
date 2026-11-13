@@ -178,7 +178,6 @@ def test_remote_image_rows_are_refused(view):
     assert not src.startswith("http")
 
 
-@pytest.mark.xfail(reason="WIP-01: addSection is declared inside plotElement, so Python can't call it", strict=True)
 def test_add_section_can_be_called(view):
     assert js(view, "typeof addSection") == "function"
 

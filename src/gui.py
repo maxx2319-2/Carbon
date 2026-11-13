@@ -96,6 +96,7 @@ from PySide6.QtGui import (
 import re
 import interpreter
 import chem
+from mat import Vector
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import biotek
 import license_manager
@@ -652,10 +653,12 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\rightleftharpoons(?![A-Za-z])\s*", "<->", s)
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
     s = s.replace(r"\left", "").replace(r"\right", "")
+    s = re.sub(r"\\[lr]?vert(?![A-Za-z])", "|", s)
+    s = re.sub(r"\|([^|]*)\|", r"Abs(\1)", s)
     s = s.replace(r"\lbrack", "[").replace(r"\rbrack", "]")
     s = s.replace(r"\lbrace", "\x01").replace(r"\rbrace", "\x02")
     s = s.replace(r"\{", "\x01").replace(r"\}", "\x02")
-    s = s.replace(r"\cdot", "*").replace(r"\times", "*")
+    s = s.replace(r"\cdot", "*").replace(r"\times", "×")
     s = s.replace(r"\#", "#")
     
     s = re.sub(r"\\(ln|log|exp)(?![A-Za-z])", r"\1", s)
@@ -673,6 +676,7 @@ def Latex_to_calc(s: str) -> str:
         prev = s
         s = re.sub(r"\\textcolor\{[^{}]*\}\{([^{}]*)\}", r"\1", s)
         s = re.sub(r"\\(?:mathrm|mathbf|text|operatorname)\{([^{}]*)\}", r"\1", s)
+        s = re.sub(r"\\(?:vec|overrightarrow)\{([^{}]*)\}", lambda m: m.group(1) + "\x00vec", s)
         s = re.sub(r"\\frac\s*([^\s{}\\\[\]])", r"\\frac{\1}", s)  # short form: \frac12
         s = re.sub(
             r"\\frac\{([^{}]*)\}\s*([^\s{}\\])", r"\\frac{\1}{\2}", s
@@ -711,7 +715,8 @@ def Latex_to_calc(s: str) -> str:
 
 
 def calc_to_latex(s) -> str:
-    s = str(s)
+    s = str(s).replace("{", "\x01").replace("}", "\x02")
+    s = re.sub(r"(?<![\w\\])([^\W\d]\w*?)(?:\\_|_)vec(?!\w)", r"\\overrightarrow{\1}", s)
     s = re.sub(r"sqrt\(([^()]*)\)", r"\\sqrt{\1}", s)
 
     s = re.sub(r"\d+\.\d{7,}(?:e[+-]?\d+)?", lambda m: f"{float(m.group()):.6g}", s)
@@ -732,7 +737,7 @@ def calc_to_latex(s) -> str:
         .replace("->", r"\to ")
         .replace("*", r"\cdot ")
     )
-    s = s.replace(" ", r"\ ")
+    s = s.replace(" ", r"\ ").replace("\x01", r"\{").replace("\x02", r"\}")
     return r"\mathrm{" + s + "}"
 
 
@@ -749,7 +754,13 @@ def latex_text(s):
         "^": r"\^{}",
         "~": r"\~{}",
     }
-    return r"\text{" + "".join(esc.get(c, c) for c in s) + "}"
+    text = lambda p: r"\text{" + "".join(esc.get(c, c) for c in p) + "}"
+    parts = re.split(r"(?<!\w)([^\W\d]\w*?)_vec(?!\w)", s)
+    return "".join(
+        r"\overrightarrow{" + text(p) + "}" if i % 2 else text(p)
+        for i, p in enumerate(parts)
+        if p or len(parts) == 1
+    )
 
 
 
@@ -841,6 +852,10 @@ class _InterpreterBridge(QObject):
                 try:
                     if isinstance(value, chem.BjerrumExport):
                         rows.append(["bjerrum", json.dumps(value.pks)])
+                        continue
+
+                    if isinstance(value, Vector):
+                        rows.append(["result", r"\Rightarrow\:\begin{pmatrix}" + r"\\".join(calc_to_latex(c) for c in value.cordinates) + r"\end{pmatrix}"])
                         continue
 
                     if isinstance(value, dict):
@@ -2796,6 +2811,26 @@ class MainWindow(QMainWindow):
                 ("Σ", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
+            ("Vektorer",symbol_grid([
+                ("v",r"\overrightarrow{#?}"),
+                ("v =",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
+                ("a×b",r"\overrightarrow{#?}\times\overrightarrow{#?}"),
+                ("a*b",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
+                ("a+b",r"\overrightarrow{#?}+\overrightarrow{#?}"),
+                ("a-b",r"\overrightarrow{#?}-\overrightarrow{#?}"),
+                ("k*v",r"{#?}\cdot\overrightarrow{#?}"),
+                ("|v|",r"\lvert\overrightarrow{#?}\rvert"),
+                ("Det(v)",r"Det(\overrightarrow{#?})"),
+                ("enheds vektor",r"EnhedsVektor(\overrightarrow{#?})"),
+                ("vinkel mellem a og b",r"VinkelVektor(\overrightarrow{#?},\overrightarrow{#?})"),
+                ("tværvektor",r"\hat{\overrightarrow{#?}}"),
+                ("Projektion",r"\overrightarrow{#?}_{\text{#?}}"),
+
+
+
+             
+
+            ],insert))
         ]))
 
         bar = QWidget()
@@ -2913,6 +2948,17 @@ class MainWindow(QMainWindow):
         self.marker_btn = icon_tool("Highlighter", "Fremhævning")
         color_menu(self.marker_btn, "backgroundColor", "Fremhævningsfarve")
         bar_layout.addWidget(self.text_tools)
+        insert_btn = QToolButton()
+        insert_btn.setText("Indsæt")
+        insert_btn.setToolTip("Indsæt")
+        insert_btn.setFocusPolicy(Qt.NoFocus)
+        insert_btn.setPopupMode(QToolButton.InstantPopup)
+        insert_menu = QMenu(insert_btn)
+        insert_menu.setStyleSheet(menu_style)
+        insert_menu.addAction("Sektion", lambda: (self.interpreter_view.page().runJavaScript("addSection()"), self.interpreter_view.setFocus()))
+        insert_btn.setMenu(insert_menu)
+        insert_btn.setStyleSheet(tool_style)
+        bar_layout.addWidget(insert_btn)
         bar_layout.addStretch()
 
         file_btn = QToolButton()
@@ -3008,7 +3054,7 @@ class MainWindow(QMainWindow):
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
-        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})"))
+        view.loadFinished.connect(lambda ok: self.interpreter_loaded(view))
         view.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/regneark.html"))))
         self.interpreter_stack.addWidget(view)
         index = self.interpreter_tabs.addTab("")
@@ -3160,13 +3206,20 @@ class MainWindow(QMainWindow):
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
-        self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.show_line_mode(mode) if mode else None)
         for i in range(self.interpreter_tabs.count()):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:
                 tab.layout().setContentsMargins(6, 0 if i == index else 4, 0, 0)
-        self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
-        self.interpreter_view.page().runJavaScript("sendStyle(lastField ?? first)")
+        if getattr(self.interpreter_view, "loaded", False):
+            self.interpreter_view.page().runJavaScript("modeOf(lastField ?? first)", 0, lambda mode: self.show_line_mode(mode) if mode else None)
+            self.interpreter_view.page().runJavaScript("JSON.stringify([undoStack.length > 0, redoStack.length > 0])", 0, lambda h: self.update_history_buttons(*(json.loads(h) if h else (False, False))))
+            self.interpreter_view.page().runJavaScript("sendStyle(lastField ?? first)")
+
+    def interpreter_loaded(self, view):
+        view.loaded = True
+        view.page().runJavaScript(f"setAccent({json.dumps(BUTTON)}); setBackground({json.dumps(BG)})")
+        if view is self.interpreter_view:
+            self.show_interpreter_tab(self.interpreter_tabs.currentIndex())
 
     def update_history_buttons(self, can_undo, can_redo):
         self.undo_btn.setEnabled(can_undo)

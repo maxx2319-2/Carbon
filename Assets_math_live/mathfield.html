@@ -89,6 +89,11 @@ function setValue(latex) { mf.value = latex; scheduleFit(); }
                 e.stopPropagation();
                 mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]);
             }
+            if (e.key == "{" && mf.mode === "math") {
+                e.preventDefault();
+                e.stopPropagation();
+                mf.executeCommand(["insert", "\\left\\lbrace#?\\right\\rbrace"]);
+            }
 
     }, true);
     scheduleFit();

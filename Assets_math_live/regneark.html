@@ -516,7 +516,7 @@
 
     function setupField(mf) {
         mf.mathModeSpace = "\\:";
-        mf.inlineShortcuts = {"*": "\\cdot", "->": "\\to","<->": "\\rightleftharpoons"};
+        mf.inlineShortcuts = {"*": "\\cdot","xx": "\\times", "->": "\\to","<->": "\\rightleftharpoons"};
         mf.mathVirtualKeyboardPolicy = "manual";
         mf.addEventListener("keydown", onKey, true);
         mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
@@ -725,6 +725,7 @@
         }
         if (!text && e.key === "/") { stop(); mf.executeCommand(["insert", "\\frac{#@}{#?}"]); return; }
         if (!text && e.key === "[") { stop(); mf.executeCommand(["insert", "\\left\\lbrack#?\\right\\rbrack"]); return; }
+        if (!text && e.key === "{") { stop(); mf.executeCommand(["insert", "\\left\\lbrace#?\\right\\rbrace"]); return; }
     }
 
     // clicking the empty space below the text continues at the end, like one big text area
@@ -798,17 +799,6 @@
                     view.y1 - (e.clientY - r.top) / r.height * (view.y1 - view.y0)];
 
         }
-
-    function addSection() {
-        clearSel();
-        let at = lastField ?? first;
-        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
-        const header = newLine(at,"","section");
-        newLine(header);
-        focusLine(header);
-        record();
-    }
-
 
         function draw() {
             const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio;
@@ -890,6 +880,16 @@
 
         requestAnimationFrame(draw);
         return el;
+    }
+
+    function addSection() {
+        clearSel();
+        let at = lastField ?? first;
+        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
+        const header = newLine(at,"","section");
+        newLine(header);
+        focusLine(header);
+        record();
     }
 
 
