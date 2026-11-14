@@ -2881,9 +2881,9 @@ class MainWindow(QMainWindow):
         bar_layout.setContentsMargins(10,4,10,4)
 
         self.line_type = SegmentedControl([
-            ("Matematik", "math", "Ctrl+1"),
+            ("Mat", "math", "Ctrl+1"),
             ("Tekst", "text", "Ctrl+2"),
-            ("Formel", "formula", "Regnes ikke (Ctrl+3)"),
+            ("Formel", "formula", "Regnes ikke Ctrl+3"),
         ])
         self.line_type.changed.connect(lambda mode: self.interpreter_view.page().runJavaScript(f"setMode({json.dumps(mode)})"))
         self.undo_btn = QToolButton()
