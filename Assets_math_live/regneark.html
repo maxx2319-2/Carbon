@@ -571,6 +571,7 @@
         current = next;
         reportDirty();
         reportHistory();
+        updateHint();
     }
 
     function reportHistory() { bridge?.reportHistory?.(undoStack.length > 0, redoStack.length > 0); }
@@ -915,6 +916,7 @@
         while (isOut(at)) at = at.previousElementSibling;
         const header = newLine(at,"","section");
         at.before(header);
+        if (at === first) { first.placeholder = ""; first = header; }
         const depth = Math.min(depthOf(at), 2);
         if (depth) header.dataset.depth = depth;
         const body = modeOf(at) === "section" ? newLine(header) : at;
@@ -1171,9 +1173,9 @@
     new MutationObserver(refold).observe(editor, { childList: true, subtree: true, attributeFilter: ["data-mode", "data-collapsed", "data-depth"] });
 
     const key = navigator.userAgent.includes("Mac") ? "Command" : "Ctrl";
-    const first = newLine();
+    let first = newLine();
     const hint = `\\textcolor{#858585}{\\text{Skriv din udregning her og tryk ${key}+Enter for at regne}}`;
-    const updateHint = () => first.placeholder = lines().every(mf => mf.value === "") ? hint : "";
+    const updateHint = () => first.placeholder = lines().length === 1 && first.value === "" && modeOf(first) !== "section" ? hint : "";
     editor.addEventListener("input",updateHint);
     updateHint();
     focusLine(first);
