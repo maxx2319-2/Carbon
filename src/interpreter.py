@@ -5,6 +5,7 @@ from quantity import quantity
 import re
 import biotek
 import json
+import math
 import sympy 
 import keyword
 from mat import Vector
@@ -35,7 +36,17 @@ def round_quantity(quant,inputs):
     value = utils.significant_figures(quant.value,inputs)
     return quantity(value,quant.dimension,quant.current_units)
 
+
+def round_vector(result, vectors):
+    inputs = [c for v in vectors for c in v.cordinates]
+    if isinstance(result, Vector):
+        return Vector([str(utils.significant_figures(float(c), inputs)) for c in result.cordinates])
+    return utils.significant_figures(result, inputs)
+
+
 CONSTANTS = ("e", "π")
+
+
 
 SYMPY_FUNCTIONS = {
     "Ln": sympy.log,
@@ -1022,6 +1033,13 @@ class EV:
         return self._pattern
 
     def vector_ev(self, expr):
+        funcs = {
+            "Det": Vector.det,
+            "EnhedsVektor": Vector.enhedsvektor,
+            "VinkelVektor": lambda a, b: math.degrees(Vector.vinkel_mellem_vektorer(a, b)),
+            "TværVektor": Vector.tværvektor,
+            "Projektion": Vector.projektion   
+            }
         vecs = {k: v.value for k, v in self.variables.items() if v.var_type == "list"}
         expr = expr.strip()
         if expr in vecs:
@@ -1034,11 +1052,24 @@ class EV:
             if m[1] in vecs and m[2] in vecs:
                 return Vector.cross_product(vecs[m[1]],vecs[m[2]])
         if m := re.fullmatch(r"(\w+)\s*\*\s*(\w+)", expr):
-            if m[1] in vecs and m[2] in vecs:
+            a,b = m.groups()
+            if a in vecs and b in vecs:
                 return Vector.dot_product(vecs[m[1]], vecs[m[2]])
+            if a in vecs or b in vecs:
+                v, k = (vecs[a],b) if a in vecs else (vecs[b],a)
+                if k in self.variables:
+                    k = self.variables[k].value.value
+                return Vector.scalar_product(k, v)
         if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
             if m[1] in vecs:
                 return abs(vecs[m[1]])
+        if m := re.fullmatch(r"(\w+)\(\s*(\w+(?:\s*,\s*\w+)*)\s*\)", expr):
+            names = [n.strip() for n in m[2].split(",")]
+            if m[1] in funcs and all(n in vecs for n in names):
+                args = [vecs[n] for n in names]
+                result = round_vector(funcs[m[1]](*args), args)
+                return f"{result}°" if m[1] == "VinkelVektor" else result
+
         return None
 
     def prep_ev(self, expr):

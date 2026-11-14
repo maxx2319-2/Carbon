@@ -658,7 +658,12 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
     s = s.replace(r"\left", "").replace(r"\right", "")
     s = re.sub(r"\\angle(?![A-Za-z])\s*", "VinkelVektor", s)
-    s = re.sub(r"\\vec\{\\mathnormal\{e\}\}_\{\\vec\{([^{}]*)\}\}", r"EnhedsVektor(\\vec{\1})", s)
+    s = re.sub(r"\{(\\(?:vec|overrightarrow)\{(?:[^{}]|\{[^{}]*\})*\})\}(?=_)", r"\1", s)
+    s = re.sub(r"\\(?:vec|overrightarrow)\{\\mathnormal\{e\}\}_\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"EnhedsVektor(\\vec{\1})", s)
+    s = re.sub(r"\\!\\(?:vec|overrightarrow)\{\\:\\hat\{([^{}]*)\}\}", r"TværVektor(\\vec{\1})", s)
+    s = re.sub(r"\\hat\{([^{}]*)\}", r"TværVektor(\\vec{\1})", s)
+    s = re.sub(r"\\(?:vec|overrightarrow)\{([^{}]*)\}_\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"Projektion(\\vec{\1},\\vec{\2})", s)
+
     s = re.sub(r"\\[lr]?vert(?![A-Za-z])", "|", s)
     s = re.sub(r"\|([^|]*)\|", r"Abs(\1)", s)
     s = s.replace(r"\lbrack", "[").replace(r"\rbrack", "]")
@@ -2849,19 +2854,19 @@ class MainWindow(QMainWindow):
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
             ("Vektorer",symbol_grid([
-                ("a\u20D7",r"\vec{#?}"),
-                ("a\u20D7 =",r"\vec{#?}=\left\lbrace#?\right\rbrace"),
-                ("a\u20D7×b\u20D7",r"\vec{#?}\times\vec{#?}"),
-                ("a\u20D7·b\u20D7",r"\vec{#?}\cdot\vec{#?}"),
-                ("a\u20D7+b\u20D7",r"\vec{#?}+\vec{#?}"),
-                ("a\u20D7−b\u20D7",r"\vec{#?}-\vec{#?}"),
-                ("k·a\u20D7",r"{#?}\cdot\vec{#?}"),
-                ("Det(a\u20D7)",r"\operatorname{Det}(\vec{#?})"),
-                ("|a\u20D7|",r"\lvert\vec{#?}\rvert"),
-                ("e\u20D7<sub>a\u20D7</sub>",r"\vec{\mathnormal{e}}_{\vec{#?}}"),
-                ("∠(a\u20D7,b\u20D7)",r"\angle(\vec{#?},\vec{#?})"),
-                ("Tvaervektor.svg",r"\!\vec{\:\hat{#?}}"),
-                ("b\u20D7<sub>a\u20D7</sub>",r"\vec{#?}_{\vec{#?}}"),
+                ("a\u20D7",r"\overrightarrow{#?}"),
+                ("a\u20D7 =",r"\overrightarrow{#?}=\left\lbrace#?\right\rbrace"),
+                ("a\u20D7×b\u20D7",r"\overrightarrow{#?}\times\overrightarrow{#?}"),
+                ("a\u20D7·b\u20D7",r"\overrightarrow{#?}\cdot\overrightarrow{#?}"),
+                ("a\u20D7+b\u20D7",r"\overrightarrow{#?}+\overrightarrow{#?}"),
+                ("a\u20D7−b\u20D7",r"\overrightarrow{#?}-\overrightarrow{#?}"),
+                ("k·a\u20D7",r"{#?}\cdot\overrightarrow{#?}"),
+                ("Det(a\u20D7)",r"\operatorname{Det}(\overrightarrow{#?})"),
+                ("|a\u20D7|",r"\lvert\overrightarrow{#?}\rvert"),
+                ("e\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{#?}}"),
+                ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
+                ("Tvaervektor.svg",r"\!\overrightarrow{\:\hat{#?}}"),
+                ("b\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
 
 
 

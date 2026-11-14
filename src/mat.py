@@ -1,5 +1,6 @@
 import math
 from matplotlib.figure import Figure
+import numpy as np
 
 
 class Vector:
@@ -49,6 +50,14 @@ class Vector:
     def __len__(self):
          return len(self.cordinates)
 
+    def __getitem__(self, key):
+        return self.cordinates[key]
+
+    def __setitem__(self, key, value):
+        try: value = float(value)
+        except: raise ValueError("alle index i en vektor skal være tal")
+        self.cordinates[key] = str(value)
+
     @staticmethod
     def dot_product(a,b):
         v = 0
@@ -66,6 +75,66 @@ class Vector:
         return Vector([str(a[1]*b[2] - a[2]*b[1]),
             str(a[2]*b[0] - a[0]*b[2]),
             str(a[0]*b[1] - a[1]*b[0])])
+    
+    @staticmethod
+    def scalar_product(k,a):
+        result = []
+        for part in a.cordinates:
+            result.append(str(float(part)*float(k)))
+
+        return Vector(result)
+
+    @staticmethod
+    def det(*args):
+        for part in args:
+            if len(part) != len(args):
+                raise ValueError("Der skal være lige så mange vektorer som længden af vektorerne")
+        flip = []
+        i =0
+        while i < len(args):
+            temp = []
+            for part in args:
+                temp.append(float(part[i]))
+            flip.append(temp)
+            i += 1
+
+        M = np.array(flip)
+        return np.linalg.det(M)
+            
+    @staticmethod
+    def enhedsvektor(a):
+        if abs(a) == 0:
+            raise ValueError("nulvektoren har ingen enhedsvektor")
+        k = 1/abs(a)
+
+        return Vector.scalar_product(k,a)
+
+    @staticmethod
+    def vinkel_mellem_vektorer(a,b):
+        top = Vector.dot_product(a,b)
+        bottom = abs(a)*abs(b)
+        if bottom == 0:
+            raise ValueError("du kan ikke finde vinklen med en nulvektor")
+        return math.acos(max(-1, min(1, top/bottom)))
+
+    @staticmethod
+    def tværvektor(a):
+        if len(a) != 2:
+            raise ValueError("du kan kun finde en tvær vektor for 2d vektorer")
+        return  Vector([str(0-float(a[1])),str(float(a[0]))])
+        
+
+    @staticmethod
+
+    def projektion(a,b):
+        top = Vector.dot_product(a,b)
+        bottom = abs(b)**2
+        if bottom == 0:
+            raise ValueError("du kan ikke projicere på en nulvektor")
+
+        return Vector.scalar_product(top/bottom,b)
+
+
 
     @staticmethod
     def plot(*vectors):
