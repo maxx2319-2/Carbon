@@ -2866,7 +2866,7 @@ class MainWindow(QMainWindow):
                 ("e\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{#?}}"),
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
                 ("Tvaervektor.svg",r"\!\overrightarrow{\:\hat{#?}}"),
-                ("b\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
+                ("a\u20D7<sub>b\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
 
 
 
