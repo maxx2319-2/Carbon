@@ -1070,8 +1070,7 @@ class EV:
                 return Vector.dot_product(vecs[m[1]], vecs[m[2]])
             if a in vecs or b in vecs:
                 v, k = (vecs[a],b) if a in vecs else (vecs[b],a)
-                if k in self.variables:
-                    k = self.variables[k].value.value
+                k = parser.evaluate(self.prep_ev(k)).value
                 return Vector.scalar_product(k, v)
         if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
             if m[1] in vecs:
