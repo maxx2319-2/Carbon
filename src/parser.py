@@ -69,7 +69,8 @@ def tokenise(text):
 
 
 class _Parser:
-    def __init__(self, text):
+    def __init__(self, text, functions = None):
+        self.functions = {**FUNCTIONS, **(functions or {})}
         self.text = text
         self.tokens = tokenise(text)
         self.i = 0
@@ -168,11 +169,11 @@ class _Parser:
         if kind == "unit" and self.peek() == ("op","("):
             if value == "sqrt":
                 return self.group() ** 0.5
-            if value in FUNCTIONS:
+            if value in self.functions:
                 values = self.args()
                 if any(v.dimension for v in values):
                      raise ValueError(f'{value} kan ikke tage imod enhed')
-                return quantity(FUNCTIONS[value](*(v.value for v in values)),{},{})
+                return quantity(self.functions[value](*(v.value for v in values)),{},{})
             raise ValueError(f'Ukendt funktion "{value}"')
 
                    
@@ -183,13 +184,11 @@ class _Parser:
             raise ValueError(f'udtrykket slutter for tidligt: "{self.text}"')
         raise ValueError(f'uventet "{value}" i {self.text}')
 
-def evaluate(equation):
-    if re.search(r"\d,\d", equation):
-        raise ValueError("Brug punktum som decimal tal ikke komma")
+def evaluate(equation,functions = None):
     if not equation.strip():
         raise ValueError("Tomt udtryk")
 
-    p = _Parser(equation)
+    p = _Parser(equation,functions)
     result = p.expr()
     p.expect_end()
     return result

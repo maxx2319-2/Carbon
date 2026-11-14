@@ -120,6 +120,8 @@ class EV:
         self.variables = {}
         self._pattern = None
         self._pattern_dirty = True
+        self.custom_funcsions = {}
+        self.custom_exprs = {}
         self.functions = [
             "Help",
             "Afstem",
@@ -958,6 +960,14 @@ class EV:
                             a, b = (p.strip() for p in line.split("=", 1))
                             if a == "" or b == "":
                                 raise ValueError("Variabel er defineret forkert")
+                            if fm := re.fullmatch(r"([^\W\d]\w*)\(([^()]*)\)", a):
+                                args = [sympy.Symbol(v.strip()) for v in fm[2].split(",")]
+                                expr = safe_parse(b, {**SYMPY_FUNCTIONS, **{str(s): s for s in args}})
+                                self.custom_exprs[fm[1]] = sympy.Lambda(tuple(args), expr)
+                                self.custom_funcsions[fm[1]] = sympy.lambdify(args, expr, "numpy")
+                                self.new_method(output, pc, a, b)
+                                pc += 1
+                                continue
                             if not re.fullmatch(r"[^\W\d]\w*", a) or a in self.functions or a in SYMPY_FUNCTIONS or a in CONSTANTS:
                                 raise ValueError(f"{a} kan ikke bruges som variabelnavn")
 
@@ -992,7 +1002,7 @@ class EV:
 
                             else:
                                 self.variables[a] = Variables(
-                                    quantity.simplify_units(parser.evaluate(self.prep_ev(b))), "Quantity"
+                                    quantity.simplify_units(parser.evaluate(self.prep_ev(b),self.custom_funcsions)), "Quantity"
                                 )
                             self._invalidate_pattern()
                             output[pc] = self.variables[a].value
@@ -1007,7 +1017,7 @@ class EV:
                             pc += 1
 
                         else:
-                            output[pc] = quantity.simplify_units(parser.evaluate(self.prep_ev(line)))
+                            output[pc] = quantity.simplify_units(parser.evaluate(self.prep_ev(line),self.custom_funcsions))
                             pc += 1
                     except Exception as e:
                         raise ValueError(e)
@@ -1016,6 +1026,9 @@ class EV:
                 output[pc] = f"Error: {e}"
                 pc += 1
         return output
+
+    def new_method(self, output, pc, a, b):
+        output[pc] = f"{a} = {b}"
 
     def _invalidate_pattern(self):
         self._pattern_dirty = True
@@ -1089,10 +1102,11 @@ class EV:
         return expr
     
     def prep_sympy(self, expr):
+        funcs = {**SYMPY_FUNCTIONS, **self.custom_exprs}
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
-            return sympy.Eq(safe_parse(lhs, SYMPY_FUNCTIONS), safe_parse(rhs, SYMPY_FUNCTIONS))
-        return safe_parse(expr, SYMPY_FUNCTIONS)
+            return sympy.Eq(safe_parse(lhs, funcs), safe_parse(rhs, funcs))
+        return safe_parse(expr, funcs)
     
     def parse_interval(self, part, name):
         _,interval = part.split("=")
