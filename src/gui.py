@@ -182,8 +182,8 @@ if sys.platform == "win32":
     user32.SetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
     user32.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
     user32.IsZoomed.argtypes = [ctypes.c_void_p]
-    user32.MonitorFromWindow.restype = ctypes.c_void_p
-    user32.MonitorFromWindow.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+    user32.MonitorFromRect.restype = ctypes.c_void_p
+    user32.MonitorFromRect.argtypes = [ctypes.c_void_p, ctypes.c_uint]
     user32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 
 button_style =  f"""
@@ -2787,7 +2787,7 @@ class MainWindow(QMainWindow):
         if msg.message == WM_NCCALCSIZE and msg.wParam:
             if user32.IsZoomed(msg.hwnd):
                 info = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
-                user32.GetMonitorInfoW(user32.MonitorFromWindow(msg.hwnd, 2), ctypes.byref(info))
+                user32.GetMonitorInfoW(user32.MonitorFromRect(msg.lParam, 2), ctypes.byref(info))
                 ctypes.memmove(msg.lParam, ctypes.byref(info.rcWork), ctypes.sizeof(RECT))
             return True, 0
         if msg.message == WM_NCHITTEST:
@@ -2861,7 +2861,7 @@ class MainWindow(QMainWindow):
                 ("a\u20D7+b\u20D7",r"\overrightarrow{#?}+\overrightarrow{#?}"),
                 ("a\u20D7−b\u20D7",r"\overrightarrow{#?}-\overrightarrow{#?}"),
                 ("k·a\u20D7",r"{#?}\cdot\overrightarrow{#?}"),
-                ("Det(a\u20D7)",r"\operatorname{Det}(\overrightarrow{#?})"),
+                ("Det(a\u20D7)",r"\operatorname{Det}(#?)"),
                 ("|a\u20D7|",r"\lvert\overrightarrow{#?}\rvert"),
                 ("e\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{#?}}"),
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
@@ -2997,7 +2997,8 @@ class MainWindow(QMainWindow):
         insert_btn.setPopupMode(QToolButton.InstantPopup)
         insert_menu = QMenu(insert_btn)
         insert_menu.setStyleSheet(menu_style)
-        insert_menu.addAction("Sektion", lambda: (self.interpreter_view.page().runJavaScript("addSection()"), self.interpreter_view.setFocus()))
+        add_section = lambda: (self.interpreter_view.page().runJavaScript("addSection()"), self.interpreter_view.setFocus())
+        insert_menu.addAction("Sektion", add_section)
         insert_btn.setMenu(insert_menu)
         insert_btn.setStyleSheet(tool_style)
         bar_layout.addWidget(insert_btn)
@@ -3021,7 +3022,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence.Close, page, lambda: self.close_interpreter_tab(self.interpreter_tabs.currentIndex()), Qt.WidgetWithChildrenShortcut)
         QShortcut(QKeySequence.NextChild, page, lambda: self.switch_tab(1), Qt.WidgetWithChildrenShortcut)
         QShortcut(QKeySequence.PreviousChild, page, lambda: self.switch_tab(-1), Qt.WidgetWithChildrenShortcut)
-        
+        QShortcut(QKeySequence("Ctrl+."), page, add_section, Qt.WidgetWithChildrenShortcut)
+
         file_btn.setIcon(hover_icon("Save.svg"))
         file_btn.setIconSize(QSize(24,24))
         file_btn.setToolTip("Fil")

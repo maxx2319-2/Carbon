@@ -719,6 +719,12 @@
             record();
             return;
         }
+    
+        if (e.key === "Backspace" && atStart && modeOf(mf) === "section") { stop(); const back = shownBefore(mf); removeSection(mf); focusLine(back ?? first, back ? "end" : "start"); record(); return; }
+        if (e.key === "Backspace" && atStart && prev && (modeOf(prev) === "section" || prev.classList.contains("folded"))) { stop(); const back = shownBefore(mf); if (!mf.lastOffset) { clearOutput(mf); mf.remove(); } focusLine(back, "end"); record(); return; }
+        if (e.key === "Delete" && atEnd && next && modeOf(next) === "section") { stop(); removeSection(next); record(); return; }
+        if (e.key === "Delete" && atEnd && modeOf(mf) === "section") { stop(); return; }
+
         if (e.key === "Backspace" && atStart && prev) {
             // join this line onto the end of the previous one
             stop();
@@ -970,6 +976,16 @@
             el.style.paddingLeft = indent < 0 ? "" : `${indent + (isField(el) ? 6 : 2)}px`;
             el.style.paddingBottom = !isField(el) && el.classList.contains("section-end") ? "2px" : "";
         }
+    }
+
+    const shownBefore = el => { do el = el.previousElementSibling; while (el && (isOut(el) || el.classList.contains("folded"))); return el; };
+
+    function removeSection(header) {
+        const gone = [header];
+        if (header.dataset.collapsed) for (let el = header.nextElementSibling; el && (isOut(el) || depthOf(el) > depthOf(header)); el = el.nextElementSibling) gone.push(el);
+        gone.forEach(el => el.remove());
+        if (!lines().length) newLine();
+        first = lines()[0];
     }
 
     function toggleSection(header) {
