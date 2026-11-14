@@ -7,15 +7,12 @@
     html, body { margin: 0; height: 100%; background: transparent; color: #fff; overflow: hidden; }
     #editor { height: 100%; overflow-y: auto; padding: 8px 12px 8px 48px; box-sizing: border-box; cursor: text; counter-reset: line; margin-right: 4px;}
     #editor > math-field[data-mode=formula]::before {color: var(--accent);}
-    #editor > math-field[data-mode=section] { font-size: 22px; margin-top: 6px; background: #4d4d4d; box-shadow: inset 2px 0 #fff; border-radius: 0 4px 4px 0; }
-    #editor > math-field[data-mode=section]::after { content: ""; position: absolute; left: 0; top: 0; width: 12px; border-top: 2px solid #fff; }
-    #editor > math-field[data-mode=section][data-collapsed]::after { bottom: 0; border-bottom: 2px solid #fff; }
+    #editor > math-field[data-mode=section] { font-size: 22px; border-radius: 0 4px 4px 0; }
+    #editor > math-field[data-mode=section]:not([data-depth]) { margin-top: 6px; }
     #editor > math-field[data-mode=section]::before { content: "\25BE  " counter(line); color: var(--accent); cursor: pointer; }
     #editor > math-field[data-mode=section][data-collapsed]::before { content: "\25B8  " counter(line); }
-    #editor > .in-section { box-shadow: inset 2px 0 #fff; border-radius: 0; }
-    #editor > div.in-section { padding-left: 2px; }
-    #editor > .section-end { margin-bottom: 4px; }
-    #editor > .section-end::after { content: ""; position: absolute; left: 0; bottom: 0; width: 12px; border-bottom: 2px solid #fff; }
+    #editor > .in-section { border-radius: 0; }
+    #editor > .section-last { margin-bottom: 4px; }
     #editor > .folded { height: 0 !important; min-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border: 0; overflow: hidden; }
     math-field {
         display: block; width: 100%; box-sizing: border-box; min-height: 1.7em;
@@ -159,6 +156,7 @@
     const MODES = {"1":"math","2":"text","3": "formula"};
     const modeOf = mf => mf.dataset.mode ?? "math";
     const isText = mf => ["text", "section"].includes(modeOf(mf));
+    const depthOf = el => +(el.dataset.depth ?? 0);
     const reportMode = mf => modeOf(mf) !== "section" && bridge?.reportMode(modeOf(mf));
     const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(strip(raw)) : raw;
     const clean = (mf, latex) => isText(mf) ? latex : strip(latex);
@@ -546,7 +544,8 @@
         if (after) after.after(mf); else editor.append(mf);
         let ref = after;
         while (isOut(ref)) ref = ref.previousElementSibling;
-        if (ref && mode !== "section" && (modeOf(ref) === "section" || ref.dataset.section)) mf.dataset.section = "1";
+        const depth = ref && mode !== "section" ? depthOf(ref) + (modeOf(ref) === "section" ? 1 : 0) : 0;
+        if (depth) mf.dataset.depth = Math.min(depth, 3);
         setupField(mf);
         applyMode(mf, mode);
         mf.style.fontSize = size;
@@ -563,12 +562,12 @@
     function snapshot () {
         const all = lines();
         const mf = document.activeElement;
-        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), sections: all.map(l => l.dataset.section ?? ""), line: all.indexOf(mf), position: mf?.position ?? 0};
+        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), depths: all.map(l => l.dataset.depth ?? ""), line: all.indexOf(mf), position: mf?.position ?? 0};
     }
 
     function record() {
         const next = snapshot();
-        if (current && JSON.stringify([current.raws, current.modes, current.sizes, current.sections]) !== JSON.stringify([next.raws, next.modes, next.sizes, next.sections])) { undoStack.push(current); redoStack.length = 0; }
+        if (current && JSON.stringify([current.raws, current.modes, current.sizes, current.depths]) !== JSON.stringify([next.raws, next.modes, next.sizes, next.depths])) { undoStack.push(current); redoStack.length = 0; }
         current = next;
         reportDirty();
         reportHistory();
@@ -606,7 +605,7 @@
         }
         while (all.length < s.raws.length) all.push(newLine());
         all.forEach((mf,i) =>{
-            if (s.sections[i]) mf.dataset.section = "1"; else delete mf.dataset.section;
+            if (s.depths[i]) mf.dataset.depth = s.depths[i]; else delete mf.dataset.depth;
             if (clean(mf, mf.value) === s.raws[i] && modeOf(mf) === s.modes[i] && mf.style.fontSize === s.sizes[i]) return;
             clearOutput(mf);
             applyMode(mf, s.modes[i]);
@@ -752,10 +751,10 @@
         if (e.target !== editor || e.offsetX >= editor.clientWidth) return;
         e.preventDefault();
         let last = lines().at(-1);
-        if (last.dataset.section) {
+        if (depthOf(last)) {
             while (isOut(last.nextElementSibling)) last = last.nextElementSibling;
             last = newLine(last);
-            delete last.dataset.section;
+            delete last.dataset.depth;
             record();
         }
         focusLine(last);
@@ -913,29 +912,62 @@
     function addSection() {
         clearSel();
         let at = lastField ?? first;
-        while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
+        while (isOut(at)) at = at.previousElementSibling;
         const header = newLine(at,"","section");
-        const body = newLine(header);
-        if (!body.nextElementSibling) delete newLine(body).dataset.section;
+        at.before(header);
+        const depth = Math.min(depthOf(at), 2);
+        if (depth) header.dataset.depth = depth;
+        const body = modeOf(at) === "section" ? newLine(header) : at;
+        body.dataset.depth = depth + 1;
+        let end = body;
+        while (isOut(end.nextElementSibling)) end = end.nextElementSibling;
+        if (!end.nextElementSibling || depthOf(end.nextElementSibling) < depth) {
+            const extra = newLine(end);
+            if (depth) extra.dataset.depth = depth; else delete extra.dataset.depth;
+        }
         focusLine(header);
         record();
     }
 
-    const headerOf = el => { while (el && modeOf(el) !== "section") el = el.previousElementSibling; return el; };
-    const sectionLength = header => { let n = 0; for (let el = header.nextElementSibling; el && (isOut(el) || el.dataset.section); el = el.nextElementSibling) if (!isOut(el)) n++; return n; };
+    const headerOf = el => { while (el && (modeOf(el) !== "section" || el.classList.contains("folded"))) el = el.previousElementSibling; return el; };
+    const sectionLength = header => { let n = 0; for (let el = header.nextElementSibling; el && (isOut(el) || depthOf(el) > depthOf(header)); el = el.nextElementSibling) if (!isOut(el)) n++; return n; };
 
     function refold() {
-        let header = null, last = null;
+        const open = [], marks = new Map();
+        const mark = (el, layer) => { if (!marks.has(el)) marks.set(el, []); marks.get(el).push(layer); };
+        const close = () => { const s = open.pop(); mark(s.last, { x: s.x, y: "100%", w: "12px", h: "2px" }); s.last.classList.add("section-end"); if (!open.length) s.last.classList.add("section-last"); };
+        let folded = false;
         for (const el of editor.children) {
-            el.classList.remove("section-end", "in-section");
-            if (modeOf(el) === "section") { last?.classList.add("section-end"); header = last = el; el.classList.remove("folded"); continue; }
-            if (header && !isOut(el) && !el.dataset.section) { last.classList.add("section-end"); header = last = null; }
-            if (!header) { delete el.dataset.section; el.classList.remove("folded"); continue; }
-            el.classList.add("in-section");
-            el.classList.toggle("folded", !!header.dataset.collapsed);
-            last = el;
+            el.classList.remove("section-end", "section-last", "in-section");
+            const header = !isOut(el) && modeOf(el) === "section";
+            const stored = depthOf(el);
+            if (!isOut(el)) {
+                while (open.length && (open.at(-1).depth >= stored || (header && open.length > 2))) close();
+                if (open.length !== stored) { if (open.length) el.dataset.depth = open.length; else delete el.dataset.depth; }
+                folded = open.some(s => s.header.dataset.collapsed);
+            }
+            el.classList.toggle("folded", folded);
+            open.forEach(s => { mark(el, { x: s.x, y: "0", w: "2px", h: "100%" }); if (!folded) s.last = el; });
+            if (header) {
+                const x = open.length * 10;
+                mark(el, { x, y: "0", w: "2px", h: "100%" });
+                mark(el, { x, y: "0", w: "12px", h: "2px" });
+                mark(el, { x, y: "0", w: "100%", h: "100%", color: "#4d4d4d" });
+                open.push({ header: el, x, last: el, depth: stored });
+            }
         }
-        last?.classList.add("section-end");
+        while (open.length) close();
+        for (const el of editor.children) {
+            const layers = (marks.get(el) ?? []).sort((a, b) => !!a.color - !!b.color);
+            const indent = Math.max(-1, ...layers.filter(l => l.w === "2px").map(l => l.x));
+            el.classList.toggle("in-section", layers.length > 0);
+            el.style.backgroundImage = layers.map(l => `linear-gradient(${l.color ?? "#fff"}, ${l.color ?? "#fff"})`).join(", ");
+            el.style.backgroundPosition = layers.map(l => `${l.x}px ${l.y}`).join(", ");
+            el.style.backgroundSize = layers.map(l => `${l.w} ${l.h}`).join(", ");
+            el.style.backgroundRepeat = layers.length ? "no-repeat" : "";
+            el.style.paddingLeft = indent < 0 ? "" : `${indent + (isField(el) ? 6 : 2)}px`;
+            el.style.paddingBottom = !isField(el) && el.classList.contains("section-end") ? "2px" : "";
+        }
     }
 
     function toggleSection(header) {
@@ -1108,12 +1140,15 @@
         let last = first;
         for (const [, raw, mode, size] of code.slice(1)) last = newLine(last, raw, mode, mode === "section" ? "" : size);
         const all = lines();
-        all.forEach(mf => delete mf.dataset.section);
+        const counts = [];
         all.forEach((mf, i) => {
+            while (counts.length && counts.at(-1) <= 0) counts.pop();
+            if (counts.length) mf.dataset.depth = counts.length; else delete mf.dataset.depth;
+            counts.forEach((c, j) => counts[j] = c - 1);
             if (code[i]?.[2] !== "section") return;
             const [count, state] = (code[i][3] ?? "").split(" ");
             if (state === "collapsed") mf.dataset.collapsed = "1";
-            all.slice(i + 1, i + 1 + (parseInt(count) || 0)).forEach(l => l.dataset.section = "1");
+            counts.push(parseInt(count) || 0);
         });
         rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
         showOutput(rows, lines());
@@ -1133,7 +1168,7 @@
     window.addEventListener("blur",idle);
     idle();
     new MutationObserver(renumberLoops).observe(editor,{ childList: true})
-    new MutationObserver(refold).observe(editor, { childList: true, subtree: true, attributeFilter: ["data-mode", "data-collapsed", "data-section"] });
+    new MutationObserver(refold).observe(editor, { childList: true, subtree: true, attributeFilter: ["data-mode", "data-collapsed", "data-depth"] });
 
     const key = navigator.userAgent.includes("Mac") ? "Command" : "Ctrl";
     const first = newLine();
