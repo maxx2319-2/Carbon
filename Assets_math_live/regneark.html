@@ -7,6 +7,16 @@
     html, body { margin: 0; height: 100%; background: transparent; color: #fff; overflow: hidden; }
     #editor { height: 100%; overflow-y: auto; padding: 8px 12px 8px 48px; box-sizing: border-box; cursor: text; counter-reset: line; margin-right: 4px;}
     #editor > math-field[data-mode=formula]::before {color: var(--accent);}
+    #editor > math-field[data-mode=section] { font-size: 22px; margin-top: 6px; background: #4d4d4d; box-shadow: inset 2px 0 #fff; border-radius: 0 4px 4px 0; }
+    #editor > math-field[data-mode=section]::after { content: ""; position: absolute; left: 0; top: 0; width: 12px; border-top: 2px solid #fff; }
+    #editor > math-field[data-mode=section][data-collapsed]::after { bottom: 0; border-bottom: 2px solid #fff; }
+    #editor > math-field[data-mode=section]::before { content: "\25BE  " counter(line); color: var(--accent); cursor: pointer; }
+    #editor > math-field[data-mode=section][data-collapsed]::before { content: "\25B8  " counter(line); }
+    #editor > .in-section { box-shadow: inset 2px 0 #fff; border-radius: 0; }
+    #editor > div.in-section { padding-left: 2px; }
+    #editor > .section-end { margin-bottom: 4px; }
+    #editor > .section-end::after { content: ""; position: absolute; left: 0; bottom: 0; width: 12px; border-bottom: 2px solid #fff; }
+    #editor > .folded { height: 0 !important; min-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border: 0; overflow: hidden; }
     math-field {
         display: block; width: 100%; box-sizing: border-box; min-height: 1.7em;
         font-size: 18px; color: #fff; background: transparent;
@@ -148,13 +158,15 @@
     }
     const MODES = {"1":"math","2":"text","3": "formula"};
     const modeOf = mf => mf.dataset.mode ?? "math";
-    const reportMode = mf => bridge?.reportMode(modeOf(mf));
+    const isText = mf => ["text", "section"].includes(modeOf(mf));
+    const reportMode = mf => modeOf(mf) !== "section" && bridge?.reportMode(modeOf(mf));
     const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(strip(raw)) : raw;
-    const clean = (mf, latex) => modeOf(mf) === "text" ? latex : strip(latex);
+    const clean = (mf, latex) => isText(mf) ? latex : strip(latex);
 
 
     function applyMode(mf,mode) {
         if (mode === "math") delete mf.dataset.mode; else mf.dataset.mode = mode;
+        if (mode !== "section") delete mf.dataset.collapsed;
     }
     
 
@@ -350,12 +362,12 @@
     const isField = el => el && el.tagName === "MATH-FIELD";
 
     function prevField(el) {
-        do el = el.previousElementSibling; while (el && !isField(el));
+        do el = el.previousElementSibling; while (el && (!isField(el) || el.classList.contains("folded")));
         return el;
     }
 
     function nextField(el) {
-        do el = el.nextElementSibling; while (el && !isField(el));
+        do el = el.nextElementSibling; while (el && (!isField(el) || el.classList.contains("folded")));
         return el;
     }
 
@@ -532,11 +544,14 @@
     function newLine(after = null, raw = "", mode = "math", size = "") {
         const mf = new MathfieldElement();
         if (after) after.after(mf); else editor.append(mf);
+        let ref = after;
+        while (isOut(ref)) ref = ref.previousElementSibling;
+        if (ref && mode !== "section" && (modeOf(ref) === "section" || ref.dataset.section)) mf.dataset.section = "1";
         setupField(mf);
         applyMode(mf, mode);
         mf.style.fontSize = size;
         setLine(mf, raw);
-        mf.addEventListener("input", () => { const text = modeOf(mf) === "text"; clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); });
+        mf.addEventListener("input", () => { const text = isText(mf); clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
@@ -548,12 +563,12 @@
     function snapshot () {
         const all = lines();
         const mf = document.activeElement;
-        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), line: all.indexOf(mf), position: mf?.position ?? 0};
+        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), sections: all.map(l => l.dataset.section ?? ""), line: all.indexOf(mf), position: mf?.position ?? 0};
     }
 
     function record() {
         const next = snapshot();
-        if (current && JSON.stringify([current.raws, current.modes, current.sizes]) !== JSON.stringify([next.raws, next.modes, next.sizes])) { undoStack.push(current); redoStack.length = 0; }
+        if (current && JSON.stringify([current.raws, current.modes, current.sizes, current.sections]) !== JSON.stringify([next.raws, next.modes, next.sizes, next.sections])) { undoStack.push(current); redoStack.length = 0; }
         current = next;
         reportDirty();
         reportHistory();
@@ -591,6 +606,7 @@
         }
         while (all.length < s.raws.length) all.push(newLine());
         all.forEach((mf,i) =>{
+            if (s.sections[i]) mf.dataset.section = "1"; else delete mf.dataset.section;
             if (clean(mf, mf.value) === s.raws[i] && modeOf(mf) === s.modes[i] && mf.style.fontSize === s.sizes[i]) return;
             clearOutput(mf);
             applyMode(mf, s.modes[i]);
@@ -613,7 +629,7 @@
     function onKey(e) {
         const mf = e.currentTarget;
         const stop = () => { e.preventDefault(); e.stopPropagation(); };
-        const text = modeOf(mf) === "text";
+        const text = isText(mf);
         if (mf.selectionIsCollapsed || (e.key.length === 1 && !e.ctrlKey && !e.metaKey)) mf.mode = text ? "text" : "math";
         if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) { stop(); clearSel(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { stop(); clearSel(); undo(); return; }
@@ -686,6 +702,7 @@
         }
 
         const prev = prevLine(mf), next = nextLine(mf);
+        if (e.key === "Enter" && modeOf(mf) === "section") { stop(); delete mf.dataset.collapsed; focusLine(newLine(mf), "start"); record(); return; }
         if (e.key === "Enter") {
             // split the line at the cursor, like a normal text editor
             stop();
@@ -732,7 +749,16 @@
 
     // clicking the empty space below the text continues at the end, like one big text area
     editor.addEventListener("mousedown", e => {
-        if (e.target === editor && e.offsetX < editor.clientWidth) { e.preventDefault(); focusLine(lines().at(-1)); }
+        if (e.target !== editor || e.offsetX >= editor.clientWidth) return;
+        e.preventDefault();
+        let last = lines().at(-1);
+        if (last.dataset.section) {
+            while (isOut(last.nextElementSibling)) last = last.nextElementSibling;
+            last = newLine(last);
+            delete last.dataset.section;
+            record();
+        }
+        focusLine(last);
     });
 
     let runId =0, runLines = null, running = false;
@@ -889,10 +915,46 @@
         let at = lastField ?? first;
         while (isOut(at.nextElementSibling)) at = at.nextElementSibling;
         const header = newLine(at,"","section");
-        newLine(header);
+        const body = newLine(header);
+        if (!body.nextElementSibling) delete newLine(body).dataset.section;
         focusLine(header);
         record();
     }
+
+    const headerOf = el => { while (el && modeOf(el) !== "section") el = el.previousElementSibling; return el; };
+    const sectionLength = header => { let n = 0; for (let el = header.nextElementSibling; el && (isOut(el) || el.dataset.section); el = el.nextElementSibling) if (!isOut(el)) n++; return n; };
+
+    function refold() {
+        let header = null, last = null;
+        for (const el of editor.children) {
+            el.classList.remove("section-end", "in-section");
+            if (modeOf(el) === "section") { last?.classList.add("section-end"); header = last = el; el.classList.remove("folded"); continue; }
+            if (header && !isOut(el) && !el.dataset.section) { last.classList.add("section-end"); header = last = null; }
+            if (!header) { delete el.dataset.section; el.classList.remove("folded"); continue; }
+            el.classList.add("in-section");
+            el.classList.toggle("folded", !!header.dataset.collapsed);
+            last = el;
+        }
+        last?.classList.add("section-end");
+    }
+
+    function toggleSection(header) {
+        if (header.dataset.collapsed) delete header.dataset.collapsed; else header.dataset.collapsed = "1";
+        refold();
+        if (document.activeElement?.classList.contains("folded")) focusLine(header);
+        reportDirty();
+    }
+
+    editor.addEventListener("pointerdown", e => {
+        const header = e.target;
+        if (modeOf(header) !== "section" || e.clientX >= header.getBoundingClientRect().left) return;
+        e.preventDefault();
+        e.stopPropagation();
+        drag = null;
+        toggleSection(header);
+    }, true);
+
+    editor.addEventListener("focusin", e => { if (e.target.classList?.contains("folded")) focusLine(headerOf(e.target)); });
 
 
     // rows: [["code" | "result" | "error", latex], ...] in document order
@@ -1024,6 +1086,7 @@
 
     function getSheet(){
         return [...editor.children].map(el => {
+            if (!isOut(el) && modeOf(el) === "section") return ["code", clean(el, el.value), "section", sectionLength(el) + (el.dataset.collapsed ? " collapsed" : "")];
             if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", clean(el, el.value), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
             if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
             if (el.querySelector("img")) return ["image", el.querySelector("img").src];
@@ -1039,10 +1102,19 @@
         applyMode(first, code[0]?.[2] ?? "math");
         delete first.textLatex;
         delete first.textSize;
-        first.style.fontSize = code[0]?.[3] ?? "";
+        delete first.dataset.collapsed;
+        first.style.fontSize = code[0]?.[2] === "section" ? "" : code[0]?.[3] ?? "";
         setLine(first, code[0]?.[1] ?? "");
         let last = first;
-        for (const [, raw, mode, size] of code.slice(1)) last = newLine(last, raw, mode, size);
+        for (const [, raw, mode, size] of code.slice(1)) last = newLine(last, raw, mode, mode === "section" ? "" : size);
+        const all = lines();
+        all.forEach(mf => delete mf.dataset.section);
+        all.forEach((mf, i) => {
+            if (code[i]?.[2] !== "section") return;
+            const [count, state] = (code[i][3] ?? "").split(" ");
+            if (state === "collapsed") mf.dataset.collapsed = "1";
+            all.slice(i + 1, i + 1 + (parseInt(count) || 0)).forEach(l => l.dataset.section = "1");
+        });
         rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
         showOutput(rows, lines());
         lines().forEach(rember);
@@ -1061,6 +1133,7 @@
     window.addEventListener("blur",idle);
     idle();
     new MutationObserver(renumberLoops).observe(editor,{ childList: true})
+    new MutationObserver(refold).observe(editor, { childList: true, subtree: true, attributeFilter: ["data-mode", "data-collapsed", "data-section"] });
 
     const key = navigator.userAgent.includes("Mac") ? "Command" : "Ctrl";
     const first = newLine();
