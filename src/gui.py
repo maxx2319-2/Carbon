@@ -2861,7 +2861,7 @@ class MainWindow(QMainWindow):
                 ("a\u20D7+b\u20D7",r"\overrightarrow{#?}+\overrightarrow{#?}"),
                 ("a\u20D7−b\u20D7",r"\overrightarrow{#?}-\overrightarrow{#?}"),
                 ("k·a\u20D7",r"{#?}\cdot\overrightarrow{#?}"),
-                ("Det(a\u20D7)",r"\operatorname{Det}(\overrightarrow{#?})"),
+                ("Det(a\u20D7)",r"\operatorname{Det}(#?)"),
                 ("|a\u20D7|",r"\lvert\overrightarrow{#?}\rvert"),
                 ("e\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{#?}}"),
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
