@@ -74,9 +74,36 @@
     #editor::-webkit-scrollbar-track { background: #737373; border-radius: 5px; margin: 8px 0 20px 0; }
     #editor::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 5px; }
 
+    html { background: var(--bg); }
+    #cover { display: none; }
+    @page { @bottom-center { content: counter(page); font: 10pt KaTeX_Main, serif; color: #000; } }
+    @page { @bottom-right-corner { content: ""; background: url("../Assets/Carbon_Logo_Black.svg") no-repeat right 3mm bottom 3mm / 8mm; } }
+    @page :first { counter-reset: page 0; @bottom-center { content: none; } @bottom-right-corner { content: none; } }
+
+    @media print {
+         html, body { height: auto; overflow: visible; background: #fff; }
+        #cover { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; break-after: page; font-family: KaTeX_Main, serif; color: #000000; }
+        #cover h1 { font-size: 34px; font-weight: normal; margin: 0 0 20px; }
+        #cover p { font-size: 16px; margin: 4px 0; }
+        #editor { height: auto; overflow: visible; padding: 0; margin: 0; }
+        #editor > * { padding-left: calc(var(--depth, 0) * 24px) !important; background-image: none !important; break-inside: avoid; }
+        #editor > *::before { content: none !important; }
+        #editor > math-field { font-family: KaTeX_Main, serif; --text-font-family: KaTeX_Main, serif; }
+        #editor > math-field:not([data-mode=section]):not([data-mode=picture]) { font-size: 12pt !important; }
+        #editor > math-field[data-mode=section] { font-size: 18pt; font-weight: 600; margin-top: 20px; break-after: avoid; }
+        #editor > math-field[data-mode=section][data-depth="1"] { font-size: 15pt; }
+        #editor > math-field[data-mode=section][data-depth="2"] { font-size: 13pt; }
+        math-field { --caret-color: transparent; }
+        #suggest, #tooltip { display: none; }
+        #editor > .out:has(> .print-version) > img:not(.print-version) { display: none; }
+        #editor img.print-version { display: block; max-width: 100%; }
+    }
+    img.print-version { display: none; }
+
 
 </style></head>
 <body>
+<div id="cover"><h1 id="cover-title"></h1><p id="cover-date"></p><p id="cover-creator"></p></div>
 <div id="editor"></div>
 <div id="suggest"></div>
 <div id="tooltip"></div>
@@ -548,7 +575,10 @@
         style.textContent = ":host(.multi) .ML__selection { background: var(--selection-background-color) !important; }"
             + " .pic { display: none; position: relative; width: fit-content; max-width: 100%; } :host([data-mode=picture]) .pic { display: block; }"
             + " .pic img { display: block; max-width: 100%; } :host([style*=font-size]) .pic img { width: 1em; } :host(:focus-within) .pic img { outline: 2px solid var(--accent); }"
-            + " .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; } :host(:focus-within) .grip { display: block; }";
+            + " .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; } :host(:focus-within) .grip { display: block; }"
+            + " @media print { * { color: #000 !important; background-color: transparent !important; outline: none !important; }"
+            + " .ML__mathbf { font-weight: normal !important; font-style: italic; } }";
+;
         const pic = document.createElement("span");
         pic.className = "pic";
         pic.innerHTML = "<img><span class=grip></span>";
@@ -1097,7 +1127,7 @@
         
         lines().forEach(clearOutput)
         let k = 0, anchor = lines().at(-1);
-        for (const [kind, latex] of rows) {
+        for (const [kind, latex, print] of rows) {
             if (kind ==="code") {anchor = all[k++]; continue; }
             let el;
             if (kind ==="image") {
@@ -1105,6 +1135,12 @@
                 const img = document.createElement("img");
                 img.src = latex;
                 el.append(img);
+                if (print) {
+                    const copy = document.createElement("img");
+                    copy.src = print;
+                    copy.className = "print-version";
+                    el.append(copy);
+                }
             } else if (kind === "plot") {
                 el = plotElement(JSON.parse(latex));
             } else {
@@ -1219,12 +1255,25 @@
     const safePlot = raw => { try { return JSON.parse(raw).functions.every(f => SAFE_JS.test(f.js)); } catch { return false; } };
 
 
+    function preparePrint(title, creator) {
+        document.getElementById("cover-title").textContent = title;
+        document.getElementById("cover-date").textContent = new Date().toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" });
+        document.getElementById("cover-creator").textContent = creator;
+        editor.querySelectorAll(".folded").forEach(el => el.classList.remove("folded"));
+        let depth = 0;
+        for (const el of editor.children) {
+            if (!isOut(el)) depth = depthOf(el);
+            el.style.setProperty("--depth", depth);
+        }
+    }
+
+
     function getSheet(){
         return [...editor.children].map(el => {
             if (!isOut(el) && modeOf(el) === "section") return ["code", clean(el, el.value), "section", sectionLength(el) + (el.dataset.collapsed ? " collapsed" : "")];
             if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", rawOf(el), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
             if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
-            if (el.querySelector("img")) return ["image", el.querySelector("img").src];
+            if (el.querySelector("img")) return ["image", el.querySelector("img").src, ...(el.querySelector(".print-version") ? [el.querySelector(".print-version").src] : [])];
             return [el.classList.contains("error") ? "error" : "result", el.value];
         });
     }
@@ -1253,7 +1302,7 @@
             if (state === "collapsed") mf.dataset.collapsed = "1";
             counts.push(parseInt(count) || 0);
         });
-        rows = rows.map(([kind, raw]) => kind === "plot" && !safePlot(raw) ? ["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : [kind, raw]);
+        rows = rows.map(row => row[0] === "plot" && !safePlot(row[1]) ?["error", "\\Rightarrow\\:\\text{Grafen kunne ikke indlæses}"] : row);
         showOutput(rows, lines());
         lines().forEach(rember);
         undoStack.length = 0;

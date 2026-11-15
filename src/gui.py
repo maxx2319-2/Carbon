@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
     QAbstractButton,
     QFileDialog,
     QTabBar,
+    QInputDialog,
 )
 from PySide6.QtCore import (
     Qt,
@@ -72,6 +73,7 @@ from PySide6.QtCore import (
     QEventLoop,
     QBuffer,
     QIODevice,
+    QMarginsF,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -95,6 +97,8 @@ from PySide6.QtGui import (
     QKeySequence,
     QIntValidator,
     QImage,
+    QPageLayout,
+    QPageSize,
 )
 import re
 import interpreter
@@ -823,7 +827,7 @@ class _InterpreterBridge(QObject):
 
     def done(self, run_id,rows, leaked):
         rows = json.loads(rows)
-        for kind, pks in rows:
+        for kind, pks, *_ in rows:
             if kind == "bjerrum":
                 self.bjerrumExported.emit(pks)
         self.finished.emit(run_id, json.dumps([row for row in rows if row[0] != "bjerrum"]))
@@ -887,7 +891,7 @@ class _InterpreterBridge(QObject):
                     if isinstance(value, Figure):
                         buf = io.BytesIO()
                         value.savefig(buf, format = "png")
-                        rows.append(["image","data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()])
+                        rows.append(["image", "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode(), "data:image/svg+xml;base64," + base64.b64encode(print_version(value)).decode()])
                         continue
                     for res in str(value).splitlines():
                         if res.startswith("Error"):
@@ -1088,6 +1092,23 @@ class TextOutput(QTextEdit):
 
     def text(self):
         return self.toPlainText()
+
+def print_version(fig):
+    fig.patch.set_facecolor("white")
+    for ax in fig.axes:
+        if ax.name == "3d":
+            ax.set_facecolor("white")
+        ax.tick_params(colors="black")
+        for label in (ax.xaxis.label, ax.yaxis.label, ax.title):
+            label.set_color("black")
+        legend = ax.get_legend()
+        box = legend.get_window_extent() if legend else None
+        if legend and (ax.name =="3d" or not ax.bbox.contains((box.x0 + box.x1)/2, (box.y0 + box.y1)/2)):
+            for text in legend.get_texts():
+                text.set_color("black")
+    buf = io.BytesIO()
+    fig.savefig(buf,format="svg")
+    return buf.getvalue()
 
 class LicenseWindow(QDialog):
     activated = Signal(bool, str)
@@ -3018,6 +3039,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Åbn", self.open_regneark)
         file_menu.addAction("Gem", self.save_regneark)
         file_menu.addAction("Gem som", self.save_regneark_as)
+        file_menu.addAction("Eksportér som PDF", self.export_pdf)
+
 
         QShortcut(QKeySequence.Save, page, self.save_regneark, Qt.WidgetWithChildrenShortcut)
         QShortcut(QKeySequence.SaveAs, page, self.save_regneark_as, Qt.WidgetWithChildrenShortcut)
@@ -3583,6 +3606,29 @@ class MainWindow(QMainWindow):
         self.set_tab_name(self.interpreter_view, Path(path).stem)
         self.interpreter_view.setProperty("path", path)
         self.save_regneark()
+
+    def export_pdf(self):
+        name = self.tab_name(self.interpreter_tabs.currentIndex())
+        path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", self.tab_name(self.interpreter_tabs.currentIndex()) + ".pdf", "PDF (*.pdf)")
+        if not path: return
+        creator, ok = QInputDialog.getText(self, "Eksportér som PDF", "Navn på forsiden (valgfrit):", text=_settings.value("pdf_creator", ""))
+        if not ok: return
+        _settings.setValue("pdf_creator",creator)
+        view = self.interpreter_view
+        
+        def write(data):
+            view.page().setBackgroundColor(QColor(BG))
+            view.page().runJavaScript("refold()")
+            try:
+                if data.isEmpty():
+                    raise OSError("PDF'en kunne ikke genereres")
+                Path(path).write_bytes(data.data())
+            except OSError as e:
+                QMessageBox.warning(self, "Eksportér PDF", f"Filen kunne ikke gemmes:\n{e}")
+        layout = QPageLayout(QPageSize(QPageSize.A4), QPageLayout.Portrait, QMarginsF(15, 15, 15, 15), QPageLayout.Millimeter)
+        view.page().setBackgroundColor(Qt.white)
+        view.page().runJavaScript(f"preparePrint({json.dumps(name)}, {json.dumps(creator)})", 0, lambda _: view.page().printToPdf(write, layout))
+                   
 
     def open_periodic(self):
         self.slide_to(self.periodic_page)
