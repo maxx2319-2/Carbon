@@ -43,6 +43,7 @@
     img.out { display: block; max-width: 100%; }
     #editor > math-field[data-mode=picture] { width: auto; font-size: 0; min-height: 0; line-height: 0; }
     #editor > math-field[data-mode=picture]::before { align-items: flex-start; }
+    #editor > math-field.nl:not([data-mode=picture])::part(content)::after { content: ""; width: 6px; height: 1em; align-self: center; background: var(--selection-background-color); }
     #editor > math-field[data-mode=picture]::part(container) { display: none; }
     
     div.plot { width: 500px; height: 400px; max-width: 100%; }
@@ -435,6 +436,7 @@
         const [a, b] = ordered(), all = lines(), i = all.indexOf(a.mf), j = all.indexOf(b.mf);
         all.forEach((mf, k) => {
             mf.classList.toggle("multi", k >= i && k <= j);
+            mf.classList.toggle("nl", k >= i && k < j);
             if (k < i || k > j) return;
             const backward = mf === sel.focus.mf && sel.focus === a;
             mf.selection = { ranges: [[k === i ? a.offset : 0, k === j ? b.offset : mf.lastOffset]], direction: backward ? "backward" : "forward" };
@@ -445,7 +447,7 @@
         if (!sel) return;
         for (const mf of lines()) {
             if (!mf.classList.contains("multi")) continue;
-            mf.classList.remove("multi");
+            mf.classList.remove("multi", "nl");
             if (mf !== document.activeElement) mf.position = mf.position;
         }
         sel = null;
@@ -489,6 +491,12 @@
             .join("\n");
     }
 
+    function selectedRows() {
+        const [a, b] = ordered(), all = lines(), part = all.slice(all.indexOf(a.mf), all.indexOf(b.mf) + 1);
+        const top = Math.min(...part.map(depthOf));
+        return part.map(mf => [modeOf(mf) === "picture" ? mf.picture : clean(mf, mf.getValue(mf === a.mf ? a.offset : 0, mf === b.mf ? b.offset : mf.lastOffset, "latex")), modeOf(mf), mf.style.fontSize, depthOf(mf) - top]);
+    }
+
     function deleteSel() {
         const [a, b] = ordered(), all = lines();
         const raw = clean(a.mf, a.mf.getValue(0, a.offset, "latex")) + clean(b.mf, b.mf.getValue(b.offset, b.mf.lastOffset, "latex"));
@@ -498,7 +506,7 @@
             if (mf !== a.mf) mf.remove();
         }
         a.mf.focus();
-        if (modeOf(a.mf) === "picture") applyMode(a.mf, "math");
+        if (["picture", "section"].includes(modeOf(a.mf)) && !a.offset) applyMode(a.mf, modeOf(b.mf) === "picture" ? "math" : modeOf(b.mf));
         setLine(a.mf, raw, a.offset);
         return a.mf;
     }
@@ -509,7 +517,7 @@
         e.stopPropagation();
         const text = selectedText();
         e.clipboardData.setData("text/plain", text);
-        e.clipboardData.setData("text/html", `<pre data-carbon-lines>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`);
+        e.clipboardData.setData("text/html", `<pre data-carbon-lines="${JSON.stringify(selectedRows()).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`);
         if (cut) { deleteSel(); record(); }
     }
 
@@ -519,17 +527,28 @@
         e.preventDefault();
         e.stopPropagation();
         const mf = sel ? deleteSel() : e.currentTarget;
-        const fix = e.clipboardData.getData("text/html").includes("data-carbon-lines") ? raw => raw : raw => raw.replace(/[\\%#&$\{\}]/g, c => c === "\\" ? "\\backslash " : "\\" + c);
-        const [head, ...rest] = text.split("\n").map(fix);
+        const carbon = new DOMParser().parseFromString(e.clipboardData.getData("text/html"), "text/html").querySelector("pre[data-carbon-lines]");
+        const rows = carbon ? JSON.parse(carbon.dataset.carbonLines) : text.split("\n").map(raw => [raw.replace(/[\\%#&$\{\}]/g, c => c === "\\" ? "\\backslash " : "\\" + c)]);
+        const plain = row => !["section", "picture"].includes(row[1]);
+        for (const i of [0, rows.length - 1]) if (!rows[i][0]) rows[i] = [""];
+        const mode = modeOf(mf);
 
         clearOutput(mf);
-        if (!rest.length) { mf.insert(head); record(); return; }
+        if (rows.length === 1 && plain(rows[0])) { mf.insert(rows[0][0]); record(); return; }
+        const depth = depthOf(mf) + (mode === "section" ? 1 : 0);
+        const before = clean(mf, mf.getValue(0, mf.position, "latex"));
         const after = clean(mf, mf.getValue(mf.position, mf.lastOffset, "latex"));
-        setLine(mf, clean(mf, mf.getValue(0, mf.position, "latex")) + head);
+        if (after && !plain(rows.at(-1))) rows.push([""]);
+        if (plain(rows[0])) setLine(mf, before + rows.shift()[0]);
+        else if (!before) { const [raw, m, size] = rows.shift(); applyMode(mf, m); mf.style.fontSize = size; setLine(mf, raw); }
+        else setLine(mf, before);
         let last = mf;
-        for (const raw of rest) last = newLine(last, raw, modeOf(mf));
+        for (const [raw, m = mode, size = "", rel = 0] of rows) {
+            last = newLine(last, raw, m, size);
+            if (depth + rel) last.dataset.depth = Math.min(depth + rel, 3); else delete last.dataset.depth;
+        }
         const end = last.lastOffset;
-        setLine(last, clean(last, last.value) + after, end);
+        if (after) setLine(last, clean(last, last.value) + after, end);
         last.focus();
         last.position = end;
         record();
@@ -576,6 +595,7 @@
             + " .pic { display: none; position: relative; width: fit-content; max-width: 100%; } :host([data-mode=picture]) .pic { display: block; }"
             + " .pic img { display: block; max-width: 100%; } :host([style*=font-size]) .pic img { width: 1em; } :host(:focus-within) .pic img { outline: 2px solid var(--accent); }"
             + " .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; } :host(:focus-within) .grip { display: block; }"
+            + " .pic::after { content: ''; display: none; position: absolute; inset: 0; background: var(--selection-background-color); pointer-events: none; } :host(.multi) .pic::after { display: block; }"
             + " @media print { * { color: #000 !important; background-color: transparent !important; outline: none !important; }"
             + " .ML__mathbf { font-weight: normal !important; font-style: italic; } }";
 ;
@@ -1115,8 +1135,7 @@
         if (modeOf(header) !== "section" || e.clientX >= header.getBoundingClientRect().left) return;
         e.preventDefault();
         e.stopPropagation();
-        drag = null;
-        toggleSection(header);
+        window.addEventListener("pointerup", () => sel || toggleSection(header), { once: true, capture: true });
     }, true);
 
     editor.addEventListener("focusin", e => { if (e.target.classList?.contains("folded")) focusLine(headerOf(e.target)); });
