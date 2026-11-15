@@ -70,6 +70,8 @@ from PySide6.QtCore import (
     QEvent,
     QTimer,
     QEventLoop,
+    QBuffer,
+    QIODevice,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -92,6 +94,7 @@ from PySide6.QtGui import (
     QShortcut,
     QKeySequence,
     QIntValidator,
+    QImage,
 )
 import re
 import interpreter
@@ -2999,6 +3002,7 @@ class MainWindow(QMainWindow):
         insert_menu.setStyleSheet(menu_style)
         add_section = lambda: (self.interpreter_view.page().runJavaScript("addSection()"), self.interpreter_view.setFocus())
         insert_menu.addAction("Sektion", add_section)
+        insert_menu.addAction("Billede", self.insert_picture)
         insert_btn.setMenu(insert_menu)
         insert_btn.setStyleSheet(tool_style)
         bar_layout.addWidget(insert_btn)
@@ -3290,6 +3294,20 @@ class MainWindow(QMainWindow):
     def focus_interpreter(self):
         self.interpreter_view.setFocus()
         self.interpreter_view.page().runJavaScript("(lastField ?? first).focus()")
+
+    def insert_picture(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Indsæt billede", "", "Billeder (*.png *.jpg *.jpeg *.bmp *.gif *.webp)")
+        image = QImage(path)
+        if image.isNull():
+            return
+        if image.width() > 800:
+            image = image.scaledToWidth(800, Qt.SmoothTransformation)
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image.save(buffer, "PNG")
+        url = "data:image/png;base64," + bytes(buffer.data().toBase64()).decode()
+        self.interpreter_view.page().runJavaScript(f"insertPicture({json.dumps(url)})")
+        self.interpreter_view.setFocus()
 
     def create_settings_page(self):
         language = QComboBox()
@@ -3695,6 +3713,8 @@ class MainWindow(QMainWindow):
             if not self.ask_close("Luk Carbon", f"Vil du lukke Carbon?\n{names} er ikke gemt og går tabt."):
                 event.ignore()
                 return
+        for view in views:
+            view.page().setWebChannel(None)
         super().closeEvent(event)
 
 def log_error(kind, value, tb):

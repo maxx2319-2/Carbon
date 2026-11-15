@@ -11,7 +11,7 @@ def insert_menu(w):
 
 def test_insert_button_has_section(window):
     btn, actions = insert_menu(window)
-    assert list(actions) == ["Sektion"]
+    assert list(actions) == ["Sektion", "Billede"]
     assert btn.isEnabled()
 
 

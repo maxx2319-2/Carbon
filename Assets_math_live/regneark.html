@@ -41,6 +41,9 @@
     #editor > div.out::before {align-items: flex-start;}
 
     img.out { display: block; max-width: 100%; }
+    #editor > math-field[data-mode=picture] { width: auto; font-size: 0; min-height: 0; line-height: 0; }
+    #editor > math-field[data-mode=picture]::before { align-items: flex-start; }
+    #editor > math-field[data-mode=picture]::part(container) { display: none; }
     
     div.plot { width: 500px; height: 400px; max-width: 100%; }
     div.plot canvas { display: block; width: 100%; height: 100%; cursor: default; }
@@ -157,18 +160,22 @@
     const modeOf = mf => mf.dataset.mode ?? "math";
     const isText = mf => ["text", "section"].includes(modeOf(mf));
     const depthOf = el => +(el.dataset.depth ?? 0);
-    const reportMode = mf => modeOf(mf) !== "section" && bridge?.reportMode(modeOf(mf));
+    const reportMode = mf => !["section", "picture"].includes(modeOf(mf)) && bridge?.reportMode(modeOf(mf));
     const styled = (mf, raw) => modeOf(mf) === "math" ? highlight(strip(raw)) : raw;
     const clean = (mf, latex) => isText(mf) ? latex : strip(latex);
+    const rawOf = mf => modeOf(mf) === "picture" ? mf.picture : clean(mf, mf.value);
 
 
     function applyMode(mf,mode) {
+        if (modeOf(mf) === "picture" && mode !== "picture") mf.style.fontSize = "";
         if (mode === "math") delete mf.dataset.mode; else mf.dataset.mode = mode;
         if (mode !== "section") delete mf.dataset.collapsed;
+        mf.readOnly = mode === "picture";
     }
     
 
     function setLine(mf, raw, position) {
+        if (modeOf(mf) === "picture") { mf.picture = raw; mf.value = ""; mf.shadowRoot.querySelector("img").src = raw; return; }
         mf.recolouring = true;
         mf._mathfield.model.at(0).style = {};
         mf.value = styled(mf, raw);
@@ -464,6 +471,7 @@
             if (mf !== a.mf) mf.remove();
         }
         a.mf.focus();
+        if (modeOf(a.mf) === "picture") applyMode(a.mf, "math");
         setLine(a.mf, raw, a.offset);
         return a.mf;
     }
@@ -472,18 +480,19 @@
         if (!sel) return;
         e.preventDefault();
         e.stopPropagation();
-        e.clipboardData.setData("text/plain", selectedText());
-        e.clipboardData.setData("application/x-carbon", "1");
+        const text = selectedText();
+        e.clipboardData.setData("text/plain", text);
+        e.clipboardData.setData("text/html", `<pre data-carbon-lines>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`);
         if (cut) { deleteSel(); record(); }
     }
 
     function onPaste(e) {
         const text = e.clipboardData.getData("text/plain").replace(/\r/g, "");
-        if (!sel && (isOut(e.currentTarget) || !text.includes("\n"))) return;
+        if (!sel && (isOut(e.currentTarget) || modeOf(e.currentTarget) === "picture" || !text.includes("\n"))) return;
         e.preventDefault();
         e.stopPropagation();
         const mf = sel ? deleteSel() : e.currentTarget;
-        const fix = e.clipboardData.types.includes("application/x-carbon") ? raw => raw : raw => raw.replace(/[\\%#&$\{\}]/g, c => c === "\\" ? "\\backslash " : "\\" + c);
+        const fix = e.clipboardData.getData("text/html").includes("data-carbon-lines") ? raw => raw : raw => raw.replace(/[\\%#&$\{\}]/g, c => c === "\\" ? "\\backslash " : "\\" + c);
         const [head, ...rest] = text.split("\n").map(fix);
 
         clearOutput(mf);
@@ -517,6 +526,7 @@
         if (mf === drag.mf && !sel) return;
         sel = { anchor: drag, focus: { mf, offset: offsetAt(mf, e) } };
         paint();
+        e.stopPropagation();
     }, true);
 
     window.addEventListener("pointerup", () => {
@@ -535,8 +545,16 @@
         mf.addEventListener("cut", e => copySel(e, true), true);
         mf.addEventListener("paste", onPaste, true);
         const style = document.createElement("style");
-        style.textContent = ":host(.multi) .ML__selection { background: var(--selection-background-color) !important; }";
-        mf.shadowRoot.append(style);
+        style.textContent = ":host(.multi) .ML__selection { background: var(--selection-background-color) !important; }"
+            + " .pic { display: none; position: relative; width: fit-content; max-width: 100%; } :host([data-mode=picture]) .pic { display: block; }"
+            + " .pic img { display: block; max-width: 100%; } :host([style*=font-size]) .pic img { width: 1em; } :host(:focus-within) .pic img { outline: 2px solid var(--accent); }"
+            + " .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; } :host(:focus-within) .grip { display: block; }";
+        const pic = document.createElement("span");
+        pic.className = "pic";
+        pic.innerHTML = "<img><span class=grip></span>";
+        pic.firstChild.onpointerdown = e => { e.preventDefault(); mf.focus(); };
+        pic.lastChild.onpointerdown = e => resizePicture(mf, e);
+        mf.shadowRoot.append(style, pic);
     }
 
     function newLine(after = null, raw = "", mode = "math", size = "") {
@@ -562,7 +580,7 @@
     function snapshot () {
         const all = lines();
         const mf = document.activeElement;
-        return {raws: all.map(l => clean(l, l.value)), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), depths: all.map(l => l.dataset.depth ?? ""), line: all.indexOf(mf), position: mf?.position ?? 0};
+        return {raws: all.map(rawOf), modes: all.map(modeOf), sizes: all.map(l => l.style.fontSize), depths: all.map(l => l.dataset.depth ?? ""), line: all.indexOf(mf), position: mf?.position ?? 0};
     }
 
     function record() {
@@ -607,7 +625,7 @@
         while (all.length < s.raws.length) all.push(newLine());
         all.forEach((mf,i) =>{
             if (s.depths[i]) mf.dataset.depth = s.depths[i]; else delete mf.dataset.depth;
-            if (clean(mf, mf.value) === s.raws[i] && modeOf(mf) === s.modes[i] && mf.style.fontSize === s.sizes[i]) return;
+            if (rawOf(mf) === s.raws[i] && modeOf(mf) === s.modes[i] && mf.style.fontSize === s.sizes[i]) return;
             clearOutput(mf);
             applyMode(mf, s.modes[i]);
             mf.style.fontSize = s.sizes[i];
@@ -686,6 +704,11 @@
         if (e.key === "ArrowDown" && down) { stop(); focusLine(down); return; }
         if (e.key === "ArrowLeft" && atStart && up) { stop(); focusLine(up, "end"); return; }
         if (e.key === "ArrowRight" && atEnd && down) { stop(); focusLine(down, "start"); return; }
+        if (modeOf(mf) === "picture") {
+            if (e.key === "Enter") { stop(); focusLine(newLine(mf), "start"); record(); }
+            if (e.key === "Backspace" || e.key === "Delete") { stop(); applyMode(mf, "math"); setLine(mf, ""); record(); }
+            return;
+        }
         const atom = mf._mathfield.model.at(mf.position);
         if (!text && e.key === " " && mf.selectionIsCollapsed && ["\\vec", "\\hat", "\\overrightarrow"].includes(atom?.parent?.command) && atom.isLastSibling) mf.executeCommand("moveToNextChar");
         if (!text && e.key === "_") { stop(); mf.executeCommand("moveToSubscript"); return; }
@@ -725,6 +748,7 @@
         if (e.key === "Delete" && atEnd && next && modeOf(next) === "section") { stop(); removeSection(next); record(); return; }
         if (e.key === "Delete" && atEnd && modeOf(mf) === "section") { stop(); return; }
 
+        if (e.key === "Backspace" && atStart && prev && modeOf(prev) === "picture") { stop(); if (!mf.lastOffset) { clearOutput(mf); mf.remove(); } prev.focus(); record(); return; }
         if (e.key === "Backspace" && atStart && prev) {
             // join this line onto the end of the previous one
             stop();
@@ -937,6 +961,67 @@
         record();
     }
 
+    function resizePicture(mf, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drag = null;
+        mf.focus();
+        const grip = e.currentTarget, x = e.clientX, width = mf.shadowRoot.querySelector("img").getBoundingClientRect().width;
+        grip.setPointerCapture(e.pointerId);
+        grip.onpointermove = m => mf.style.fontSize = Math.round(Math.min(mf.clientWidth, Math.max(40, width + m.clientX - x))) + "px";
+        grip.onpointerup = () => { grip.onpointermove = null; record(); };
+    }
+
+    function insertPicture(src, size = "") {
+        clearSel();
+        let at = lastField ?? first;
+        while (isOut(at)) at = at.previousElementSibling;
+        delete at.dataset.collapsed;
+        if (modeOf(at) === "math" && at.value === "") applyMode(at, "picture");
+        else { while (isOut(at.nextElementSibling)) at = at.nextElementSibling; at = newLine(at, "", "picture"); }
+        setLine(at, src);
+        at.style.fontSize = size;
+        at.focus();
+        record();
+    }
+
+    function pastePicture(file) {
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, 800 / img.width);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(img.src);
+            insertPicture(canvas.toDataURL("image/png"));
+        };
+        img.src = URL.createObjectURL(file);
+    }
+
+    document.addEventListener("paste", e => {
+        const copied = new DOMParser().parseFromString(e.clipboardData.getData("text/html"), "text/html").querySelector("img[data-carbon-size]");
+        const picture = [...e.clipboardData.files].find(f => f.type.startsWith("image/"));
+        if (!copied && (!picture || e.clipboardData.getData("text/plain"))) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (copied) insertPicture(copied.getAttribute("src"), copied.dataset.carbonSize); else pastePicture(picture);
+    }, true);
+
+    function copyPicture(e) {
+        const mf = document.activeElement;
+        if (sel || modeOf(mf) !== "picture") return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.clipboardData.setData("text/html", `<img src="${mf.picture}" data-carbon-size="${mf.style.fontSize}">`);
+        if (e.type === "cut") { applyMode(mf, "math"); setLine(mf, ""); record(); }
+    }
+
+    document.addEventListener("copy", copyPicture, true);
+    document.addEventListener("cut", copyPicture, true);
+
     const headerOf = el => { while (el && (modeOf(el) !== "section" || el.classList.contains("folded"))) el = el.previousElementSibling; return el; };
     const sectionLength = header => { let n = 0; for (let el = header.nextElementSibling; el && (isOut(el) || depthOf(el) > depthOf(header)); el = el.nextElementSibling) if (!isOut(el)) n++; return n; };
 
@@ -1066,7 +1151,7 @@
     function setMode(mode, mf = lastField ?? first) {
         hideSuggest();
         for (const line of sel ? selectedLines() : [mf]) {
-            if (isOut(line) || modeOf(line) === mode || modeOf(line) === "section") continue;
+            if (isOut(line) || modeOf(line) === mode || ["section", "picture"].includes(modeOf(line))) continue;
             clearOutput(line);
             if (modeOf(line) === "text") {
                 line.textLatex = line.value;
@@ -1137,7 +1222,7 @@
     function getSheet(){
         return [...editor.children].map(el => {
             if (!isOut(el) && modeOf(el) === "section") return ["code", clean(el, el.value), "section", sectionLength(el) + (el.dataset.collapsed ? " collapsed" : "")];
-            if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", clean(el, el.value), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
+            if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", rawOf(el), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
             if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
             if (el.querySelector("img")) return ["image", el.querySelector("img").src];
             return [el.classList.contains("error") ? "error" : "result", el.value];
@@ -1191,7 +1276,7 @@
     const key = navigator.userAgent.includes("Mac") ? "Command" : "Ctrl";
     let first = newLine();
     const hint = `\\textcolor{#858585}{\\text{Skriv din udregning her og tryk ${key}+Enter for at regne}}`;
-    const updateHint = () => first.placeholder = lines().length === 1 && first.value === "" && modeOf(first) !== "section" ? hint : "";
+    const updateHint = () => first.placeholder = lines().length === 1 && first.value === "" && !["section", "picture"].includes(modeOf(first)) ? hint : "";
     editor.addEventListener("input",updateHint);
     updateHint();
     focusLine(first);
