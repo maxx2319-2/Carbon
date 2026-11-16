@@ -2921,8 +2921,8 @@ class MainWindow(QMainWindow):
                 ("∫", r"\int #?\,\differentialD #?"),
                 ("Integral_ab.svg", r"\int_{#?}^{#?}#?\,\differentialD #?"),
                 ("Ddx.svg", r"\frac{\differentialD}{\differentialD #?}\left(#?\right)"),
-                ("lim", r"\lim_{#?\to#?}\left(#?\right)"),
-                ("Σ", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
+                ("Lim.svg", r"\lim_{#?\to#?}\left(#?\right)"),
+                ("Sum.svg", r"\sum_{#?=#?}^{#?}\left(#?\right)"),
             ], insert)),
             ("Græsk", symbol_grid([(char, "\\" + name) for name, char in GREEK.items()], insert)),
             ("Vektorer",symbol_grid([
