@@ -19,7 +19,7 @@
         font-size: 18px; color: #fff; background: transparent;
         border: none; outline: none; padding: 2px 6px;
         --caret-color: var(--accent);
-        --selection-background-color: color-mix(in srgb, var(--accent) 35%, transparent);
+        --selection-background-color: color-mix(in srgb, var(--accent) 35%, var(--bg));
         --contains-highlight-background-color: hsl(212, 5%, 34%);
         --text-highlight-background-color: transparent;
         --highlight-text: transparent;
@@ -43,7 +43,7 @@
     img.out { display: block; max-width: 100%; }
     #editor > math-field[data-mode=picture] { width: auto; font-size: 0; min-height: 0; line-height: 0; }
     #editor > math-field[data-mode=picture]::before { align-items: flex-start; }
-    #editor > math-field.nl:not([data-mode=picture])::part(content)::after { content: ""; width: 6px; height: 1em; align-self: center; background: var(--selection-background-color); }
+    #editor > math-field.nl:not([data-mode=picture])::part(content)::after { content: ""; width: 2px; align-self: stretch; margin: -8px 0; background: var(--selection-background-color); }
     #editor > math-field[data-mode=picture]::part(container) { display: none; }
     
     div.plot { width: 500px; height: 400px; max-width: 100%; }
@@ -591,11 +591,12 @@
         mf.addEventListener("cut", e => copySel(e, true), true);
         mf.addEventListener("paste", onPaste, true);
         const style = document.createElement("style");
-        style.textContent = ":host(.multi) .ML__selection { background: var(--selection-background-color) !important; }"
-            + " .pic { display: none; position: relative; width: fit-content; max-width: 100%; } :host([data-mode=picture]) .pic { display: block; }"
+        style.textContent = ":host(.multi) .ML__selection { background: var(--selection-background-color) !important; top: -6px !important; height: calc(100% + 12px) !important; box-sizing: content-box !important; padding-right: 1px !important; }"
+            + " :host(.multi) .ML__content { overflow: visible; }"
+            + " .pic { display: none; position: relative; width: fit-content; max-width: calc(100% - 5px); margin-left: 5px; } :host([data-mode=picture]) .pic { display: block; }"
             + " .pic img { display: block; max-width: 100%; } :host([style*=font-size]) .pic img { width: 1em; } :host(:focus-within) .pic img { outline: 2px solid var(--accent); }"
             + " .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; } :host(:focus-within) .grip { display: block; }"
-            + " .pic::after { content: ''; display: none; position: absolute; inset: 0; background: var(--selection-background-color); pointer-events: none; } :host(.multi) .pic::after { display: block; }"
+            + " .pic::after { content: ''; display: none; position: absolute; inset: -2px 0; background: color-mix(in srgb, var(--accent) 35%, transparent); pointer-events: none; } :host(.multi) .pic::after { display: block; }"
             + " @media print { * { color: #000 !important; background-color: transparent !important; outline: none !important; }"
             + " .ML__mathbf { font-weight: normal !important; font-style: italic; } }";
 ;
