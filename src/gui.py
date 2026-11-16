@@ -3830,7 +3830,7 @@ def report_error(kind, value, tb):
     QTimer.singleShot(0, lambda: QMessageBox.warning(None, "Carbon", f"Der skete en fejl:\n{value}"))
 
 def preload(window, splash):
-    pages = [window.interpreter_view.page()]
+    pages = [window.interpreter_view.page(), window.definition_list.page()]
     scripts = ["typeof getSheet === 'function'", "typeof setDefinitions === 'function'"]
     names = ["regneark", "definitioner"]
     if resource_path("Assets_Ketcher/index.html").exists():
