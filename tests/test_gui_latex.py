@@ -125,7 +125,7 @@ def test_latex_text_escapes(text, expected):
 # --- the whole Regneark round trip ---
 
 def run_sheet(*lines):
-    return json.loads(gui._InterpreterBridge().evaluate(json.dumps(list(lines))))
+    return [row for row in json.loads(gui._InterpreterBridge().evaluate(json.dumps(list(lines)))) if row[0] != "defs"]
 
 
 def test_sheet_result():

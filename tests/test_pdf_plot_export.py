@@ -27,7 +27,7 @@ def test_plots_get_a_print_version(lines):
 
 def test_done_accepts_rows_with_a_print_version():
     rows = evaluate(r"BjerrumDiagram\left(4.76\right)")
-    bridge = SimpleNamespace(bjerrumExported=Mock(), finished=Mock(), leaked=Mock())
+    bridge = SimpleNamespace(bjerrumExported=Mock(), definitionsChanged=Mock(), finished=Mock(), leaked=Mock())
     _InterpreterBridge.done(bridge, 1, json.dumps(rows), False)
     sent = json.loads(bridge.finished.emit.call_args.args[1])
     assert any(row[0] == "image" and len(row) == 3 for row in sent)

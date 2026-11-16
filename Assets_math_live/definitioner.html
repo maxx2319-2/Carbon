@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="mathlive.min.js"></script>
+<style>
+    html, body { margin: 0; background: transparent; color: #fff; overflow: hidden; }
+    #list:empty::before { content: "Intet defineret"; color: #858585; font: 14px "Segoe UI"; }
+    math-field {
+        display: block; width: 100%; box-sizing: border-box;
+        font-size: 16px; color: #fff; background: transparent;
+        border: none; outline: none; padding: 2px 0;
+        --caret-color: transparent;
+    }
+    math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { display: none; }
+    math-field::part(content) { overflow-x: auto; }
+    math-field::part(content)::-webkit-scrollbar { height: 6px; }
+    math-field::part(content)::-webkit-scrollbar-thumb { background: #737373; border-radius: 3px; }
+</style></head>
+<body><div id="list"></div>
+<script>
+    MathfieldElement.fontsDirectory = "./fonts";
+    MathfieldElement.soundsDirectory = null;
+    const list = document.getElementById("list");
+    function setDefinitions(defs) {
+        list.replaceChildren(...defs.map(latex => {
+            const mf = new MathfieldElement();
+            mf.readOnly = true;
+            mf.value = latex;
+            return mf;
+        }));
+    }
+    new QWebChannel(qt.webChannelTransport, ch => {
+        new ResizeObserver(() => ch.objects.bridge.setHeight(list.offsetHeight)).observe(list);
+    });
+</script>
+</body></html>

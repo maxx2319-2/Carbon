@@ -785,6 +785,7 @@ def latex_text(s):
 MAX_LOOP_ROWS = 50
 
 class _InterpreterBridge(QObject):
+    definitionsChanged = Signal(str)
     finished = Signal(int, str)
     modeChanged = Signal(str)
     escaped = Signal()
@@ -827,10 +828,12 @@ class _InterpreterBridge(QObject):
 
     def done(self, run_id,rows, leaked):
         rows = json.loads(rows)
-        for kind, pks, *_ in rows:
+        for kind, data, *_ in rows:
             if kind == "bjerrum":
-                self.bjerrumExported.emit(pks)
-        self.finished.emit(run_id, json.dumps([row for row in rows if row[0] != "bjerrum"]))
+                self.bjerrumExported.emit(data)
+            elif kind == "defs":
+                self.definitionsChanged.emit(data)
+        self.finished.emit(run_id, json.dumps([row for row in rows if row[0] not in ("bjerrum", "defs")]))
         if leaked:
             self.leaked.emit()
 
@@ -908,6 +911,18 @@ class _InterpreterBridge(QObject):
                             )
                 except Exception as e:
                     rows.append(["error", r"\Rightarrow\:" + latex_text(f"Error: {e}")])
+        defs = []
+        for k, v in ev.variables.items():
+            name = sympy.latex(sympy.Symbol(k.removesuffix("_vec")))
+            if isinstance(v.value, Vector):
+                defs.append(rf"\overrightarrow{{{name}}}=\begin{{pmatrix}}" + r"\\".join(calc_to_latex(c) for c in v.value.cordinates) + r"\end{pmatrix}")
+            elif v.var_type == "str":
+                defs.append(name + "=" + latex_text(f'"{v.value}"'))
+            else:
+                defs.append(name + "=" + calc_to_latex(v.value))
+        for k, f in ev.custom_exprs.items():
+            defs.append(k + r"\left(" + ",".join(map(sympy.latex, f.variables)) + r"\right)=" + sympy.latex(f.expr))
+        rows.append(["defs", json.dumps(defs)])
         return json.dumps(rows)
 
     @Slot(int, str)
@@ -1058,6 +1073,37 @@ class MathOutput(QWebEngineView):
 
     def setStyleSheet(self, _):
         pass
+
+class _HeightBridge(QObject):
+    resized = Signal(int)
+
+    @Slot(int)
+    def setHeight(self, h):
+        self.resized.emit(h)
+
+class DefinitionList(QWebEngineView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.defs = "[]"
+        self.loaded = False
+        self.setFixedHeight(1)
+        self.bridge = _HeightBridge()
+        self.bridge.resized.connect(self.setFixedHeight)
+        channel = QWebChannel(self.page())
+        channel.registerObject("bridge", self.bridge)
+        self.page().setWebChannel(channel)
+        self.page().setBackgroundColor(QColor(BG))
+        self.loadFinished.connect(self.on_loaded)
+        self.load(QUrl.fromLocalFile(str(resource_path("Assets_math_live/definitioner.html"))))
+
+    def on_loaded(self, ok):
+        self.loaded = True
+        self.set_definitions(self.defs)
+
+    def set_definitions(self, defs):
+        self.defs = defs
+        if self.loaded:
+            self.page().runJavaScript(f"setDefinitions({defs})")
 
 class TextOutput(QTextEdit): 
     def __init__(self, placeholder="", parent=None, height=BOX_HEIGHT):
@@ -2868,6 +2914,7 @@ class MainWindow(QMainWindow):
         def insert(latex):
             self.interpreter_view.page().runJavaScript(f"insertLatex({json.dumps(latex)})")
 
+        self.definition_list = DefinitionList()
         layout.addWidget(Sidebar([
             ("Calculus", symbol_grid([
                 ("∫", r"\int #?\,\differentialD #?"),
@@ -2896,7 +2943,8 @@ class MainWindow(QMainWindow):
 
 
 
-            ],insert,3))
+            ],insert,3)),
+            ("Definitioner", self.definition_list),
         ]))
 
         bar = QWidget()
@@ -3123,6 +3171,7 @@ class MainWindow(QMainWindow):
         bridge.escaped.connect(self.restore_window)
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
+        bridge.definitionsChanged.connect(lambda defs: self.show_definitions(view, defs))
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: self.interpreter_loaded(view))
@@ -3274,9 +3323,15 @@ class MainWindow(QMainWindow):
             self.show_style(False, False)
         self.interpreter_view.page().runJavaScript("sizeOf(lastField ?? first)", 0, lambda size: self.size_box.setText(str(int(size))) if size else None)
 
+    def show_definitions(self, view, defs):
+        view.definitions = defs
+        if view is self.interpreter_view:
+            self.definition_list.set_definitions(defs)
+
     def show_interpreter_tab(self, index):
         self.interpreter_stack.setCurrentIndex(index)
         self.focus_interpreter()
+        self.definition_list.set_definitions(getattr(self.interpreter_view, "definitions", "[]"))
         for i in range(self.interpreter_tabs.count()):
             tab = self.interpreter_tabs.tabButton(i, QTabBar.LeftSide)
             if tab:

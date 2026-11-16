@@ -37,7 +37,7 @@ def test_fuzzed_latex_sheet_always_gives_rows(seed):
         "import gui\n"
         f"lines = {lines!r}\n"
         "rows = json.loads(gui._InterpreterBridge().evaluate(json.dumps(lines)))\n"
-        "ok = all(isinstance(r, list) and len(r) == 2 and r[0] in ('code', 'result', 'error', 'image', 'plot') and isinstance(r[1], str) for r in rows)\n"
+        "ok = all(isinstance(r, list) and len(r) == 2 and r[0] in ('code', 'result', 'error', 'image', 'plot', 'defs') and isinstance(r[1], str) for r in rows)\n"
         "print(json.dumps([ok, sum(1 for r in rows if r[0] == 'code')]))\n"
     )
     env = {**os.environ, "MPLBACKEND": "agg", "QT_QPA_PLATFORM": "offscreen", "PYTHONIOENCODING": "utf-8"}
