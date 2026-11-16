@@ -667,6 +667,7 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\angle(?![A-Za-z])\s*", "VinkelVektor", s)
     s = re.sub(r"\{(\\(?:vec|overrightarrow)\{(?:[^{}]|\{[^{}]*\})*\})\}(?=_)", r"\1", s)
     s = re.sub(r"\\(?:vec|overrightarrow)\{\\mathnormal\{e\}\}_\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"EnhedsVektor(\\vec{\1})", s)
+    s = re.sub(r"\\overset\{\\text\{\\\^(?:\{\})?\}\}\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"TværVektor(\\vec{\1})", s)
     s = re.sub(r"\\!\\(?:vec|overrightarrow)\{\\:\\hat\{([^{}]*)\}\}", r"TværVektor(\\vec{\1})", s)
     s = re.sub(r"\\hat\{([^{}]*)\}", r"TværVektor(\\vec{\1})", s)
     s = re.sub(r"\\(?:vec|overrightarrow)\{([^{}]*)\}_\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"Projektion(\\vec{\1},\\vec{\2})", s)
@@ -2936,7 +2937,7 @@ class MainWindow(QMainWindow):
                 ("|a\u20D7|",r"\lvert\overrightarrow{#?}\rvert"),
                 ("e\u20D7<sub>a\u20D7</sub>",r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{#?}}"),
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
-                ("Tvaervektor.svg",r"\!\overrightarrow{\:\hat{#?}}"),
+                ("Tvaervektor.svg",r"\overset{\text{\^{}}}{\overrightarrow{#?}}"),
                 ("a\u20D7<sub>b\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
 
 

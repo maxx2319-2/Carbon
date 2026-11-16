@@ -27,6 +27,8 @@ B = r"\overrightarrow{b}=\left\lbrace3.0000,1.0000\right\rbrace"
     (r"\overrightarrow{\mathnormal{e}}_{\overrightarrow{a}}", [0.4472135955, 0.894427191]),
     (r"\hat{a}", [-2, 1]),
     (r"\!\overrightarrow{\:\hat{a}}", [-2, 1]),
+    (r"\overset{\text{\^}}{\overrightarrow{a}}", [-2, 1]),
+    (r"\overset{\text{\^{}}}{\overrightarrow{a}}", [-2, 1]),
     (r"\overrightarrow{b}_{\overrightarrow{a}}", [1, 2]),
     (r"{\overrightarrow{\mathnormal{e}}}_{\overrightarrow{a}}", [0.4472135955, 0.894427191]),
     (r"{\overrightarrow{b}}_{\overrightarrow{a}}", [1, 2]),
