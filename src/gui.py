@@ -3830,8 +3830,8 @@ def report_error(kind, value, tb):
 
 def preload(window, splash):
     pages = [window.interpreter_view.page()]
-    scripts = ["typeof getSheet === 'function'"]
-    names = ["regneark"]
+    scripts = ["typeof getSheet === 'function'", "typeof setDefinitions === 'function'"]
+    names = ["regneark", "definitioner"]
     if resource_path("Assets_Ketcher/index.html").exists():
         pages.append(window.molecule_view.page())
         scripts.append("!!(window.ketcher && ketcher.editor)")
