@@ -2925,6 +2925,7 @@ class MainWindow(QMainWindow):
                 ("Frac.svg", r"\frac{#?}{#?}"),
                 ("a<sup>b</sup>", r"#?^{#?}"),
                 ("a<sub>b</sub>", r"#?_{#?}"),
+                ("SubSup.svg", r"#?^{#?}_{#?}"),
                 ("Sqrt.svg", r"\sqrt{#?}"),
                 ("(a)", r"\left(#?\right)"),
                 ("[a]", r"\left[#?\right]"),
