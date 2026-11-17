@@ -43,6 +43,7 @@ FUNCTIONS = {
     "Erf": math.erf,
 }
 
+CONSTANTS = {"π": math.pi, "ℯ": math.e}
 
 
 TOKEN_RE = re.compile(
@@ -166,6 +167,8 @@ class _Parser:
         kind, value = self.take()
         if kind == "number":
             return quantity(float(value), {}, {})
+        if kind == "unit" and value in CONSTANTS:
+            return quantity(CONSTANTS[value], {}, {})
         if kind == "unit" and self.peek() == ("op","("):
             if value == "sqrt":
                 return self.group() ** 0.5

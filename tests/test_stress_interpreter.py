@@ -199,8 +199,7 @@ def test_round_rounds_halves_up():
     assert ev("Round(2.5)")[0].value == 3
 
 
-@pytest.mark.xfail(reason="M-01: π and e are read as units", strict=True)
-@pytest.mark.parametrize("text, expected", [("2π", 6.2832), ("e^2", 7.3891)])
+@pytest.mark.parametrize("text, expected", [("2π", 6.2832), ("ℯ^2", 7.3891)])
 def test_constants_are_numbers(text, expected):
     assert ev(text)[0].value == pytest.approx(expected, rel=1e-4)
 

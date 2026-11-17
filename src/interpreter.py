@@ -44,7 +44,7 @@ def round_vector(result, vectors):
     return utils.significant_figures(result, inputs)
 
 
-CONSTANTS = ("e", "π")
+CONSTANTS = ("ℯ", "π")
 
 
 
@@ -88,7 +88,7 @@ SAFE_GLOBALS = {
     "__builtins__": {},
     "Symbol": sympy.Symbol, "Integer": sympy.Integer, "Float": sympy.Float, "Rational": sympy.Rational, "Number": sympy.Number, "Function": sympy.Function,
     "integrate": sympy.integrate, "diff": sympy.diff, "limit": sympy.limit, "summation": sympy.summation,
-    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "e": sympy.E,
+    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi,
 }
 
 def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
@@ -100,7 +100,7 @@ def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
     for name in re.findall(r"([^\W\d]\w+)\s*\(", text):
         if name not in local_dict and name not in SAFE_GLOBALS:
             raise ValueError(f'Ukendt funktion "{name}"')
-    return parse_expr(text, local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=transformations)
+    return parse_expr(text.replace("ℯ", "Exp(1)"), local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=transformations)
 
 class Variables:
     def __init__(self, value, var_type):
@@ -1009,7 +1009,7 @@ class EV:
                             pc += 1
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
-                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "e": sympy.E, "π": sympy.pi})
+                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "π": sympy.pi})
                             pc += 1
 
                         elif (r := self.vector_ev(line)) is not None:

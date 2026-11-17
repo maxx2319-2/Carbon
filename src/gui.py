@@ -687,6 +687,7 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\(" + "|".join(GREEK) + r")(?![A-Za-z])", lambda m: GREEK[m.group(1)], s)
     s = s.replace(r"\%", "%")
     s = s.replace(r"\infty", "oo")
+    s = s.replace(r"\exponentialE", "ℯ")
     s = calculus_to_calc(s)
 
     prev = None
@@ -2917,6 +2918,26 @@ class MainWindow(QMainWindow):
 
         self.definition_list = DefinitionList()
         layout.addWidget(Sidebar([
+            ("Udtryk", symbol_grid([
+                ("a+b", r"#?+#?"),
+                ("a−b", r"#?-#?"),
+                ("a·b", r"#?\cdot#?"),
+                ("Frac.svg", r"\frac{#?}{#?}"),
+                ("a<sup>b</sup>", r"#?^{#?}"),
+                ("a<sub>b</sub>", r"#?_{#?}"),
+                ("Sqrt.svg", r"\sqrt{#?}"),
+                ("(a)", r"\left(#?\right)"),
+                ("[a]", r"\left[#?\right]"),
+                ("{a}", r"\left\lbrace#?\right\rbrace"),
+                ("|a|", r"\left|#?\right|"),
+                ("f(x)", r"#?\left(#?\right)"),
+                ("f(x)=", r"#?\left(#?\right)=#?"),
+            ], insert, 4)),
+            ("Konstanter", symbol_grid([
+                ("π", r"\pi"),
+                ("e", r"\exponentialE"),
+                ("∞", r"\infty"),
+            ], insert)),
             ("Calculus", symbol_grid([
                 ("∫", r"\int #?\,\differentialD #?"),
                 ("Integral_ab.svg", r"\int_{#?}^{#?}#?\,\differentialD #?"),
