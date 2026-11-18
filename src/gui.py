@@ -1078,10 +1078,15 @@ class MathOutput(QWebEngineView):
 
 class _HeightBridge(QObject):
     resized = Signal(int)
+    inserted = Signal(str)
 
     @Slot(int)
     def setHeight(self, h):
         self.resized.emit(h)
+
+    @Slot(str)
+    def insert(self, latex):
+        self.inserted.emit(latex)
 
 class DefinitionList(QWebEngineView):
     def __init__(self, parent=None):
@@ -2915,8 +2920,10 @@ class MainWindow(QMainWindow):
 
         def insert(latex):
             self.interpreter_view.page().runJavaScript(f"insertLatex({json.dumps(latex)})")
+            self.interpreter_view.setFocus()
 
         self.definition_list = DefinitionList()
+        self.definition_list.bridge.inserted.connect(insert)
         layout.addWidget(Sidebar([
             ("Definitioner", self.definition_list),
             ("Udtryk", symbol_grid([
