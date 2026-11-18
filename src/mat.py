@@ -7,17 +7,6 @@ class Vector:
     def __init__(self,cordinates):
         self.cordinates = cordinates 
 
-    @staticmethod
-    def create_vector(v):
-        if v.count("{") != 1:
-            raise ValueError("antal af '{' er forkert")
-        if v.count("}") != 1:
-                    raise ValueError("antal af '}' er forkert")
-
-        v = v.replace("{","").replace("}","")
-        v = v.split(",")
-        v = [x.strip() for x in v]
-        return Vector(v)
 
     def __str__(self):
           v = ", ".join(self.cordinates)
@@ -44,7 +33,10 @@ class Vector:
         for x in self.cordinates:
               result += float(x)**2
     
-        return math.sqrt(result) 
+        return math.sqrt(result)
+
+    def __pow__(self, power):
+        raise ValueError("en vektor kan ikke opløftes i en potens")
 
 
     def __len__(self):
@@ -60,6 +52,8 @@ class Vector:
 
     @staticmethod
     def dot_product(a,b):
+        if len(a) != len(b):
+            raise ValueError("vektorerne skal have samme længde")
         v = 0
 
         for x,y in zip(a.cordinates, b.cordinates):
@@ -80,7 +74,7 @@ class Vector:
     def scalar_product(k,a):
         result = []
         for part in a.cordinates:
-            result.append(str(float(part)*float(k)))
+            result.append(str(float(part)*float(k)+0.0))
 
         return Vector(result)
 
