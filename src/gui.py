@@ -3689,10 +3689,23 @@ class MainWindow(QMainWindow):
 
     def export_pdf(self):
         name = self.tab_name(self.interpreter_tabs.currentIndex())
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Eksportér som PDF")
+        dialog.setLabelText("Navn på forsiden (valgfrit):")
+        dialog.setTextValue(_settings.value("pdf_creator", ""))
+        dialog.setCancelButtonText("Annuller")
+        dialog.setStyleSheet(f"""
+            QInputDialog {{ background-color: {BG}; }}
+            QLabel {{ color: {BUTTON}; }}
+            QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 10px; border: none; border-radius: 8px; selection-background-color: {BG}; selection-color: {BUTTON}; }}
+            QPushButton {{ background-color: {BUTTON}; color: {TEXT}; padding: 6px 14px; border: none; border-radius: 8px; }}
+            QPushButton:hover {{ background-color: {HOVER}; }}
+        """)
+        point_cursor(dialog)
+        if not dialog.exec(): return
+        creator = dialog.textValue()
         path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", self.tab_name(self.interpreter_tabs.currentIndex()) + ".pdf", "PDF (*.pdf)")
         if not path: return
-        creator, ok = QInputDialog.getText(self, "Eksportér som PDF", "Navn på forsiden (valgfrit):", text=_settings.value("pdf_creator", ""))
-        if not ok: return
         _settings.setValue("pdf_creator",creator)
         view = self.interpreter_view
         
