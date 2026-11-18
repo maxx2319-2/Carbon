@@ -993,7 +993,7 @@ class EV:
                             pc += 1
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
-                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "π": sympy.pi})
+                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, **self.custom_exprs, "π": sympy.pi})
                             pc += 1
 
                         else:
