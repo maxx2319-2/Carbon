@@ -119,7 +119,8 @@
                   "ArcSinh", "ArcCosh", "ArcTanh", "Cbrt", "Abs", "Floor", "Ceil", "Round", "Degrees", "Radians",
                   "Gamma", "Erf"];
     const MATH_CALL = new RegExp(String.raw`(?<![A-Za-zæøåÆØÅ\\])(${MATH.join("|")})(?=\\left\(|\()`, "g");
-
+    const SYMBOLS = new Map([["sqrt", "\\sqrt{#?}"],["kvadratrod", "\\sqrt{#?}"] , ["Pi", "\\pi"], ["Euler", "\\exponentialE"], ["uendelig", "\\infty"], ["inf", "\\infty"]]);
+    const SYMBOL_LABELS = new Map([["sqrt", "√"],["kvadratrod", "√"] , ["Pi", "π"], ["Euler", "e"], ["uendelig", "∞"], ["inf", "∞"]]);
 
     const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
@@ -221,7 +222,7 @@
 
     const BOX = "\\placeholder{}";
 
-   
+
     // typing the letters "sqrt" turns them into a square root
     function makeSqrt(mf) {
         const before = strip(mf.getValue(0, mf.position, "latex"));
@@ -260,7 +261,7 @@
         const func = strip(mf.value).match(/^([A-Za-zæøåÆØÅ]+)\\left\(/)?.[1];
         const args = ARGS[func] ?? [];
         const opened = strip(mf.getValue(mf.position - 1, mf.position, "latex")) === BOX;
-        matches = word ? [...new Set([...args, ...FUNCTIONS,...MATH, ...variables()])].filter(f => f.toLowerCase().startsWith(word) && f.toLowerCase() !== word)
+        matches = word ? [...new Set([...args, ...FUNCTIONS,...MATH, ...SYMBOLS.keys(), ...variables()])].filter(f => f.toLowerCase().startsWith(word) && (f.toLowerCase() !== word || SYMBOLS.has(f)))
                 : opened ? args : [];
         active = 0;
         if (!matches.length) return hideSuggest();
@@ -274,7 +275,7 @@
         const atStart = suggestFor.position === currentWord(suggestFor).length;
         matches.forEach((f,i) => {
             const el = document.createElement("div");
-            el.textContent= f;
+            el.textContent = SYMBOL_LABELS.get(f) ?? f;
             if (atStart || MATH.includes(f)) el.style.color = wordColor(f) ?? "";
             if (i === active) el.classList.add("active");
             el.addEventListener("mousedown", e => { e.preventDefault(); active = i; accept(); })
@@ -295,7 +296,7 @@
         const inHelp = strip(mf.value).startsWith("Help");
         hideSuggest();
         mf.selection = { ranges: [[p - word.length, p]] };
-        mf.executeCommand(["insert", (FUNCTIONS.includes(name) && !inHelp) || MATH.includes(name) ? `${name}\\left(#?\\right)` : name, { selectionMode: "placeholder" }]);
+        mf.executeCommand(["insert", SYMBOLS.get(name) ?? ((FUNCTIONS.includes(name) && !inHelp) || MATH.includes(name) ? `${name}\\left(#?\\right)` : name), { selectionMode: "placeholder" }]);
     }
 
     let scrollTop = 0;

@@ -2918,6 +2918,7 @@ class MainWindow(QMainWindow):
 
         self.definition_list = DefinitionList()
         layout.addWidget(Sidebar([
+            ("Definitioner", self.definition_list),
             ("Udtryk", symbol_grid([
                 ("a+b", r"#?+#?"),
                 ("a−b", r"#?-#?"),
@@ -2960,13 +2961,7 @@ class MainWindow(QMainWindow):
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
                 ("Tvaervektor.svg",r"\overset{\text{\^{}}}{\overrightarrow{#?}}"),
                 ("a\u20D7<sub>b\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
-
-
-
-
-
             ],insert,3)),
-            ("Definitioner", self.definition_list),
         ]))
 
         bar = QWidget()
