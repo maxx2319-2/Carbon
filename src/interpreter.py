@@ -37,13 +37,6 @@ def round_quantity(quant,inputs):
     return quantity(value,quant.dimension,quant.current_units)
 
 
-def round_vector(result, vectors):
-    inputs = [c for v in vectors for c in v.cordinates]
-    if isinstance(result, Vector):
-        return Vector([str(utils.significant_figures(float(c), inputs)) for c in result.cordinates])
-    return utils.significant_figures(result, inputs)
-
-
 CONSTANTS = ("ℯ", "π")
 
 
@@ -92,6 +85,7 @@ SAFE_GLOBALS = {
 }
 
 def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
+    text = text.replace("×", "*")
     if re.search(r"_|\.(?!\d)|[^\w\s+\-*/^(),.]", text):
         raise ValueError("Ugyldigt tegn i udtrykket")
     for name in re.findall(r"[^\W\d]\w*", text):
@@ -113,6 +107,10 @@ class Variables:
 
     def __str__(self):
         return f"{self.value} {self.var_type}"
+
+
+def to_variable(r):
+    return Variables(r, "list") if isinstance(r, Vector) else Variables(quantity.simplify_units(r), "Quantity")
 
 
 class EV:
@@ -305,8 +303,6 @@ class EV:
                 continue
 
             line = re.sub(r"(\d)\s+\[", r"\1[", line)
-            vecs = {k for k, v in self.variables.items() if v.var_type == "list"}
-            line = re.sub(r"(\w*)\s*×\s*(\w*)", lambda m: m[0] if m[1] in vecs and m[2] in vecs else f"{m[1]}*{m[2]}", line)
 
             
             
@@ -939,9 +935,7 @@ class EV:
                             if a not in self.variables:
                                 raise ValueError(f'Ukendt variabel {a}')
 
-                            self.variables[a] = Variables(
-                                quantity.simplify_units(parser.evaluate(self.prep_ev(f"{a}+({b})"))), "Quantity"
-                            )
+                            self.variables[a] = to_variable(parser.evaluate(self.prep_ev(f"{a}+({b})")))
                             output[pc] = self.variables[a].value
                             pc +=1
 
@@ -950,9 +944,7 @@ class EV:
                             if a not in self.variables:
                                 raise ValueError(f'Ukendt variabel {a}')
 
-                            self.variables[a] = Variables(
-                                quantity.simplify_units(parser.evaluate(self.prep_ev(f"{a}-({b})"))), "Quantity"
-                            )
+                            self.variables[a] = to_variable(parser.evaluate(self.prep_ev(f"{a}-({b})")))
                             output[pc] = self.variables[a].value
                             pc +=1
 
@@ -994,16 +986,8 @@ class EV:
                                     b.strip("'").strip('"'), "str"
                                 )
 
-                            elif '{' in b or '}' in b:
-                                self.variables[a] = Variables(Vector.create_vector(b),"list")
-
-                            elif (r := self.vector_ev(b)) is not None:
-                                self.variables[a] = Variables(r, "list" if isinstance(r, Vector) else "Quantity")
-
                             else:
-                                self.variables[a] = Variables(
-                                    quantity.simplify_units(parser.evaluate(self.prep_ev(b),self.custom_funcsions)), "Quantity"
-                                )
+                                self.variables[a] = to_variable(parser.evaluate(self.prep_ev(b),self.custom_funcsions))
                             self._invalidate_pattern()
                             output[pc] = self.variables[a].value
                             pc += 1
@@ -1012,12 +996,9 @@ class EV:
                             output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, "π": sympy.pi})
                             pc += 1
 
-                        elif (r := self.vector_ev(line)) is not None:
-                            output[pc] = r
-                            pc += 1
-
                         else:
-                            output[pc] = quantity.simplify_units(parser.evaluate(self.prep_ev(line),self.custom_funcsions))
+                            r = parser.evaluate(self.prep_ev(line),self.custom_funcsions)
+                            output[pc] = r if isinstance(r, Vector) else quantity.simplify_units(r)
                             pc += 1
                     except Exception as e:
                         raise ValueError(e)
@@ -1044,45 +1025,6 @@ class EV:
                 self._pattern = None
             self._pattern_dirty = False
         return self._pattern
-
-    def vector_ev(self, expr):
-        funcs = {
-            "Det": Vector.det,
-            "EnhedsVektor": Vector.enhedsvektor,
-            "VinkelVektor": lambda a, b: math.degrees(Vector.vinkel_mellem_vektorer(a, b)),
-            "TværVektor": Vector.tværvektor,
-            "Projektion": Vector.projektion   
-            }
-        vecs = {k: v.value for k, v in self.variables.items() if v.var_type == "list"}
-        expr = expr.strip()
-        if expr in vecs:
-            return vecs[expr]
-        if m := re.fullmatch(r"(\w+)\s*([+-])\s*(\w+)", expr):
-            a, op, b = m.groups()
-            if a in vecs and b in vecs:
-                return vecs[a] + vecs[b] if op == "+" else vecs[a] - vecs[b]
-        if m := re.fullmatch(r"(\w+)\s*×\s*(\w+)", expr):
-            if m[1] in vecs and m[2] in vecs:
-                return Vector.cross_product(vecs[m[1]],vecs[m[2]])
-        if m := re.fullmatch(r"(\w+)\s*\*\s*(\w+)", expr):
-            a,b = m.groups()
-            if a in vecs and b in vecs:
-                return Vector.dot_product(vecs[m[1]], vecs[m[2]])
-            if a in vecs or b in vecs:
-                v, k = (vecs[a],b) if a in vecs else (vecs[b],a)
-                k = parser.evaluate(self.prep_ev(k)).value
-                return Vector.scalar_product(k, v)
-        if m := re.fullmatch(r"Abs\(\s*(\w+)\s*\)", expr):
-            if m[1] in vecs:
-                return abs(vecs[m[1]])
-        if m := re.fullmatch(r"(\w+)\(\s*(\w+(?:\s*,\s*\w+)*)\s*\)", expr):
-            names = [n.strip() for n in m[2].split(",")]
-            if m[1] in funcs and all(n in vecs for n in names):
-                args = [vecs[n] for n in names]
-                result = round_vector(funcs[m[1]](*args), args)
-                return f"{result}°" if m[1] == "VinkelVektor" else result
-
-        return None
 
     def prep_ev(self, expr):
         expr = str(expr)

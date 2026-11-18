@@ -5,7 +5,7 @@ from path import resource_path
 import json
 from types import SimpleNamespace
 from decimal import Decimal, ROUND_HALF_UP
-
+from mat import Vector
 with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -45,12 +45,22 @@ FUNCTIONS = {
 
 CONSTANTS = {"π": math.pi, "ℯ": math.e}
 
+VECTOR_FUNCTIONS = {
+    "Abs": abs,
+    "Det": Vector.det,
+    "EnhedsVektor": Vector.enhedsvektor,
+    "VinkelVektor": lambda a, b: math.degrees(Vector.vinkel_mellem_vektorer(a, b)),
+    "TværVektor": Vector.tværvektor,
+    "Projektion": Vector.projektion,
+}
+
+
 
 TOKEN_RE = re.compile(
     r"\s*(?:"
     r"(?P<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)"
     r"|(?P<unit>°?[^\W\d_][^\W_]*)"
-    r"|(?P<op>[-+*/^(),])"
+    r"|(?P<op>[-+*/^(),{}×])"
     r")"
 )
 
@@ -67,6 +77,36 @@ def tokenise(text):
         tokens.append((kind, m.group(kind)))
         pos = m.end()
     return tokens
+
+
+def scalar(q):
+    if isinstance(q, Vector):
+        raise ValueError("en vektor kan ikke indeholde en vektor")
+    if q.dimension:
+        raise ValueError("en vektor kan ikke have enheder")
+    return q.value
+
+
+def multiply(a, b, op):
+    if isinstance(a, Vector) and isinstance(b, Vector):
+        if op == "/":
+            raise ValueError("man kan ikke dividere med en vektor")
+        return Vector.cross_product(a,b) if op == "×" else quantity(Vector.dot_product(a,b),{},{})
+    if isinstance(b, Vector):
+        if op == "/":
+            raise ValueError("man kan ikke dividere med en vektor")
+        return Vector.scalar_product(scalar(a),b)
+    if isinstance(a, Vector):
+        return Vector.scalar_product(1 / scalar(b) if op == "/" else scalar(b), a)
+    return a / b if op == "/" else a * b
+
+
+def vector_function(name, values):
+    if name not in VECTOR_FUNCTIONS or not all(isinstance(v, Vector) for v in values):
+        raise ValueError(f"{name} kan ikke tage imod en vektor")
+    result = VECTOR_FUNCTIONS[name](*values)
+    return result if isinstance(result, Vector) else quantity(float(result), {}, {})
+
 
 
 class _Parser:
@@ -96,23 +136,25 @@ class _Parser:
         while self.peek() in (("op", "+"), ("op", "-")):
             op = self.take()[1]
             right = self.term()
+            if isinstance(result, Vector) != isinstance(right, Vector):
+                raise ValueError("man kan ikke bruge + eller - mellem et tal og en vektor")
             result = result + right if op == "+" else result - right
         return result
 
     def term(self):
         result = self.implicit()
-        while self.peek() in (("op", "*"), ("op", "/")):
+        while self.peek() in (("op", "*"), ("op", "/"),("op","×")):
             op = self.take()[1]
             right = self.implicit()
-            result = result * right if op == "*" else result / right
+            result = multiply(result, right, op)
         return result
 
     def implicit(self):
         result = self.unary()
         while True:
             kind, value = self.peek()
-            if kind == "unit" or (kind, value) == ("op", "("):
-                result = result * self.power()
+            if kind == "unit" or (kind, value) in (("op", "("), ("op", "{")):
+                result = multiply(result, self.power(), "*")
             elif kind == "number":
                 raise ValueError(f"Mangler et regnetegn før '{value}' i '{self.text}'")
             else:
@@ -122,6 +164,8 @@ class _Parser:
         if self.peek() in (("op", "-"), ("op", "+")):
             op = self.take()[1]
             value = self.unary()
+            if isinstance(value, Vector):
+                return Vector.scalar_product(-1, value) if op == "-" else value
             return quantity(-value.value, value.dimension, value.current_units) if op == "-" else value
         return self.power()
 
@@ -151,19 +195,21 @@ class _Parser:
             raise ValueError(f'mangler ")" i {self.text}')
         return result
 
-    def args(self):
+    def args(self, end = ")"):
         self.take()
         result = [self.expr()]
         while self.peek() == ("op",","):
             self.take()
             result.append(self.expr())
-        if self.take() != ("op", ")"):
-            raise ValueError(f'mangler ")" i {self.text}')
+        if self.take() != ("op", end):
+            raise ValueError(f'mangler "{end}" i {self.text}')
         return result
 
     def atom(self):
         if self.peek() == ("op","("):
             return self.group()
+        if self.peek() == ("op","{"):
+            return Vector([str(scalar(v)) for v in self.args("}")])
         kind, value = self.take()
         if kind == "number":
             return quantity(float(value), {}, {})
@@ -172,8 +218,12 @@ class _Parser:
         if kind == "unit" and self.peek() == ("op","("):
             if value == "sqrt":
                 return self.group() ** 0.5
-            if value in self.functions:
+            if value in self.functions or value in VECTOR_FUNCTIONS:
                 values = self.args()
+                if any(isinstance(v, Vector) for v in values):
+                    return vector_function(value, values)
+                if value not in self.functions:
+                    raise ValueError(f"{value} skal have vektorer")
                 if any(v.dimension for v in values):
                      raise ValueError(f'{value} kan ikke tage imod enhed')
                 return quantity(self.functions[value](*(v.value for v in values)),{},{})
