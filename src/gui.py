@@ -3798,10 +3798,16 @@ class MainWindow(QMainWindow):
         except(OSError, UnicodeError, ValueError, KeyError, TypeError):
             QMessageBox.warning(self, "åbn regneark","filen kunne ikke åbnes. Den er måske corrupted")
             return
+        current = self.interpreter_view
+        if view is None and not current.property("path") and not current.property("dirty"):
+            view = current
         view = view or self.new_interpreter_tab()
         self.set_tab_name(view, Path(path).stem)
         view.setProperty("path", path)
-        view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setSheet({json.dumps(rows)})"))
+        if getattr(view, "loaded", False):
+            view.page().runJavaScript(f"setSheet({json.dumps(rows)})")
+        else:
+            view.loadFinished.connect(lambda ok: view.page().runJavaScript(f"setSheet({json.dumps(rows)})"))
         self.open_interpreter()
 
     def tab_for_path(self, path):
