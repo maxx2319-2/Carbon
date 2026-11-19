@@ -530,6 +530,28 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
     refresh()
     return container
 
+CONSTANT_LATEX = {
+    r"\pi": "π",
+    r"\exponentialE": "ℯ",
+    r"\mathit{c}": "𝑐",
+    r"\mathit{g}": "𝑔",
+    r"\mathit{G}": "𝐺",
+    r"\mathit{h}": "ℎ",
+    r"\mathit{e}": "𝑒",
+    r"\mathit{k}_{B}": "𝑘",
+    r"\mathit{N}_{A}": "𝑁",
+    r"\mathit{R}": "𝑅",
+    r"\mathit{F}": "𝐹",
+    r"\mathit{\epsilon}_{0}": "𝜀",
+    r"\mathit{\mu}_{0}": "𝜇",
+    r"\mathit{\sigma}": "𝜎",
+    r"\mathit{m}_{e}": "𝑚",
+    r"\mathit{m}_{p}": "𝑝",
+    r"\mathit{K}_{w}": "𝐾",
+    r"\mathit{V}_{m}": "𝑉",
+}
+
+
 GREEK = {
     "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "epsilon": "ε", "zeta": "ζ", "eta": "η", "theta": "θ",
     "iota": "ι", "kappa": "κ", "lambda": "λ", "mu": "µ", "nu": "ν", "xi": "ξ", "pi": "π", "rho": "ρ",
@@ -664,6 +686,10 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\rightleftharpoons(?![A-Za-z])\s*", "<->", s)
     s = re.sub(r"\\(to|rightarrow|longrightarrow)(?![A-Za-z])\s*", "->", s)
     s = s.replace(r"\left", "").replace(r"\right", "")
+    s = s.replace(r"\left", "").replace(r"\right", "")
+    for latex, char in CONSTANT_LATEX.items():
+        s = s.replace(latex, f" {char} ")
+
     s = re.sub(r"\\angle(?![A-Za-z])\s*", "VinkelVektor", s)
     s = re.sub(r"\{(\\(?:vec|overrightarrow)\{(?:[^{}]|\{[^{}]*\})*\})\}(?=_)", r"\1", s)
     s = re.sub(r"\\(?:vec|overrightarrow)\{\\mathnormal\{e\}\}_\{\\(?:vec|overrightarrow)\{([^{}]*)\}\}", r"EnhedsVektor(\\vec{\1})", s)
@@ -687,7 +713,7 @@ def Latex_to_calc(s: str) -> str:
     s = re.sub(r"\\(" + "|".join(GREEK) + r")(?![A-Za-z])", lambda m: GREEK[m.group(1)], s)
     s = s.replace(r"\%", "%")
     s = s.replace(r"\infty", "oo")
-    s = s.replace(r"\exponentialE", "ℯ")
+
     s = calculus_to_calc(s)
 
     prev = None
@@ -2918,6 +2944,7 @@ class MainWindow(QMainWindow):
 
         self.definition_list = DefinitionList()
         layout.addWidget(Sidebar([
+            ("Definitioner", self.definition_list),
             ("Udtryk", symbol_grid([
                 ("a+b", r"#?+#?"),
                 ("a−b", r"#?-#?"),
@@ -2938,6 +2965,22 @@ class MainWindow(QMainWindow):
                 ("π", r"\pi"),
                 ("e", r"\exponentialE"),
                 ("∞", r"\infty"),
+                ("c", r"\mathit{c}"),
+                ("g", r"\mathit{g}"),
+                ("G", r"\mathit{G}"),
+                ("h", r"\mathit{h}"),
+                ("q<sub>e</sub>", r"\mathit{e}"),
+                ("k<sub>B</sub>", r"\mathit{k}_{B}"),
+                ("N<sub>A</sub>", r"\mathit{N}_{A}"),
+                ("R", r"\mathit{R}"),
+                ("F", r"\mathit{F}"),
+                ("ε<sub>0</sub>", r"\mathit{\epsilon}_{0}"),
+                ("μ<sub>0</sub>", r"\mathit{\mu}_{0}"),
+                ("σ", r"\mathit{\sigma}"),
+                ("m<sub>e</sub>", r"\mathit{m}_{e}"),
+                ("m<sub>p</sub>", r"\mathit{m}_{p}"),
+                ("K<sub>w</sub>", r"\mathit{K}_{w}"),
+                ("V<sub>m</sub>", r"\mathit{V}_{m}"),
             ], insert)),
             ("Calculus", symbol_grid([
                 ("∫", r"\int #?\,\differentialD #?"),
@@ -2961,13 +3004,8 @@ class MainWindow(QMainWindow):
                 ("∠(a\u20D7,b\u20D7)",r"\angle(\overrightarrow{#?},\overrightarrow{#?})"),
                 ("Tvaervektor.svg",r"\overset{\text{\^{}}}{\overrightarrow{#?}}"),
                 ("a\u20D7<sub>b\u20D7</sub>",r"{\overrightarrow{#?}}_{\overrightarrow{#?}}"),
-
-
-
-
-
             ],insert,3)),
-            ("Definitioner", self.definition_list),
+            
         ]))
 
         bar = QWidget()

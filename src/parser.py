@@ -43,7 +43,26 @@ FUNCTIONS = {
     "Erf": math.erf,
 }
 
-CONSTANTS = {"π": math.pi, "ℯ": math.e}
+CONSTANTS = {
+            "π": math.pi,
+            "ℯ": math.e,
+            "𝑐": (2.99792458, "m/s"),
+            "𝑔": (9.82, "m/s^2"),
+            "𝐺": (6.674e-11,"N m^2/kg^2"),
+            "ℎ": (6.626e-34,"J s"),
+            "𝑒": (1.602e-19, "A s"),
+            "𝑘": (1.381e-23, "J/K"),
+            "𝑁": (6.022e23,"/mol"),
+            "𝑅": (8.314, "J/mol K"),
+            "𝐹": (96485, "A s/mol"),
+            "𝜀": (8.854e-12, "A^2 s^4/kg m^3"),
+            "𝜇": (1.2566e-6, "N/A^2"),
+            "𝜎": (5.670e-8, "W/m^2 K^4"),
+            "𝑚": (9.109e-31, "kg"),
+            "𝑝": (1.6726e-27,"kg"),
+            "𝐾": (1.0e-14, "mol^2/L^2"),
+            "𝑉": (24.5, "L/mol")
+            }
 
 VECTOR_FUNCTIONS = {
     "Abs": abs,
@@ -214,7 +233,8 @@ class _Parser:
         if kind == "number":
             return quantity(float(value), {}, {})
         if kind == "unit" and value in CONSTANTS:
-            return quantity(CONSTANTS[value], {}, {})
+            number, unit = CONSTANTS[value]
+            return quantity.create_quantity(number, unit)
         if kind == "unit" and self.peek() == ("op","("):
             if value == "sqrt":
                 return self.group() ** 0.5
