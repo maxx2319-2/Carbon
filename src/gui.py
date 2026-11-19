@@ -2988,7 +2988,7 @@ class MainWindow(QMainWindow):
                 ("m<sub>p</sub>", r"\mathit{m}_{p}"),
                 ("K<sub>w</sub>", r"\mathit{K}_{w}"),
                 ("V<sub>m</sub>", r"\mathit{V}_{m}"),
-            ], insert)),
+            ], insert, 5)),
             ("Calculus", symbol_grid([
                 ("∫", r"\int #?\,\differentialD #?"),
                 ("Integral_ab.svg", r"\int_{#?}^{#?}#?\,\differentialD #?"),
