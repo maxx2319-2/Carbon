@@ -21,16 +21,22 @@
     MathfieldElement.fontsDirectory = "./fonts";
     MathfieldElement.soundsDirectory = null;
     const list = document.getElementById("list");
+    let bridge;
+    list.addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); }, true);
     function setDefinitions(defs) {
         list.replaceChildren(...defs.map(latex => {
             const mf = new MathfieldElement();
             mf.readOnly = true;
             mf.value = latex;
+            mf.shadowRoot.append(Object.assign(document.createElement("style"), { textContent: ".ML__base { cursor: pointer !important; } .ML__base:hover { color: #cccccc; }" }));
+            const name = latex.slice(0, latex.indexOf("=")).replace(/\\left\((.*)\\right\)$/, (_, args) => `\\left(${args.split(",").map(() => "#?").join(",")}\\right)`);
+            mf.addEventListener("click", e => { if (e.composedPath().some(el => el.classList?.contains("ML__base"))) bridge.insert(name); }, true);
             return mf;
         }));
     }
     new QWebChannel(qt.webChannelTransport, ch => {
-        new ResizeObserver(() => ch.objects.bridge.setHeight(list.offsetHeight)).observe(list);
+        bridge = ch.objects.bridge;
+        new ResizeObserver(() => bridge.setHeight(list.offsetHeight)).observe(list);
     });
 </script>
 </body></html>
