@@ -96,6 +96,12 @@ def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
             raise ValueError(f'Ukendt funktion "{name}"')
     return parse_expr(text.replace("ℯ", "Exp(1)"), local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=transformations)
 
+def quantity_expr(text):
+    number,_,unit = text.partition(" ")
+    top,_, bottom = unit.partition("/")
+    return "(" + number + ("" if top in ("", "1") else " " + top) + (f"/({bottom}))" if bottom else ")")
+
+
 class Variables:
     def __init__(self, value, var_type):
         if var_type != "list":
@@ -954,9 +960,9 @@ class EV:
                                 raise ValueError("Variabel er defineret forkert")
                             if fm := re.fullmatch(r"([^\W\d]\w*)\(([^()]*)\)", a):
                                 args = [sympy.Symbol(v.strip()) for v in fm[2].split(",")]
-                                expr = safe_parse(b, {**SYMPY_FUNCTIONS, **{str(s): s for s in args}})
+                                expr = safe_parse(b, {**SYMPY_FUNCTIONS, "π": sympy.pi, **{str(s): s for s in args}})
                                 self.custom_exprs[fm[1]] = sympy.Lambda(tuple(args), expr)
-                                self.custom_funcsions[fm[1]] = sympy.lambdify(args, expr, "numpy")
+                                self.custom_funcsions[fm[1]] = lambda *vals, names=[str(s) for s in args], body=b: parser.evaluate(body, self.custom_funcsions, dict(zip(names, vals)))
                                 self.new_method(output, pc, a, b)
                                 pc += 1
                                 continue
@@ -1033,7 +1039,7 @@ class EV:
             parts = re.split(r"(\[[^\]]*\])", expr)  # bracket parts land on odd indexes
             for i in range(0, len(parts), 2):
                 parts[i] = pattern.sub(
-                    lambda m: "(" + self.variables[m.group(0)].value + ")"
+                    lambda m: quantity_expr(self.variables[m.group(0)].value)
                     if self.variables[m.group(0)].var_type.lower() == "quantity"
                     else str(self.variables[m.group(0)].value),
                     parts[i],

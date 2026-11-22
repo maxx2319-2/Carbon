@@ -44,9 +44,10 @@ FUNCTIONS = {
 }
 
 CONSTANTS = {
-            "π": math.pi,
-            "ℯ": math.e,
-            "𝑐": (2.99792458, "m/s"),
+            "π": (math.pi,""),
+            "ℯ": (math.e,""),
+            "oo": (math.inf, ""),
+            "𝑐": (2.99792458e8, "m/s"),
             "𝑔": (9.82, "m/s^2"),
             "𝐺": (6.674e-11,"N m^2/kg^2"),
             "ℎ": (6.626e-34,"J s"),
@@ -129,8 +130,10 @@ def vector_function(name, values):
 
 
 class _Parser:
-    def __init__(self, text, functions = None):
+    def __init__(self, text, functions = None,bound = None):
         self.functions = {**FUNCTIONS, **(functions or {})}
+        self.custom = functions or {}
+        self.bound = bound or {}
         self.text = text
         self.tokens = tokenise(text)
         self.i = 0
@@ -232,6 +235,9 @@ class _Parser:
         kind, value = self.take()
         if kind == "number":
             return quantity(float(value), {}, {})
+        if kind == "unit" and value in self.bound:
+            return self.bound[value]
+        
         if kind == "unit" and value in CONSTANTS:
             number, unit = CONSTANTS[value]
             return quantity.create_quantity(number, unit)
@@ -240,6 +246,8 @@ class _Parser:
                 return self.group() ** 0.5
             if value in self.functions or value in VECTOR_FUNCTIONS:
                 values = self.args()
+                if value in self.custom:
+                    return self.custom[value](*values)
                 if any(isinstance(v, Vector) for v in values):
                     return vector_function(value, values)
                 if value not in self.functions:
@@ -257,11 +265,11 @@ class _Parser:
             raise ValueError(f'udtrykket slutter for tidligt: "{self.text}"')
         raise ValueError(f'uventet "{value}" i {self.text}')
 
-def evaluate(equation,functions = None):
+def evaluate(equation,functions = None,bound = None):
     if not equation.strip():
         raise ValueError("Tomt udtryk")
 
-    p = _Parser(equation,functions)
+    p = _Parser(equation,functions,bound)
     result = p.expr()
     p.expect_end()
     return result
