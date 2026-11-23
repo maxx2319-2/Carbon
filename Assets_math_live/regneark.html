@@ -47,7 +47,7 @@
     #editor > math-field[data-mode=picture]::part(container) { display: none; }
     
     div.plot { width: 500px; aspect-ratio: 5 / 4; max-width: 100%; }
-    #editor > .out.sized { width: fit-content; max-width: 100%; }
+    #editor > .out.sized:not(.plot) { width: fit-content; max-width: 100%; }
     #editor > .out.sized[style*=width] > img { width: 100%; }
     #editor > .out.sized > .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; }
     #editor > .out.sized:hover > .grip { display: block; }
@@ -1002,7 +1002,7 @@
         }, { passive: false });
         canvas.addEventListener("dblclick", () => { view = { ...home }; draw(); });
 
-        requestAnimationFrame(draw);
+        new ResizeObserver(draw).observe(canvas);
         return el;
     }
 
@@ -1032,7 +1032,7 @@
         const grip = document.createElement("span")
         grip.className = "grip";
         el.append(grip);
-        if (owner,outSizes?.[i]) el.style.width = owner.outSizes[i];
+        if (owner.outSizes?.[i]) el.style.width = owner.outSizes[i];
         grip.onpointerdown = e => {
             e.preventDefault();
             e.stopPropagation();
@@ -1178,9 +1178,10 @@
     function showOutput(rows,all) {
         
         lines().forEach(clearOutput)
-        let k = 0, anchor = lines().at(-1);
-        for (const [kind, latex, print] of rows) {
-            if (kind ==="code") {anchor = all[k++]; continue; }
+        let k = 0, anchor = lines().at(-1), owner = anchor, n = 0;
+        for (const [kind, latex, print, size] of rows) {
+            if (kind ==="code") {anchor = owner = all[k++]; n = 0; continue; }
+
             let el;
             if (kind ==="image") {
                 el = document.createElement("div");
@@ -1196,8 +1197,8 @@
             } else if (kind === "plot") {
                 el = plotElement(JSON.parse(latex));
             } else {
-            
-            
+
+
                 el = new MathfieldElement();
                 el.classList.add(kind);
             }
@@ -1206,8 +1207,14 @@
             anchor.after(el);
             if (isField(el)) { setupField(el); el.value = latex; }
             anchor = el;
+            if (kind === "image" || kind === "plot") {
+                if (size) (owner.outSizes ??= [])[n] = size;
+                makeSizable(el, owner, n);
+            }
+            n++;
         }
     }
+
     
     let lastField = null, usingKeyboard = false;
     editor.addEventListener("keydown", () => usingKeyboard = true, true);
@@ -1324,9 +1331,12 @@
         return [...editor.children].map(el => {
             if (!isOut(el) && modeOf(el) === "section") return ["code", clean(el, el.value), "section", sectionLength(el) + (el.dataset.collapsed ? " collapsed" : "")];
             if (!isOut(el)) return modeOf(el) === "math" ? ["code", strip(el.value)] : ["code", rawOf(el), modeOf(el), ...(el.style.fontSize ? [el.style.fontSize] : [])];
-            if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data)];
-            if (el.querySelector("img")) return ["image", el.querySelector("img").src, ...(el.querySelector(".print-version") ? [el.querySelector(".print-version").src] : [])];
+            const width = el.style.width ? [el.style.width] : [];
+            if (el.classList.contains("plot")) return ["plot", JSON.stringify(el.data), ...(width.length ? ["", ...width] : [])];
+            const print = el.querySelector(".print-version")?.src;
+            if (el.querySelector("img")) return ["image", el.querySelector("img").src, ...(print || width.length ? [print ?? ""] : []), ...width];
             return [el.classList.contains("error") ? "error" : "result", el.value];
+
         });
     }
 
