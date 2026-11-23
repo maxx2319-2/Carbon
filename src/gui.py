@@ -569,6 +569,16 @@ Polonium Astat Radon Francium Radium Actinium Thorium Protactinium Uran Neptuniu
 Einsteinium Fermium Mendelevium Nobelium Lawrencium Rutherfordium Dubnium Seaborgium Bohrium Hassium Meitnerium Darmstadtium
 Røntgenium Copernicium Nihonium Flerovium Moscovium Livermorium Tennessin Oganesson""".split()
 
+LATIN_NAMES = """Hydrogenium Helium Lithium Beryllium Borum Carboneum Nitrogenium Oxygenium Fluorum Neon Natrium Magnesium Aluminium Silicium
+Phosphorus Sulfur Chlorum Argon Kalium Calcium Scandium Titanium Vanadium Chromium Manganum Ferrum Cobaltum Niccolum Cuprum Zincum
+Gallium Germanium Arsenicum Selenium Bromum Krypton Rubidium Strontium Yttrium Zirconium Niobium Molybdaenum Technetium Ruthenium
+Rhodium Palladium Argentum Cadmium Indium Stannum Stibium Tellurium Iodum Xenon Caesium Barium Lanthanum Cerium Praseodymium
+Neodymium Promethium Samarium Europium Gadolinium Terbium Dysprosium Holmium Erbium Thulium Ytterbium Lutetium Hafnium Tantalum
+Wolframium Rhenium Osmium Iridium Platinum Aurum Hydrargyrum Thallium Plumbum Bismuthum Polonium Astatium Radon Francium Radium
+Actinium Thorium Protactinium Uranium Neptunium Plutonium Americium Curium Berkelium Californium Einsteinium Fermium Mendelevium
+Nobelium Lawrencium Rutherfordium Dubnium Seaborgium Bohrium Hassium Meitnerium Darmstadtium Roentgenium Copernicium Nihonium
+Flerovium Moscovium Livermorium Tennessium Oganesson""".split()
+
 ELEMENT_SERIES = {
     1: ("Andre ikkemetaller", "#a8d5a2"), 2: ("Ædelgas", "#c3b1e1"), 3: ("Alkalimetal", "#f4a6a6"),
     4: ("Jordalkalimetal", "#f6c89f"), 5: ("Halvmetal", "#9fd3c7"), 6: ("Halogen", "#f7e39c"),
@@ -3500,6 +3510,7 @@ class MainWindow(QMainWindow):
             grid.addWidget(label, row, 0 if row < 8 else 3, Qt.AlignRight | Qt.AlignVCenter)
 
         self.element_info = QLabel()
+        self.element_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.element_info.setStyleSheet(f"color: {BUTTON}; font-size: 13px; padding-left: 12px;")
         self.element_info.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         grid.addWidget(self.element_info, 1, 3, 3, 5)
@@ -3585,6 +3596,7 @@ class MainWindow(QMainWindow):
         sup = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
         config = re.sub(r"([spdf])(\d*)", lambda m: m[1] + (m[2] or "1").translate(sup), e.electronic_configuration)
         rows = [
+            ("Latinsk navn", LATIN_NAMES[e.atomic_number-1]),
             ("Atomnummer", e.atomic_number),
             ("Molarmasse", f"{element_mass(e)} g/mol"),
             ("Elektronegativitet", "–" if math.isnan(e.en_pauling) else str(e.en_pauling).replace(".", ",")),
