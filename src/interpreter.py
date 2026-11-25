@@ -1000,7 +1000,17 @@ class EV:
                             pc += 1
        
                         elif re.search(r"(?<![A-Za-z])(integrate|diff|limit|summation)\(", line):
-                            output[pc] = safe_parse(line, {**SYMPY_FUNCTIONS, **self.custom_exprs, "π": sympy.pi})
+                            names = {k: sympy.Symbol(k) for k in self.variables}
+                            keep = set()
+                            bound = lambda f: lambda e, *args: keep.update(a for a in args if isinstance(a, sympy.Symbol)) or f(e, *args)
+                            result = safe_parse(line, {**SYMPY_FUNCTIONS, **self.custom_exprs, "π": sympy.pi, **names, "diff": bound(sympy.diff), "integrate": bound(sympy.integrate)})
+                            values = {}
+                            for symbol in result.free_symbols & set(names.values()) - keep:
+                                number, _, unit = str(self.variables[str(symbol)].value).partition(" ")
+                                if self.variables[str(symbol)].var_type != "Quantity" or unit:
+                                    raise ValueError(f"{symbol} skal være et tal uden enhed for at kunne bruges her")
+                                values[symbol] = sympy.nsimplify(float(number))
+                            output[pc] = result.subs(values)
                             pc += 1
 
                         else:

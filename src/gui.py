@@ -3759,7 +3759,8 @@ class MainWindow(QMainWindow):
         point_cursor(dialog)
         if not dialog.exec(): return
         creator = dialog.textValue()
-        path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", self.tab_name(self.interpreter_tabs.currentIndex()) + ".pdf", "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", name + ".pdf", "PDF (*.pdf)")
+        name = Path(path).stem
         if not path: return
         _settings.setValue("pdf_creator",creator)
         view = self.interpreter_view

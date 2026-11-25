@@ -599,6 +599,7 @@
         mf.mathModeSpace = "\\:";
         mf.inlineShortcuts = {"*": "\\cdot","xx": "\\times", "->": "\\to","<->": "\\rightleftharpoons"};
         mf.mathVirtualKeyboardPolicy = "manual";
+        mf.menuItems = [];
         mf.addEventListener("keydown", onKey, true);
         mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
         mf.addEventListener("focusin", () => followCaret(mf));
