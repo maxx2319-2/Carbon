@@ -1297,6 +1297,14 @@
         return size;
     }
 
+    function resetStyle() {
+        const mf = lastField ?? first;
+        if (modeOf(mf) !== "text") return sizeOf(mf);
+        mf.style.fontSize = "";
+        format({color: "none", backgroundColor: "none", fontSeries: "auto", fontShape: "auto"});
+        return 18;
+    }
+
     function setAccent(c) { document.documentElement.style.setProperty("--accent", c); }
     function setBackground(c) { document.documentElement.style.setProperty("--bg", c); }
 

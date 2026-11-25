@@ -3138,6 +3138,7 @@ class MainWindow(QMainWindow):
         color_menu(self.color_btn, "color", "Tekstfarve")
         self.marker_btn = icon_tool("Highlighter", "Fremhævning")
         color_menu(self.marker_btn, "backgroundColor", "Fremhævningsfarve")
+        icon_tool("Clear_Format", "Nulstil formatering").clicked.connect(lambda: self.interpreter_view.page().runJavaScript("resetStyle()", 0, lambda size: self.size_box.setText(str(int(size)))))
         bar_layout.addWidget(self.text_tools)
         insert_btn = QToolButton()
         insert_btn.setText("Indsæt")
