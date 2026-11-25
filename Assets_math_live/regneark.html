@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8">
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="mathlive.min.js"></script>
+<script src="spell/typo.js"></script>
 <style>
     :root { --accent: #6fc6fb; --results: #9CDCFE; --error: #ff5d8f; --bg: #404040; }
     html, body { margin: 0; height: 100%; background: transparent; color: #fff; overflow: hidden; }
@@ -69,6 +70,13 @@
     #suggest::-webkit-scrollbar-thumb { background: #737373; border-radius: 3px; }
     #suggest::-webkit-scrollbar-thumb:hover { background: #8a8a8a; }
 
+    #spellmenu {position: fixed; display: none; z-index: 12; background: #323232; font: 14px "Segoe UI"; min-width: 160px; border-radius: 8px; padding: 4px; box-sizing: border-box;}
+    #spellmenu div {padding: 3px 10px; color: #fff; cursor: pointer; border-radius: 4px;}
+    #spellmenu div:hover:not(.off):not(.sep) {background: #737373;}
+    #spellmenu .fix {font-weight: bold;}
+    #spellmenu .off {color: #858585; cursor: default;}
+    #spellmenu .sep {padding: 0; margin: 4px 0; border-top: 1px solid #555; border-radius: 0;}
+
     #tooltip math-field { font-size: 14px; padding: 0; }
     #tooltip {position: fixed; display: none; z-index: 11; background: #323232; color: #fff; font: 14px "Segoe UI";
     padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; pointer-events: none;}
@@ -99,7 +107,7 @@
         #editor > math-field[data-mode=section][data-depth="1"] { font-size: 15pt; }
         #editor > math-field[data-mode=section][data-depth="2"] { font-size: 13pt; }
         math-field { --caret-color: transparent; }
-        #suggest, #tooltip { display: none; }
+        #suggest, #tooltip, #spellmenu { display: none; }
         #editor > .out:has(> .print-version) > img:not(.print-version) { display: none; }
         #editor img.print-version { display: block; max-width: 100%; }
     }
@@ -114,6 +122,7 @@
 <div id="editor"></div>
 <div id="suggest"></div>
 <div id="tooltip"></div>
+<div id="spellmenu"></div>
 
 <script>
     MathfieldElement.fontsDirectory = "./fonts"; 
@@ -601,6 +610,8 @@
         mf.mathVirtualKeyboardPolicy = "manual";
         mf.addEventListener("keydown", onKey, true);
         mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
+        mf.addEventListener("selection-change", () => spellSchedule(mf));
+        mf.addEventListener("focusout", () => spellSchedule(mf));
         mf.addEventListener("focusin", () => followCaret(mf));
         mf.addEventListener("copy", e => copySel(e, false), true);
         mf.addEventListener("cut", e => copySel(e, true), true);
@@ -634,7 +645,7 @@
         applyMode(mf, mode);
         mf.style.fontSize = size;
         setLine(mf, raw);
-        mf.addEventListener("input", () => { const text = isText(mf); clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); });
+        mf.addEventListener("input", () => { const text = isText(mf); clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); spellInput(mf); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
@@ -652,6 +663,7 @@
     function record() {
         const next = snapshot();
         if (current && JSON.stringify([current.raws, current.modes, current.sizes, current.depths]) !== JSON.stringify([next.raws, next.modes, next.sizes, next.depths])) { undoStack.push(current); redoStack.length = 0; }
+        spellChanged(current, next);
         current = next;
         reportDirty();
         reportHistory();
@@ -680,6 +692,7 @@
     function step(from, to) {
         const s = from.pop();
         if (!s) return;
+        if (s.corrected) spell.kept.add(s.corrected.toLowerCase());
         to.push(snapshot());
         hideSuggest();
         const all = lines();
@@ -707,6 +720,7 @@
         updateHint();
         reportDirty();
         reportHistory();
+        lines().forEach(spellSchedule);
     }
 
 
@@ -1313,6 +1327,7 @@
             bridge = ch.objects.bridge;
             bridge.help(h => HELP = JSON.parse(h))
             bridge.finished.connect((id, rows) => { if (id === runId) { running = false; showOutput(JSON.parse(rows), runLines); } });
+            bridge.userWords(w => { for (const word of JSON.parse(w)) spell.ignored.add(word); lines().forEach(spellSchedule); });
 
 
         });
@@ -1382,8 +1397,434 @@
         focusLine(first);
         markSaved();
         reportHistory();
+        lines().forEach(spellSchedule);
     }
 
+
+    const SPELL_LETTERS = "abcdefghijklmnopqrstuvwxyzæøåé";
+    const SPELL_FIXES = { teh: "the", adn: "and", taht: "that", hvsi: "hvis", ikek: "ikke", dne: "den", nogel: "nogle" };
+    const SPELL_WAVE = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 3 L1.5 1 L3 3 L4.5 1 L6 3' fill='none' stroke='%23ff5d8f' stroke-width='1.2'/%3E%3C/svg%3E")`;
+    const CHEM_STRONG = `form acet acetyl acetylen acetylene phenylen phenylene formyl acryl vinyl allyl phenyl fenyl benzyl benz benzen benzene toluen toluene xylen xylene naphthalen naphthalene anthracen anthracene phenol fenol pyridin pyridine furan pyrrol indol styren styrene
+        hydroxy hydroxo hydroxid hydroxide hydroxido amino amin amine amid amide imin imine imid imide nitril nitrile nitro nitroso nitr nitrat nitrate nitrit nitrite nitrito nitrosyl nitrogen
+        chlor chloro chlorid chloride chlorido chlorat chlorate chlorit chlorite brom bromo bromid bromide bromido bromat bromate iod iodo jod iodid iodide jodid iodido iodat iodate jodat fluor fluoro fluorid fluoride fluorido
+        cyan cyano cyanid cyanide cyanido cyanate bromit bromite iodit iodite thio thiol sulf sulfo sulfon sulfoxid sulfoxide sulfat sulfate sulphate sulfit sulfite sulfid sulfide sulfur sulphur sulph svovl phosph phosphor phosphat phosphate fosfor fosfat
+        carbon carbonat carbonate carboxyl carboxylat carboxylate carbonyl carbid carbide kul
+        oxid oxide oxido perox peroxid peroxide hydrogen hydrid hydride oxygen oxalat oxalate oxalato acetat acetate citrat citrate lactat lactate formiat ethanoat ethanoate methanoat methanoate
+        manganat manganate permanganat permanganate chromat chromate kromat dichromat dichromate ferrat ferrate cuprat cuprate argentat argentate aurat aurate plumbat plumbate stannat stannate aluminat aluminate zinkat zincate
+        thiosulfat thiosulfate hypochlorit hypochlorite perchlorat perchlorate ammin ammine aqua ammonium ammoniak ammonia ethylendiamin ethylenediamine
+        natrium sodium kalium potassium calcium magnesium lithium barium strontium aluminium aluminum jern iron kobber copper zink zinc sølv silver bly lead mangan manganese chrom chromium krom cobalt kobolt nikkel nickel platin platinum guld gold
+        ferr ferro ferri cupr argent aur plumb stann silicium silicon bor boron salicyl glycer glycol glyc thymol blå blåt blue ether ester keton ketone aldehyd aldehyde alkohol alcohol syre acid`.split(/\s+/);
+    const CHEM_SUFFIX = "an ane en ene yn yne dien diene trien triene yl ylen ylene yliden ylidene ol ole diol triol al dial on one dion dione oat oate at ate it ite id ide ido ato ito oic ic ous oyl oxy oxo".split(" ");
+    const CHEM_PREFIX = "iso neo sec tert cyclo ortho meta para cis trans hydro dihydro hypo ferro ferri".split(" ");
+    const CHEM_ROOT = "meth eth prop but pent hex hept oct okt non dec dek undec dodec icos eicos alk metha etha propa buta penta hexa hepta octa okta nona deca deka".split(" ");
+    const CHEM_MULT = "mono di tri tetra penta hexa hepta octa okta nona deca deka bis tris tetrakis".split(" ");
+    const CHEM_ELIDED = "pent hex hept oct okt non dec dek".split(" ");
+    const CHEM_BOUND = "form acet benz nitr sulf sulph phosph perox plumb stann glyc glycer".split(" ");
+    const CHEM_METAL_STEM = "ferr cupr argent aur".split(" ");
+    const CHEM_NOT_END = "chlor brom iod jod fluor cyan thio sulfo nitro nitroso amino hydroxy hydroxo chloro bromo iodo jodo fluoro cyano".split(" ");
+    const CHEM_UNSAT = new Set("an ane en ene yn yne dien diene trien triene".split(" "));
+    const CHEM_YL = new Set(["yl", "ylen", "ylene", "yliden", "ylidene"]);
+    const CHEM = new Map();
+    for (const [list, kind] of [[CHEM_SUFFIX, 0], [CHEM_STRONG.filter(m => ![...CHEM_BOUND, ...CHEM_METAL_STEM, ...CHEM_PREFIX, ...CHEM_NOT_END].includes(m)), 1], [CHEM_PREFIX, 2], [CHEM_ROOT, 3], [CHEM_MULT, 4], [CHEM_ELIDED, 5], [CHEM_BOUND, 6], [CHEM_METAL_STEM, 7], [CHEM_NOT_END, 9]])
+        for (const m of list) CHEM.set(m, [...(CHEM.get(m) ?? []), kind]);
+    const spell = { ready: false, busy: false, da: null, en: null, ignored: new Set(), kept: new Set(), known: new Map(), parts: new Map(), pending: new Set() };
+    const spellMenu = document.getElementById("spellmenu");
+
+    const spellRead = path => new Promise((ok, fail) => {
+        const r = new XMLHttpRequest();
+        r.open("GET", path);
+        r.overrideMimeType("text/plain; charset=utf-8");
+        r.onload = () => ok(r.responseText);
+        r.onerror = fail;
+        r.send();
+    });
+    const spellLoad = async lang => {
+        const [aff, dic] = await Promise.all([spellRead(`spell/${lang}/index.aff`), spellRead(`spell/${lang}/index.dic`)]);
+        return new Promise(ok => new Typo(lang, aff, dic, { asyncLoad: true, loadedCallback: ok }));
+    };
+
+    function spellChemStep(state, m, kind) {
+        const last = state >> 4, group = state >> 2 & 3, substituent = CHEM_YL.has(m) || m === "oxy";
+        if (last === 3) {
+            if (kind !== 0 || !(CHEM_UNSAT.has(m) || substituent) || (state & 2 && !substituent) || (group === 1 && CHEM_UNSAT.has(m) && m !== "an" && m !== "ane")) return -1;
+        } else if (last === 6 || last === 7) {
+            if (kind !== 0 || (last === 7 && !["at", "ate", "ic", "ous"].includes(m))) return -1;
+        } else if (kind === 0 && ([2, 4, 5, 8].includes(last) || group >= 2 || ((group === 1 || last === 1) && CHEM_UNSAT.has(m)) || (last === 9 && !["ic", "ous"].includes(m)))) return -1;
+        if ((kind === 4 || kind === 5) && (last === 4 || last === 5)) return -1;
+        if (last === 5 && !m.startsWith("o")) return -1;
+        const nextGroup = kind === 3 ? (m.startsWith("meth") ? 1 : 0) : kind !== 0 ? 0 : CHEM_UNSAT.has(m) ? 1 : CHEM_YL.has(m) ? 2 : 3;
+        return kind * 16 + nextGroup * 4 + (kind === 3 && (last === 4 || last === 5) ? 2 : 0) + (state & 1 | ([1, 3, 6, 7, 9].includes(kind) ? 1 : 0));
+    }
+
+    const spellChemEnd = state => (state & 1) === 1 && state >> 4 <= 1;
+
+    function spellChemical(w) {
+        if (w.length < 5) return false;
+        const states = Array.from({ length: w.length + 1 }, () => new Set());
+        states[0].add(128);
+        for (let i = 0; i < w.length; i++)
+            for (const state of states[i])
+                for (let j = i + 1; j <= Math.min(w.length, i + 16); j++) {
+                    const m = w.slice(i, j);
+                    for (const kind of CHEM.get(m) ?? []) {
+                        const next = spellChemStep(state, m, kind);
+                        if (next >= 0) states[j].add(next);
+                    }
+                }
+        return [...states[w.length]].some(spellChemEnd);
+    }
+
+    function spellDistance(typo, cand) {
+        const d = Array.from({ length: typo.length + 1 }, (_, i) => [i, ...new Array(cand.length).fill(0)]);
+        for (let j = 1; j <= cand.length; j++) d[0][j] = j * 0.8;
+        for (let i = 1; i <= typo.length; i++)
+            for (let j = 1; j <= cand.length; j++) {
+                d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 0.8, d[i - 1][j - 1] + (typo[i - 1] === cand[j - 1] ? 0 : 1));
+                if (i > 1 && j > 1 && typo[i - 1] === cand[j - 2] && typo[i - 2] === cand[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 0.9);
+            }
+        return d[typo.length][cand.length];
+    }
+
+    function spellChemFuzzy(w) {
+        const at = Array.from({ length: w.length + 1 }, () => new Map());
+        at[0].set(128, [[0, ""]]);
+        for (let i = 0; i < w.length; i++) {
+            if (!at[i].size) continue;
+            for (const [m, kinds] of CHEM)
+                for (let len = Math.max(1, m.length - 2); len <= m.length + 2 && i + len <= w.length; len++) {
+                    const d = spellDistance(w.slice(i, i + len), m);
+                    if (d > (m.length <= 4 ? 1 : 2)) continue;
+                    for (const [state, entries] of at[i])
+                        for (const kind of kinds) {
+                            const next = spellChemStep(state, m, kind);
+                            if (next < 0) continue;
+                            const list = at[i + len].get(next) ?? [];
+                            for (const [cost, text] of entries) {
+                                if (cost + d > 2) continue;
+                                const old = list.find(([, t]) => t === text + m);
+                                if (!old) list.push([cost + d, text + m]);
+                                else old[0] = Math.min(old[0], cost + d);
+                            }
+                            list.sort((a, b) => a[0] - b[0]);
+                            at[i + len].set(next, list.slice(0, 8));
+                        }
+                }
+        }
+        return [...new Set([...at[w.length]].filter(([s]) => spellChemEnd(s)).flatMap(([, list]) => list).filter(([cost]) => cost > 0).map(([, text]) => text))];
+    }
+
+    const PLAUS_CLASS = new Map();
+    for (const [cls, words] of Object.entries({
+        ROOT: "meth eth prop but pent hex hept oct okt non dec dek undec dodec icos eicos alk",
+        ROOTA: "metha etha propa buta penta hexa hepta octa okta nona deca deka",
+        MULT: "mono di tri tetra penta hexa hepta octa okta nona deca deka bis tris tetrakis pent hex hept oct okt non dec dek",
+        HALO: "chlor brom iod jod fluor chloro bromo iodo jodo fluoro",
+        SUBO: "nitro nitroso amino hydroxy",
+        METAL: "natrium sodium kalium potassium calcium magnesium lithium barium strontium aluminium aluminum jern iron kobber copper zink zinc sølv silver bly lead mangan manganese chrom chromium krom cobalt kobolt nikkel nickel platin platinum guld gold ammonium",
+        IDE: "chlorid chloride bromid bromide iodid iodide jodid fluorid fluoride cyanid cyanide hydroxid hydroxide sulfid sulfide hydrid hydride carbid carbide",
+        OXID: "oxid oxide peroxid peroxide",
+        ANION: "chlorid chloride bromid bromide iodid iodide jodid fluorid fluoride cyanid cyanide oxid oxide hydroxid hydroxide sulfat sulfate sulphate sulfit sulfite sulfid sulfide nitrat nitrate nitrit nitrite carbonat carbonate phosphat phosphate fosfat acetat acetate citrat citrate oxalat oxalate lactat lactate formiat permanganat permanganate manganat manganate chromat chromate kromat dichromat dichromate thiosulfat thiosulfate hypochlorit hypochlorite perchlorat perchlorate chlorat chlorate chlorit chlorite bromat bromate iodat iodate jodat cyanate bromit bromite iodit iodite peroxid peroxide hydrid hydride carbid carbide ethanoat ethanoate methanoat methanoate carboxylat carboxylate",
+        METALAT: "ferrat ferrate cuprat cuprate argentat argentate aurat aurate plumbat plumbate stannat stannate aluminat aluminate zinkat zincate",
+        LIGAND: "ammin ammine aqua cyanido chlorido bromido iodido fluorido hydroxido hydroxo oxido nitrito oxalato",
+        ELEM: "hydrogen nitrogen oxygen carbon svovl sulfur sulphur phosphor fosfor silicium silicon bor boron kul",
+        ARENE: "benzen benzene toluen toluene xylen xylene naphthalen naphthalene phenol fenol pyridin pyridine furan pyrrol indol styren styrene anthracen anthracene",
+        SUBYL: "phenyl fenyl benzyl formyl vinyl allyl acryl salicyl carboxyl carbonyl",
+    })) for (const w of words.split(" ")) if (!PLAUS_CLASS.has(w)) PLAUS_CLASS.set(w, cls);
+    const PLAUS_TRAIN = `methan ethan propan butan pentan hexan heptan octan nonan decan methen ethen propen buten penten hexen ethyn propyn butyn hexyn
+        methanol ethanol propanol butanol pentanol hexanol propenol cyclohexanol methanal ethanal propanal butanal propanon butanon pentanon hexanon cyclohexanon
+        methansyre ethansyre propansyre butansyre propensyre methanoat ethanoat propanoat butanoat methylethanoat ethylethanoat propylethanoat butylethanoat methylpropanoat
+        methyl ethyl propyl butyl pentyl hexyl methylen ethylen propylen vinyl allyl phenyl benzyl acetyl
+        methylamin ethylamin propylamin butylamin dimethylamin diethylamin dipropylamin trimethylamin triethylamin methylpropylamin ethylmethylamin phenylamin benzylamin
+        methanamin ethanamin propanamin ethandiamin propandiamin ethanolamin propanolamin ethylendiamin
+        methoxy ethoxy methoxymethan ethoxyethan methoxyethan dimethoxymethan diethylether dimethylether dipropylether ethylmethylether
+        dimethylpropan dimethylbutan trimethylpentan methylpropan ethylpropan methylbutan ethylhexan methylcyclohexan ethylcyclohexan
+        cyclopropan cyclobutan cyclopentan cyclohexan cyclohexen cyclopenten cyclohexanon
+        propandiol ethandiol butandiol propantriol butadien pentadien hexadien propadien hexandion butandion ethandial
+        chlormethan brommethan iodmethan fluormethan dichlormethan trichlormethan tetrachlormethan chlorethan bromethan dichlorethan trichlorethan chlorpropan brompropan dibrompropan
+        chlorbenzen brombenzen iodbenzen fluorbenzen dichlorbenzen nitrobenzen aminobenzen hydroxybenzen methylbenzen ethylbenzen dimethylbenzen trimethylbenzen chlorphenol nitrophenol aminophenol methylphenol
+        chlorethen dichlorethen trichlorethen tetrachlorethen bromethen
+        methylchlorid ethylchlorid methylbromid ethylbromid methyliodid ethyliodid diethyliodid propylchlorid benzylchlorid acetylchlorid benzoylchlorid
+        aminosyre nitrosyre chlorsyre bromsyre iodsyre benzoesyre salicylsyre acetylsalicylsyre carboxylsyre
+        nitromethan nitroethan aminoethan hydroxyethan cyanomethan
+        methanoic ethanoic propanoic butanoic methanoate ethanoate propanoate butanoate methylethanoate ethylethanoate
+        methane ethane propane butane pentane hexane heptane octane ethene propene butene ethyne propyne cyclohexane cyclohexene
+        methylamine ethylamine dimethylamine diethylamine trimethylamine triethylamine ethanolamine ethylenediamine
+        propanone butanone pentanone cyclohexanone methanal ethanal propanal
+        chloromethane bromomethane iodomethane dichloromethane trichloromethane tetrachloromethane chloroethane bromoethane chlorobenzene bromobenzene nitrobenzene methylbenzene ethylbenzene
+        hydrochloric hydrobromic hydroiodic hydrofluoric hydrocyanic nitric nitrous sulfuric sulphuric phosphoric chloric chlorous acetic formic benzoic carboxylic
+        natriumchlorid natriumbromid natriumiodid natriumfluorid natriumhydroxid natriumsulfat natriumnitrat natriumnitrit natriumcarbonat natriumacetat natriumcyanid natriumthiosulfat natriumhypochlorit natriumhydrogencarbonat natriumhydrogensulfat natriumoxid natriumperoxid natriumhydrid natriumethanoat natriumcyanat natriumsulfid
+        kaliumchlorid kaliumbromid kaliumiodid kaliumhydroxid kaliumnitrat kaliumpermanganat kaliumdichromat kaliumchromat kaliumcyanid kaliumcarbonat kaliumsulfat kaliumchlorat kaliumiodat kaliumthiocyanat kaliumhydrogencarbonat
+        calciumchlorid calciumcarbonat calciumhydroxid calciumoxid calciumsulfat calciumnitrat calciumfluorid calciumphosphat magnesiumoxid magnesiumchlorid magnesiumsulfat magnesiumhydroxid bariumsulfat bariumchlorid bariumhydroxid lithiumchlorid aluminiumoxid aluminiumchlorid aluminiumhydroxid
+        ammoniumchlorid ammoniumnitrat ammoniumsulfat ammoniumcarbonat ammoniumhydroxid kobbersulfat kobberoxid kobberchlorid kobbernitrat jernoxid jernchlorid jernsulfat zinkchlorid zinksulfat zinkoxid sølvnitrat sølvchlorid sølvbromid blynitrat blyoxid manganoxid
+        hydrogenchlorid hydrogenbromid hydrogeniodid hydrogenfluorid hydrogenperoxid hydrogensulfid hydrogencarbonat hydrogensulfat hydrogenphosphat dihydrogenphosphat
+        carbondioxid carbonmonoxid svovldioxid svovltrioxid nitrogendioxid nitrogenmonoxid dinitrogenoxid dinitrogentetraoxid dinitrogenpentaoxid diphosphorpentaoxid siliciumdioxid
+        sodium chloride potassium iodide sodiumchloride carbondioxide sulfurdioxide nitrogendioxide dinitrogenpentoxide
+        hexacyanoferrat tetracyanoferrat tetrachloridocuprat tetraamminkobber hexaaquajern tetraamminzink dicyanidoargentat diamminsølv tetrachloridoaurat hexahydroxostannat hexahydroxoaluminat tetrahydroxozinkat hexaamminkobolt hexacyanocobaltat
+        kaliumhexacyanoferrat natriumtetrahydroxoaluminat natriumhexahydroxostannat kaliumdicyanidoargentat
+        hexacyanoferrate tetrachlorocuprate tetraamminecopper hexaaquairon dicyanoargentate
+        ferricyanid ferrocyanid ferric ferrous cupric cuprous auric
+        thiosulfat thiocyanat thiol ethanthiol methanthiol
+        dimethylsulfoxid sulfonsyre methylsulfonat
+        bromthymolblåt bromothymol thymolblåt
+        benzen benzene toluen toluene xylen xylene phenol fenol naphthalen pyridin styren methoxybenzen ethoxybenzen glycerol ethenyl ethylenglycol natriumstannit natriumplumbit dinitrogen`.split(/\s+/);
+    const PLAUS_PAIRS = new Set();
+
+    function plausSegmentations(w, limit = 40) {
+        const out = [];
+        const walk = (i, state, path) => {
+            if (out.length >= limit) return;
+            if (i === w.length) { if (spellChemEnd(state)) out.push(path); return; }
+            for (let j = Math.min(w.length, i + 16); j > i; j--) {
+                const m = w.slice(i, j);
+                for (const kind of CHEM.get(m) ?? []) {
+                    const next = spellChemStep(state, m, kind);
+                    if (next >= 0) walk(j, next, [...path, [m, kind]]);
+                }
+            }
+        };
+        walk(0, 128, []);
+        return out;
+    }
+
+    const plausTokens = path => ["^", ...path.map(([m, kind]) => kind === 3 && PLAUS_CLASS.get(m) === "MULT" ? "ROOT" : kind === 4 || kind === 5 ? "MULT" : PLAUS_CLASS.get(m) ?? m), "$"];
+
+    function spellPlausible(w) {
+        if (!PLAUS_PAIRS.size)
+            for (const name of PLAUS_TRAIN) {
+                const segs = plausSegmentations(name);
+                if (!segs.length) continue;
+                const t = plausTokens(segs.reduce((a, b) => b.length < a.length ? b : a));
+                for (let i = 0; i < t.length - 1; i++) PLAUS_PAIRS.add(t[i] + ">" + t[i + 1]);
+            }
+        return plausSegmentations(w.toLowerCase()).some(path => {
+            const t = plausTokens(path);
+            for (let i = 0; i < t.length - 1; i++) if (!PLAUS_PAIRS.has(t[i] + ">" + t[i + 1])) return false;
+            return true;
+        });
+    }
+
+    function spellNearChem(w) {
+        const legitTail = i => {
+            for (let s = 3; s <= i && s <= w.length - 4; s++) if (spellChemical(w.slice(0, s)) && spell.da.check(w.slice(s))) return true;
+            return false;
+        };
+        for (let i = 0; i <= w.length; i++) {
+            const cands = [];
+            if (i < w.length - 1) cands.push(spellSwap(w, i));
+            if (i < w.length) cands.push(w.slice(0, i) + w.slice(i + 1));
+            for (const c of SPELL_LETTERS) {
+                if (i < w.length) cands.push(w.slice(0, i) + c + w.slice(i + 1));
+                cands.push(w.slice(0, i) + c + w.slice(i));
+            }
+            if (cands.some(c => c !== w && spellChemical(c)) && !legitTail(i)) return true;
+        }
+        return false;
+    }
+
+    function spellSafeCompound(c, typo) {
+        for (let i = 4; i <= c.length - 4; i++) {
+            const head = c.slice(0, i), tail = c.slice(i);
+            if (!typo.startsWith(head) || !spell.da.check(tail) || spell.da.check(typo.slice(i))) continue;
+            const word = /[se]$/.test(head) && !spell.da.check(head) ? head.slice(0, -1) : head;
+            const stem = word.replace(/[se]$/, "");
+            if (![word, stem].some(x => CHEM.has(x) || spellChemical(x)) && (spell.da.check(word) || spellCompound(word, false))) return true;
+        }
+        return false;
+    }
+
+    function spellTSpelling(w) {
+        const th = w.replace(/et(?=an|en|yn|yl)/g, "eth");
+        return th !== w && (spellChemical(th) || spellChemical(th.replace(/s$/, "")));
+    }
+
+    const spellInDict = w => spell.da.check(w) || spell.en.check(w);
+    const spellSwap = (w, i) => w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2);
+    const spellCase = (word, fix) => word[0] !== word[0].toLowerCase() ? fix[0].toUpperCase() + fix.slice(1) : fix;
+    const spellValid = w => spellInDict(w) || spellChemical(w.toLowerCase()) || (spellCompound(w.toLowerCase()) && !spellNearChem(w.toLowerCase()));
+
+    function spellPart(w) {
+        if (!spell.parts.has(w)) spell.parts.set(w, spell.da.check(w) || spellChemical(w));
+        return spell.parts.get(w);
+    }
+
+    function spellCompound(w, chem = true) {
+        if (w.length < 7) return false;
+        const part = x => chem ? spellPart(x) : spell.da.check(x);
+        for (let i = 3; i <= w.length - 4; i++) {
+            const head = w.slice(0, i), tail = w.slice(i);
+            const headOk = part(head) || (i > 3 && /[se]$/.test(head) && part(head.slice(0, -1)));
+            if (headOk && !CHEM_NOT_END.includes(tail) && (part(tail) || spellCompound(tail, chem))) return true;
+        }
+        return false;
+    }
+
+    function spellKnown(word) {
+        const lower = word.toLowerCase();
+        if (spell.ignored.has(lower)) return true;
+        if (!spell.known.has(word)) spell.known.set(word, !spellTSpelling(lower) && spellValid(word));
+        return spell.known.get(word);
+    }
+
+    function spellSuggest(word, limit = 5) {
+        const lower = word.toLowerCase(), seen = new Set([lower]), ranked = [];
+        const add = c => {
+            if (seen.has(c)) return;
+            seen.add(c);
+            if (spellTSpelling(c)) return;
+            const rank = spellChemical(c) && spellPlausible(c) ? -4 : spellInDict(c) ? 0 : spellSafeCompound(c, lower) ? 10 : null;
+            if (rank !== null) ranked.push([c, rank + spellDistance(lower, c)]);
+        };
+        for (let i = 0; i < lower.length - 1; i++) add(spellSwap(lower, i));
+        for (let i = 0; i < lower.length; i++) add(lower.slice(0, i) + lower.slice(i + 1));
+        for (let i = 0; i < lower.length; i++) for (const c of SPELL_LETTERS) add(lower.slice(0, i) + c + lower.slice(i + 1));
+        for (let i = 0; i <= lower.length; i++) for (const c of SPELL_LETTERS) add(lower.slice(0, i) + c + lower.slice(i));
+        if (lower.length >= 6 && !ranked.some(([, r]) => r < 10))
+            ranked.push(...spellChemFuzzy(lower).filter(c => !seen.has(c) && !spellTSpelling(c) && (spellInDict(c) || spellPlausible(c))).map(c => [c, 4 + spellDistance(lower, c) - (spellInDict(c) ? 0.5 : 0)]).sort((a, b) => a[1] - b[1]).slice(0, 3));
+        ranked.sort((a, b) => a[1] - b[1]);
+        const direct = ranked.filter(([, r]) => r < 10);
+        return (direct.length ? direct : ranked.slice(0, 3)).slice(0, limit).map(([c]) => spellCase(word, c));
+    }
+
+    function spellFix(word) {
+        const lower = word.toLowerCase();
+        let fix = SPELL_FIXES[lower];
+        if (!fix) {
+            const found = new Set();
+            for (let i = 0; i < lower.length - 1; i++)
+                for (const c of [spellSwap(lower, i), lower[i] === lower[i + 1] ? lower.slice(0, i) + lower.slice(i + 1) : null])
+                    if (c && c !== lower && spellInDict(c) && !spellTSpelling(c)) found.add(c);
+            if (found.size === 1) [fix] = found;
+        }
+        return fix && spellCase(word, fix);
+    }
+
+    function spellWords(mf) {
+        const model = mf._mathfield.model, chars = [], words = [];
+        for (let i = 1; i <= mf.lastOffset; i++) {
+            const atom = model.at(i);
+            chars.push(atom?.type === "text" && atom.parent === model.root ? atom.value : null);
+        }
+        const letter = c => typeof c === "string" && /^[\p{L}']$/u.test(c);
+        const hard = c => c === null || (typeof c === "string" && /\d/.test(c));
+        const blocks = (c, beyond) => hard(c) || (c === "-" && hard(beyond));
+        for (let k = 0; k < chars.length;) {
+            if (!letter(chars[k])) { k++; continue; }
+            let e = k;
+            while (letter(chars[e])) e++;
+            const text = chars.slice(k, e).join("").replace(/^'+|'+$/g, "");
+            if (text.length > 1 && !blocks(chars[k - 1], chars[k - 2]) && !blocks(chars[e], chars[e + 1])) words.push({ start: k, end: e, text });
+            k = e;
+        }
+        return words;
+    }
+
+    function spellMisspelled(mf, all = false) {
+        if (!spell.ready || isOut(mf) || !isText(mf)) return [];
+        const typing = !all && document.activeElement === mf && mf.selectionIsCollapsed ? mf.position : -1;
+        return spellWords(mf).filter(w => w.end !== typing && !/.\p{Lu}/u.test(w.text) && !spellKnown(w.text));
+    }
+
+    function spellPaint(mf) {
+        if (!mf.isConnected) return;
+        let layer = mf.shadowRoot.querySelector(".spell");
+        if (!layer) {
+            const style = document.createElement("style");
+            style.textContent = `.spell { position: absolute; inset: 0; pointer-events: none; } .spell > div { position: absolute; height: 4px; background: ${SPELL_WAVE} repeat-x; } @media print { .spell { display: none; } }`;
+            layer = document.createElement("div");
+            layer.className = "spell";
+            mf.shadowRoot.append(style, layer);
+        }
+        const host = mf.getBoundingClientRect();
+        layer.replaceChildren(...spellMisspelled(mf).map(w => {
+            const line = document.createElement("div");
+            const a = mf.getElementInfo(w.start + 1)?.bounds, b = mf.getElementInfo(w.end)?.bounds;
+            if (a && b) Object.assign(line.style, { left: a.left - host.left + "px", width: b.right - a.left + "px", top: Math.max(a.bottom, b.bottom) - host.top - 2 + "px" });
+            return line;
+        }));
+    }
+
+    function spellSchedule(mf) {
+        if (!spell.pending.size) requestAnimationFrame(() => { for (const m of spell.pending) spellPaint(m); spell.pending.clear(); });
+        spell.pending.add(mf);
+    }
+
+    function spellChanged(before, after) {
+        lines().forEach((mf, i) => { if (!before || before.raws[i] !== after.raws[i] || before.modes[i] !== after.modes[i] || before.sizes[i] !== after.sizes[i]) spellSchedule(mf); });
+    }
+
+    function spellReplace(mf, w, text) {
+        const pos = mf.position, style = { ...mf._mathfield.model.at(w.start + 1).style };
+        spell.busy = true;
+        mf.selection = { ranges: [[w.start, w.end]], direction: "forward" };
+        mf.insert(text, { insertionMode: "replaceSelection", mode: "text", format: "text", style });
+        mf.position = pos >= w.end ? pos + text.length - (w.end - w.start) : pos;
+        spell.busy = false;
+        spellSchedule(mf);
+    }
+
+    function spellAutocorrect(mf) {
+        if (!spell.ready || !isText(mf) || !mf.selectionIsCollapsed) return null;
+        const model = mf._mathfield.model;
+        let end = mf.position;
+        while (end > 0 && model.at(end)?.type === "text" && /^[\s.,!?;:]$/.test(model.at(end).value)) end--;
+        if (end === mf.position) return null;
+        const w = spellWords(mf).find(w => w.end === end);
+        if (!w || /.\p{Lu}/u.test(w.text) || spellKnown(w.text) || spell.kept.has(w.text.toLowerCase())) return null;
+        const fix = spellFix(w.text);
+        if (!fix) return null;
+        spellReplace(mf, w, fix);
+        return w.text;
+    }
+
+    function spellInput(mf) {
+        if (spell.busy) return;
+        const corrected = spellAutocorrect(mf);
+        if (corrected) { record(); undoStack.at(-1).corrected = corrected; }
+        spellSchedule(mf);
+    }
+
+    function closeSpellMenu() { spellMenu.style.display = "none"; }
+
+    function openSpellMenu(mf, w, x, y) {
+        const ignore = () => { spell.ignored.add(w.text.toLowerCase()); lines().forEach(spellSchedule); };
+        const items = spellSuggest(w.text).map(s => [s, () => { spellReplace(mf, w, s); record(); }, "fix"]);
+        if (!items.length) items.push(["Ingen forslag", null, "off"]);
+        items.push(null, ["Ignorer alle", ignore], ["Tilføj til ordbog", () => { ignore(); bridge?.addWord(w.text.toLowerCase()); }]);
+        spellMenu.replaceChildren(...items.map(item => {
+            const el = document.createElement("div");
+            if (!item) { el.className = "sep"; return el; }
+            el.textContent = item[0];
+            if (item[2]) el.className = item[2];
+            if (item[1]) el.onmousedown = e => { e.preventDefault(); closeSpellMenu(); item[1](); };
+            return el;
+        }));
+        spellMenu.style.display = "block";
+        spellMenu.style.left = Math.min(x, innerWidth - spellMenu.offsetWidth - 4) + "px";
+        spellMenu.style.top = Math.min(y, innerHeight - spellMenu.offsetHeight - 4) + "px";
+    }
+
+    window.addEventListener("contextmenu", e => {
+        const mf = e.target.closest?.("math-field");
+        if (!mf) return;
+        const offset = mf.getOffsetFromPoint(e.clientX, e.clientY);
+        const w = spellMisspelled(mf, true).find(w => offset >= w.start && offset <= w.end);
+        if (!w) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openSpellMenu(mf, w, e.clientX, e.clientY);
+    }, true);
+    window.addEventListener("pointerdown", e => { if (!spellMenu.contains(e.target)) closeSpellMenu(); }, true);
+    window.addEventListener("blur", closeSpellMenu);
+    window.addEventListener("keydown", closeSpellMenu, true);
+    window.addEventListener("resize", () => lines().forEach(spellSchedule));
+    editor.addEventListener("scroll", closeSpellMenu);
+    document.fonts.addEventListener("loadingdone", () => lines().forEach(spellSchedule));
+    Promise.all([spellLoad("da"), spellLoad("en")]).then(([da, en]) => {
+        spell.da = da;
+        spell.en = en;
+        spell.ready = true;
+        lines().forEach(spellSchedule);
+    });
 
     const idle = () => document.body.classList.toggle("idle", !document.hasFocus());
     window.addEventListener("focus",idle);

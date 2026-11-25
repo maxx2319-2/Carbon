@@ -848,6 +848,16 @@ class _InterpreterBridge(QObject):
     def setStyle(self, bold, italic, color, highlight):
         self.styleChanged.emit(bold, italic, color, highlight)
 
+    @Slot(result=str)
+    def userWords(self):
+        return _settings.value("spell_words", "[]")
+
+    @Slot(str)
+    def addWord(self, word):
+        words = json.loads(_settings.value("spell_words", "[]"))
+        if word not in words:
+            _settings.setValue("spell_words", json.dumps(words + [word]))
+
     @Slot(bool)
     def reportDirty(self, dirty):
         self.dirtyChanged.emit(dirty)
