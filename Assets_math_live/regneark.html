@@ -128,7 +128,7 @@
     const SYMBOLS = new Map([["sqrt", "\\sqrt{#?}"],["kvadratrod", "\\sqrt{#?}"] , ["Pi", "\\pi"], ["Euler", "\\exponentialE"], ["uendelig", "\\infty"], ["inf", "\\infty"]]);
     const SYMBOL_LABELS = new Map([["sqrt", "√"],["kvadratrod", "√"] , ["Pi", "π"], ["Euler", "e"], ["uendelig", "∞"], ["inf", "∞"]]);
 
-    const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
+    const FUNCTIONS = ["Help", "Afstem","PHBeregning","POHBeregning","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MutationsAnalyse","MængdeBeregning","Puffer","pHTilKoncentration",
                     "Løs","Plot","NumeriskLøs","SystemLøs","Simplificer","Regression",
@@ -149,7 +149,7 @@
         control: ["Help", "Loop"],
         solve: ["Løs","NumeriskLøs","SystemLøs","Simplificer","Plot"],
         regression: ["Regression", "LinReg", "PropReg", "ExpReg", "KvadReg", "LogistReg", "HarmReg"],
-        chem: ["Afstem", "pH", "pOH", "Analyse", "BjerrumDiagram", "Puffer", "pHTilKoncentration", "MængdeBeregning", "UdbytteProcent", "VolumenProcent", "MasseProcent", "EnhedKonvertering"],
+        chem: ["Afstem", "PHBeregning", "POHBeregning", "Analyse", "BjerrumDiagram", "Puffer", "pHTilKoncentration", "MængdeBeregning", "UdbytteProcent", "VolumenProcent", "MasseProcent", "EnhedKonvertering"],
         bio: ["DNATilPeptid", "RNATilPeptid", "MutationsAnalyse"],
     }   
     const COLORS = { control: "#c77dff", solve: "#00d9ff", regression: "#5ffbf1", chem: "#06ffa5", bio: "#f78fb3", math: "#ff9e6d", number: "#ffd166", unit: "#b8f2e6", string: "#ff6ec7", comment: "#858585" };

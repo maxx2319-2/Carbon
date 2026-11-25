@@ -129,8 +129,8 @@ class EV:
         self.functions = [
             "Help",
             "Afstem",
-            "pH",
-            "pOH",
+            "PHBeregning",
+            "POHBeregning",
             "EnhedKonvertering",
             "Loop",
             "Analyse",
@@ -162,8 +162,8 @@ class EV:
         self.error_text = {
             "Help" : "Help() or Help(function)",
             "Afstem": "Afstem(reaktion,opløsning(syre,base eller ingenting))",
-            "pH": "pH(pKs eller syre/basenavn,Koncentration)",
-            "pOH": "pOH(pKb eller syre/base navn,Koncentration)",
+            "PHBeregning": "PHBeregning(pKs eller syre/basenavn,Koncentration)",
+            "POHBeregning": "POHBeregning(pKb eller syre/base navn,Koncentration)",
             "EnhedKonvertering": 'EnhedKonvertering(Mængde,ny Enhed eller "SI" for SI-enhed)',
             "Loop": "Loop(startlinje,slutlinje,antal gange)",
             "Analyse": "Analyse(molekyle)",
@@ -194,8 +194,8 @@ class EV:
         self.help_text = {
             "Help": "Help() eller Help(funktion)\nViser alle funktioner, eller hjælp til én funktion.\nEks: Help(pH) ",
             "Afstem": "Afstem(reaktion, opløsning)\nAfstemmer en reaktion. Opløsning er syre, base eller udeladt.\nEks: Afstem(H2 + O2 -> H2O) ",
-            "pH": "pH(pKs eller syrenavn eller basenavn, koncentration)\nBeregner pH for en syre eller base.\nEks: pH(4.76, 0.10) ",
-            "pOH": "pOH(pKb eller basenavn eller syrenavn, koncentration)\nBeregner pOH for en base eller syre.\nEks: pOH(4.75, 0.10) ",
+            "PHBeregning": "PHBeregning(pKs eller syrenavn eller basenavn, koncentration)\nBeregner pH for en syre eller base.\nEks: PHBeregning(4.76, 0.10) ",
+            "POHBeregning": "POHBeregning(pKb eller basenavn eller syrenavn, koncentration)\nBeregner pOH for en base eller syre.\nEks: POHBeregning(4.75, 0.10) ",
             "EnhedKonvertering": 'EnhedKonvertering(størrelse, ny enhed eller "SI")\nKonverterer en størrelse til en ny enhed eller til SI-enhed.\nEks: EnhedKonvertering(4[km],SI) ',
             "Loop": "Loop(startlinje, slutlinje, antal gange)\nKører linjerne fra start til slut flere gange. Variablen i tæller fra 0.\nEks: Loop(1, 3, 5) ",
             "Analyse": "Analyse(molekyle)\nViser empirisk formel, molar masse, DBE, antal atomer og masseprocent.\nEks: Analyse(C6H12O6) ",
@@ -659,12 +659,12 @@ class EV:
                             output[pc] = result
                             pc += 1
 
-                        case "pH":
+                        case "PHBeregning":
                             if len(args) != 2:
-                                raise ValueError(self.error_text["pH"])
+                                raise ValueError(self.error_text["PHBeregning"])
                             x, c = (p.strip() for p in args)
                             if x == "" or c == "":
-                                raise ValueError(self.error_text["pH"])
+                                raise ValueError(self.error_text["PHBeregning"])
 
                             
 
@@ -675,12 +675,12 @@ class EV:
                             output[pc] = result
                             pc += 1
 
-                        case "pOH":
+                        case "POHBeregning":
                             if len(args) != 2:
-                                raise ValueError(self.error_text["pOH"])
+                                raise ValueError(self.error_text["POHBeregning"])
                             x, c = (p.strip() for p in args)
                             if x == "" or c == "":
-                                raise ValueError(self.error_text["pOH"])
+                                raise ValueError(self.error_text["POHBeregning"])
 
                             q = parser.evaluate(self.prep_ev(c))
                             con = q.value if not q.dimension else quantity.unit_convert(q, "mol/l").value

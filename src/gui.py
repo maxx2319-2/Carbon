@@ -1537,7 +1537,7 @@ def pH_panel():
             ph_output.setText("Udfyld enten syre eller base")
             poh_output.setText("")
             return
-        result = interpreter.EV().ev(f"{'pH' if acid else 'pOH'}({acid or base},{konc_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"{'PHBeregning' if acid else 'POHBeregning'}({acid or base},{konc_input.text()})").get(0, "")
         if result.startswith("Error"):
             ph_output.setText(result)
             poh_output.setText("")

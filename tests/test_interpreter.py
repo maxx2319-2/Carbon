@@ -157,7 +157,7 @@ HELP_TEXT = interpreter.EV().help_text
 
 
 def test_functions_registered(interpreter):
-    assert {"Help", "Afstem", "pH", "pOH","EnhedKonvertering"} <= set(interpreter.functions)
+    assert {"Help", "Afstem", "PHBeregning", "POHBeregning","EnhedKonvertering"} <= set(interpreter.functions)
 
 
 @pytest.mark.parametrize("name", [f for f in FUNCTIONS if f != "Help"])
@@ -182,8 +182,8 @@ def test_help_lists_functions(interpreter):
 
 
 def test_help_for_function(interpreter):
-    out = interpreter.ev("Help(pH)")
-    assert out[0] == interpreter.help_text["pH"]
+    out = interpreter.ev("Help(PHBeregning)")
+    assert out[0] == interpreter.help_text["PHBeregning"]
 
 
 def test_help_unknown_function(interpreter):
@@ -233,49 +233,49 @@ def test_afstem_chemistry_errors(interpreter, line, message):
 # --- pH and pOH ---
 
 @pytest.mark.parametrize("line, expected", [
-    ("pH(4.76,0.10)", "2.88"),
-    ("pH(4.76, 0.10)", "2.88"),
-    ("pH(ethansyre,0.10)", "2.88"),
-    ("pH(4.76,0.100)", "2.883"),       # rounded to the significant figures of the concentration
-    ("pH(4.76,0.1)", "2.9"),
-    ("  pH(4.76,0.10)  ", "2.88"),
-    ("pOH(4.75,0.10)", "2.88"),
+    ("PHBeregning(4.76,0.10)", "2.88"),
+    ("PHBeregning(4.76, 0.10)", "2.88"),
+    ("PHBeregning(ethansyre,0.10)", "2.88"),
+    ("PHBeregning(4.76,0.100)", "2.883"),       # rounded to the significant figures of the concentration
+    ("PHBeregning(4.76,0.1)", "2.9"),
+    ("  PHBeregning(4.76,0.10)  ", "2.88"),
+    ("POHBeregning(4.75,0.10)", "2.88"),
 ])
 def test_pH_and_pOH(interpreter, line, expected):
     assert interpreter.ev(line)[0] == expected
 
 
 @pytest.mark.parametrize("line", [
-    "pH(4)",
-    "pH(4,1,2)",
-    "pH(,0.1)",
-    "pH(4,)",
+    "PHBeregning(4)",
+    "PHBeregning(4,1,2)",
+    "PHBeregning(,0.1)",
+    "PHBeregning(4,)",
 ])
 def test_pH_bad_input(interpreter, line):
     out = interpreter.ev(line)
-    assert out[0] == "Error: " + interpreter.error_text["pH"]
+    assert out[0] == "Error: " + interpreter.error_text["PHBeregning"]
 
 
 @pytest.mark.parametrize("line", [
-    "pOH(4)", 
-    "pOH(4,1,2)", 
-    "pOH(,0.1)"
+    "POHBeregning(4)", 
+    "POHBeregning(4,1,2)", 
+    "POHBeregning(,0.1)"
 ])
 def test_pOH_bad_input(interpreter, line):
     out = interpreter.ev(line)
-    assert out[0] == "Error: " + interpreter.error_text["pOH"]
+    assert out[0] == "Error: " + interpreter.error_text["POHBeregning"]
 
 
 def test_pH_unknown_acid(interpreter):
-    assert interpreter.ev("pH(findesikke,0.1)")[0] == 'Error: ukendt syre "findesikke"'
+    assert interpreter.ev("PHBeregning(findesikke,0.1)")[0] == 'Error: ukendt syre "findesikke"'
 
 
 def test_pOH_unknown_base(interpreter):
-    assert interpreter.ev("pOH(findesikke,0.1)")[0] == 'Error: ukendt base "findesikke"'
+    assert interpreter.ev("POHBeregning(findesikke,0.1)")[0] == 'Error: ukendt base "findesikke"'
 
 
 def test_pH_zero_concentration(interpreter):
-    assert interpreter.ev("pH(4.76,0)")[0].startswith("Error")
+    assert interpreter.ev("PHBeregning(4.76,0)")[0].startswith("Error")
 
 
 
@@ -316,9 +316,9 @@ def test_loop_with_non_number_does_not_stop_other_lines(interpreter):
 
 
 def test_each_line_gets_its_own_result(interpreter):
-    out = interpreter.ev("pH(4.76,0.10)\nHelp(pH)\n1+1")
+    out = interpreter.ev("PHBeregning(4.76,0.10)\nHelp(PHBeregning)\n1+1")
     assert out[0] == "2.88"
-    assert out[1] == interpreter.help_text["pH"]
+    assert out[1] == interpreter.help_text["PHBeregning"]
     assert str(out[2]) == "2.0"
 
 
