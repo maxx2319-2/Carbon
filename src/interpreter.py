@@ -1,7 +1,7 @@
 import parser
 import utils
 import chem
-from quantity import quantity
+from quantity import quantity,SI_TO_DIMENSION, DIMENSION_TO_SI
 import re
 import biotek
 import json
@@ -23,7 +23,9 @@ from chem import pKa_values,pKb_values
 from path import resource_path
 from pathlib import Path
 
+DIMENSION_SYMBOLS = {d: sympy.Symbol(f"[{d}]", positive=True) for d in SI_TO_DIMENSION.values()}
 
+REVERSE_DIMENSION_SYMBOLS = {b:a for a,b in DIMENSION_SYMBOLS.items()}
 
 with open(resource_path("config.json")) as f:
     config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
@@ -36,6 +38,32 @@ def round_quantity(quant,inputs):
     value = utils.significant_figures(quant.value,inputs)
     return quantity(value,quant.dimension,quant.current_units)
 
+def _Quantity_to_Sympy_Bridge(q):
+    if q.units != "":
+        q = quantity.si_convert(q)
+        return q.value * sympy.Mul(*(DIMENSION_SYMBOLS[d] ** sympy.nsimplify(p) for d, p in q.dimension.items()))
+    else: return q
+
+def _Sympy_to_Quantity_Bridge(s):
+    number, rest = sympy.sympify(s).as_independent(*DIMENSION_SYMBOLS.values(), as_Add=False)
+    rest = rest.as_powers_dict()
+    dimension = {}
+    for dim,power in rest.items():
+        if dim != "1":
+            try:
+                dimension[REVERSE_DIMENSION_SYMBOLS[dim]:float(power)]
+            except: raise ValueError("Enhederne passer ikke sammen")
+
+    units = {}
+    for dim,power in dimension.items():
+        units[DIMENSION_TO_SI[dim]] = power
+
+    return quantity(float(number),dimension,units)
+
+        
+    
+
+    
 
 CONSTANTS = ("ℯ", "π")
 
@@ -81,7 +109,7 @@ SAFE_GLOBALS = {
     "__builtins__": {},
     "Symbol": sympy.Symbol, "Integer": sympy.Integer, "Float": sympy.Float, "Rational": sympy.Rational, "Number": sympy.Number, "Function": sympy.Function,
     "integrate": sympy.integrate, "diff": sympy.diff, "limit": sympy.limit, "summation": sympy.summation,
-    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi,
+    "sqrt": sympy.sqrt, "oo": sympy.oo, "pi": sympy.pi, "π" : sympy.pi,
 }
 
 def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
@@ -94,6 +122,12 @@ def safe_parse(text, local_dict, transformations=TRANSFORMATIONS):
     for name in re.findall(r"([^\W\d]\w+)\s*\(", text):
         if name not in local_dict and name not in SAFE_GLOBALS:
             raise ValueError(f'Ukendt funktion "{name}"')
+
+    for char, (number,_) in parser.CONSTANTS.items():
+        if char not in ("π", "ℯ", "oo"):
+            text = text.replace(char, f"{number}")
+    
+    
     return parse_expr(text.replace("ℯ", "Exp(1)"), local_dict=local_dict, global_dict=SAFE_GLOBALS, transformations=transformations)
 
 def quantity_expr(text):
@@ -475,8 +509,10 @@ class EV:
                         case 'Simplificer':
                             if len(args) != 1:
                                 raise ValueError(self.error_text["Simplificer"])
-                            output[pc] = sympy.N(simplify(self.prep_sympy(args[0])))
+                            output[pc] = round(sympy.N(simplify(self.prep_sympy(args[0]))),config.rounding_decimals)
                             pc +=1
+
+                            
 
                         case 'Plot' if args and all(a.strip() in self.variables and self.variables[a.strip()].var_type == "list" for a in args):
                             output[pc] = Vector.plot(*(self.variables[a.strip()].value for a in args))
