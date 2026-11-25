@@ -44,7 +44,7 @@ TOKENS = [
 ]
 
 FUNCTION_HEADS = [
-    "pH(", "pOH(", "Afstem(", "Analyse(", "EnhedKonvertering(", "MængdeBeregning(", "Puffer(", "Help(",
+    "PHBeregning(", "POHBeregning(", "Afstem(", "Analyse(", "EnhedKonvertering(", "MængdeBeregning(", "Puffer(", "Help(",
     "UdbytteProcent(", "MasseProcent(", "DNATilPeptid(", "pHTilKoncentration(", "BjerrumDiagram(",
     "LinReg(", "ExpReg(", "Regression(", "PlotFunktion(", "Simplificer(", "Løs(", "NumeriskLøs(", "Loop(",
 ]
@@ -264,11 +264,11 @@ def test_harmonic_regression_finds_a_clean_sine():
 
 @pytest.mark.xfail(reason="M-02: function calls only work as a whole line, so their result can't be stored", strict=True)
 def test_function_result_in_a_variable():
-    assert not str(ev("x = pH(4.76, 0.1)")[0]).startswith("Error")
+    assert not str(ev("x = PHBeregning(4.76, 0.1)")[0]).startswith("Error")
 
 
 @pytest.mark.xfail(reason="E-01: Python's own English error text reaches the user", strict=True)
-@pytest.mark.parametrize("text", ["1/0", "Ln(-1)", "Exp(1000)", "10^309", "Loop(1,1,2.5)", "pH(4.76, 0)"])
+@pytest.mark.parametrize("text", ["1/0", "Ln(-1)", "Exp(1000)", "10^309", "Loop(1,1,2.5)", "PHBeregning(4.76, 0)"])
 def test_errors_are_in_danish(text):
     message = str(ev(text)[0])
     assert not any(word in message for word in ("division", "math domain", "math range", "Result too large", "invalid literal"))

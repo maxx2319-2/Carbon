@@ -1547,7 +1547,7 @@ def pH_panel():
             ph_output.setText("Udfyld enten syre eller base")
             poh_output.setText("")
             return
-        result = interpreter.EV().ev(f"{'pH' if acid else 'pOH'}({acid or base},{konc_input.text()})").get(0, "")
+        result = interpreter.EV().ev(f"{'PHBeregning' if acid else 'POHBeregning'}({acid or base},{konc_input.text()})").get(0, "")
         if result.startswith("Error"):
             ph_output.setText(result)
             poh_output.setText("")
@@ -3769,7 +3769,8 @@ class MainWindow(QMainWindow):
         point_cursor(dialog)
         if not dialog.exec(): return
         creator = dialog.textValue()
-        path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", self.tab_name(self.interpreter_tabs.currentIndex()) + ".pdf", "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self, "Eksportér som PDF", name + ".pdf", "PDF (*.pdf)")
+        name = Path(path).stem
         if not path: return
         _settings.setValue("pdf_creator",creator)
         view = self.interpreter_view

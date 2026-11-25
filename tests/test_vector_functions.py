@@ -4,6 +4,7 @@ import re
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
+import sympy
 
 import gui
 import interpreter
@@ -43,6 +44,7 @@ def test_vector_function(latex, expected):
 def test_custom_function_definition():
     ev = interpreter.EV()
     out = ev.ev("x = 2+3\nf(x) = x^2+2x\ng(x, y) = Sin(x)*y")
-    assert [str(v) for v in out.values()] == ["5.0", "f(x) = x^2+2x", "g(x, y) = Sin(x)*y"]
+    assert [str(v) for v in out.values()] == ["5.0", "Eq(f(x), x**2 + 2*x)", "Eq(g(x, y), y*Sin(x))"]
+    assert sympy.latex(list(out.values())[1]) == r"f{\left(x \right)} = x^{2} + 2 x"
     assert ev.custom_funcsions["f"](3) == 15
     assert ev.custom_funcsions["g"](30, 2) == pytest.approx(1)

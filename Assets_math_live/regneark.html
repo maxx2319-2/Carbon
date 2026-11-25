@@ -47,13 +47,13 @@
     #editor > math-field.nl:not([data-mode=picture])::part(content)::after { content: ""; width: 2px; align-self: stretch; margin: -8px 0; background: var(--selection-background-color); }
     #editor > math-field[data-mode=picture]::part(container) { display: none; }
     
-    div.plot { width: 500px; aspect-ratio: 5 / 4; max-width: 100%; }
+    div.plot { width: 500px; aspect-ratio: 5 / 4; max-width: 100%; display: flex; flex-direction: column; }
     #editor > .out.sized:not(.plot) { width: fit-content; max-width: 100%; }
     #editor > .out.sized[style*=width] > img { width: 100%; }
     #editor > .out.sized > .grip { display: none; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: var(--accent); cursor: nwse-resize; }
     #editor > .out.sized:hover > .grip { display: block; }
-    div.plot canvas { display: block; width: 100%; height: 100%; cursor: default; }
-    div.plot .legend { position: absolute; top: 8px; right: 8px; background: #1e1e1e; border: 1px solid #555566; border-radius: 4px; padding: 2px 8px; font-size: 14px; pointer-events: none; }
+    div.plot canvas { display: block; width: 100%; flex: 1; min-height: 0; cursor: default; }
+    div.plot .legend { order: -1; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 16px; padding: 4px 8px; font-size: 14px; pointer-events: none; }
     div.plot .legend div { display: flex; align-items: center; gap: 6px; }
     div.plot .legend math-field { display: inline-block; width: auto; min-height: 0; padding: 0; font-size: 14px; }
     div.plot .swatch { width: 18px; height: 3px; }
@@ -137,7 +137,7 @@
     const SYMBOLS = new Map([["sqrt", "\\sqrt{#?}"],["kvadratrod", "\\sqrt{#?}"] , ["Pi", "\\pi"], ["Euler", "\\exponentialE"], ["uendelig", "\\infty"], ["inf", "\\infty"]]);
     const SYMBOL_LABELS = new Map([["sqrt", "√"],["kvadratrod", "√"] , ["Pi", "π"], ["Euler", "e"], ["uendelig", "∞"], ["inf", "∞"]]);
 
-    const FUNCTIONS = ["Help", "Afstem","pH","pOH","EnhedKonvertering","Loop","Analyse",
+    const FUNCTIONS = ["Help", "Afstem","PHBeregning","POHBeregning","EnhedKonvertering","Loop","Analyse",
                     "BjerrumDiagram","UdbytteProcent","VolumenProcent","MasseProcent",
                     "DNATilPeptid","RNATilPeptid","MutationsAnalyse","MængdeBeregning","Puffer","pHTilKoncentration",
                     "Løs","Plot","NumeriskLøs","SystemLøs","Simplificer","Regression",
@@ -158,7 +158,7 @@
         control: ["Help", "Loop"],
         solve: ["Løs","NumeriskLøs","SystemLøs","Simplificer","Plot"],
         regression: ["Regression", "LinReg", "PropReg", "ExpReg", "KvadReg", "LogistReg", "HarmReg"],
-        chem: ["Afstem", "pH", "pOH", "Analyse", "BjerrumDiagram", "Puffer", "pHTilKoncentration", "MængdeBeregning", "UdbytteProcent", "VolumenProcent", "MasseProcent", "EnhedKonvertering"],
+        chem: ["Afstem", "PHBeregning", "POHBeregning", "Analyse", "BjerrumDiagram", "Puffer", "pHTilKoncentration", "MængdeBeregning", "UdbytteProcent", "VolumenProcent", "MasseProcent", "EnhedKonvertering"],
         bio: ["DNATilPeptid", "RNATilPeptid", "MutationsAnalyse"],
     }   
     const COLORS = { control: "#c77dff", solve: "#00d9ff", regression: "#5ffbf1", chem: "#06ffa5", bio: "#f78fb3", math: "#ff9e6d", number: "#ffd166", unit: "#b8f2e6", string: "#ff6ec7", comment: "#858585" };
@@ -608,6 +608,7 @@
         mf.mathModeSpace = "\\:";
         mf.inlineShortcuts = {"*": "\\cdot","xx": "\\times", "->": "\\to","<->": "\\rightleftharpoons"};
         mf.mathVirtualKeyboardPolicy = "manual";
+        mf.menuItems = [];
         mf.addEventListener("keydown", onKey, true);
         mf.addEventListener("selection-change", () => { followCaret(mf); sendStyle(mf); });
         mf.addEventListener("selection-change", () => spellSchedule(mf));

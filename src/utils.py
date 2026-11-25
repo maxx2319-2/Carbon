@@ -190,7 +190,7 @@ def regretion(f,freturn,params,xs,ys,p0 = None):
     r2 = 1 - np.sum(residuals**2) / np.sum((np.array(ys) - np.mean(ys))**2)
 
 
-    fig = Figure(figsize=(5, 4))
+    fig = Figure(figsize=(5, 4), layout="constrained")
     fig.patch.set_facecolor("#404040")
     ax = fig.add_subplot(111)
     ax.set_facecolor("#323232")
@@ -199,7 +199,7 @@ def regretion(f,freturn,params,xs,ys,p0 = None):
     ax.plot(line_x, f(line_x, *popt), color="#00d9ff", linewidth=2.2, label=f"$y = {sympy.latex(rounded)}$\n$R^2 = {r2:.4f}$\nRMSE = {rmse:.4g}")
     ax.scatter(xs, ys, color="#ffffff", s=30, zorder=5)
 
-    legend = ax.legend(facecolor="#1e1e1e", edgecolor="#555566", handlelength=0, handletextpad=0)
+    legend = ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False, fontsize="small")
     for text in legend.get_texts():
         text.set_color("white")
 
@@ -210,7 +210,6 @@ def regretion(f,freturn,params,xs,ys,p0 = None):
     for spine in ax.spines.values():
         spine.set_color("#555566")
 
-    fig.tight_layout()
     return fig
 
     
