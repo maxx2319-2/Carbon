@@ -39,29 +39,30 @@ def round_quantity(quant,inputs):
     return quantity(value,quant.dimension,quant.current_units)
 
 def _Quantity_to_Sympy_Bridge(q):
-    if q.units != "":
+    if len(q.current_units) != 0:
         q = quantity.si_convert(q)
-        return q.value * sympy.Mul(*(DIMENSION_SYMBOLS[d] ** sympy.nsimplify(p) for d, p in q.dimension.items()))
-    else: return q
+        return sympy.nsimplify(q.value) * sympy.Mul(*(DIMENSION_SYMBOLS[d] ** sympy.nsimplify(p) for d, p in q.dimension.items()))
+    else: return sympy.nsimplify(q.value)
 
 def _Sympy_to_Quantity_Bridge(s):
     number, rest = sympy.sympify(s).as_independent(*DIMENSION_SYMBOLS.values(), as_Add=False)
     rest = rest.as_powers_dict()
     dimension = {}
     for dim,power in rest.items():
-        if dim != "1":
+        if dim != 1:
             try:
-                dimension[REVERSE_DIMENSION_SYMBOLS[dim]:float(power)]
-            except: raise ValueError("Enhederne passer ikke sammen")
-
+                rdim = REVERSE_DIMENSION_SYMBOLS[dim] 
+            except KeyError: raise ValueError("Enhederne passer ikke sammen")
+            dimension[rdim] = float(power)
     units = {}
     for dim,power in dimension.items():
         units[DIMENSION_TO_SI[dim]] = power
-
+    if len(number.free_symbols) != 0:
+            return quantity(number,dimension,units)
     return quantity(float(number),dimension,units)
 
         
-    
+   
 
     
 
@@ -399,23 +400,29 @@ class EV:
                         case 'Løs':
                             if len(args) not in (1, 2) or (len(args) == 2 and "Interval" not in args[1]):
                                 raise ValueError(self.error_text["Løs"])
-                            if "[" in args[0]:
-                                raise ValueError("kan ikke tage imod enheder")
-
-                            expr = self.prep_sympy(args[0])
+                            expr = self.prep_sympy(args[0], units=True)
                             f = expr.lhs - expr.rhs if isinstance(expr, sympy.Eq) else expr
+                            dims = set(DIMENSION_SYMBOLS.values())
+                            unknowns = f.free_symbols - dims
                             if expr is sympy.true:
                                 output[pc] = "Alle tal er løsninger"
 
+                            elif not unknowns:
+                                if f.free_symbols:
+                                    raise ValueError("Enhederne passer ikke sammen")
+                                output[pc] = "Ingen løsninger"
+
                             elif len(args) == 2:
-                                if len(f.free_symbols) != 1:
+                                if f.free_symbols & dims:
+                                    raise ValueError("Interval kan ikke bruges med enheder endnu")
+                                if len(unknowns) != 1:
                                     raise ValueError(self.error_text["Løs"])
                                 start,end = self.parse_interval(args[1], "Løs")
-                                output[pc] = self.roots_in(f, f.free_symbols.pop(), start, end) or "Ingen løsninger i intervallet"
+                                output[pc] = self.roots_in(f, unknowns.pop(), start, end) or "Ingen løsninger i intervallet"
 
                             else:
                                 try:
-                                    solutions = [s for s in sympy.solve(self.prep_sympy(args[0]))]
+                                    solutions = [self.from_sympy(s) for s in sympy.solve(expr, *sorted(unknowns, key = str), dict = len(unknowns) > 1)]
                                 except NotImplementedError:
                                     try:
                                         solutions = [self.clean_number(sympy.nsolve(f, 1))]
@@ -1091,9 +1098,37 @@ class EV:
             expr = "".join(parts)
         expr = re.sub(r"\[([^\]]*)\]", r" (\1)", expr)
         return expr
+
+    def sympy_units(self,text):
+        names = {}
+        def add(q):
+            name= f"Qenh{len(names)}"
+            names[name] = _Quantity_to_Sympy_Bridge(q)
+            return f"({name})"
+        text = re.sub(r"(\d+(?:\.\d+)?)\[([^\]]*)\]", lambda m: add(quantity.create_quantity(float(m[1]), m[2])), text)
+        for char, (number, unit) in parser.CONSTANTS.items():
+            if char not in ("π", "ℯ", "oo") and char in text:
+                text = text.replace(char, add(quantity.create_quantity(number, unit)))
+        for name, var in self.variables.items():
+            if var.var_type.lower() == "quantity":
+                number, _, unit = str(var.value).partition(" ")
+                names[name] = _Quantity_to_Sympy_Bridge(quantity.create_quantity(float(number), unit))
+        return text, names
+
+    def from_sympy(self, s):
+        if isinstance(s, dict):
+            return {k: self.from_sympy(v) for k, v in s.items()}
+        if s.free_symbols & set(DIMENSION_SYMBOLS.values()):
+            return quantity.simplify_units(_Sympy_to_Quantity_Bridge(s))
+        return s
+
     
-    def prep_sympy(self, expr):
-        funcs = {**SYMPY_FUNCTIONS, **self.custom_exprs}
+    
+    def prep_sympy(self, expr,units = False):
+        names = {}
+        if units:
+            expr, names = self.sympy_units(expr)
+        funcs = {**SYMPY_FUNCTIONS, **self.custom_exprs, **names}
         if "=" in expr:
             lhs, rhs = expr.split("=",maxsplit = 1)
             return sympy.Eq(safe_parse(lhs, funcs), safe_parse(rhs, funcs))
