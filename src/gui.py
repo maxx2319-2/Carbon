@@ -530,6 +530,104 @@ def pk_table(data_dict, key_placeholder, value_placeholder, settings_key):
     refresh()
     return container
 
+def word_table(settings_key, on_change):
+    container = QWidget()
+    container.setStyleSheet("background: transparent;")
+    container.setFixedWidth(240)
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0,0,0,0)
+    layout.setSpacing(6)
+
+    list_widget = QListWidget()
+    list_widget.setFixedHeight(140)
+    list_widget.setSelectionMode(QListWidget.NoSelection)
+    list_widget.setStyleSheet(f"""
+        QListWidget {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 12px; }}
+        QScrollBar:vertical {{ background: {BUTTON}; }}
+    """)
+    layout.addWidget(list_widget)
+
+    word_input = QLineEdit()
+    word_input.setPlaceholderText("Ord")
+    word_input.setStyleSheet(f"QLineEdit {{ background-color: {BUTTON}; color: {TEXT}; border: none; border-radius: 8px; padding: 4px 8px; }}")
+    add_btn = QPushButton("+")
+    add_btn.setFixedSize(28, 28)
+    add_btn.setStyleSheet(button_style)
+
+    items = {}
+
+    def save():
+        _settings.setValue(settings_key, json.dumps(list(items)))
+
+    def insert_row(word):
+        index = sum(1 for w in items if w < word)
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(6,2,6,2)
+        label = QLabel(word)
+        label.setStyleSheet(f"color: {TEXT}; background: transparent;")
+        row_layout.addWidget(label)
+        row_layout.addStretch()
+        del_btn = QPushButton("x")
+        del_btn.setFixedSize(20,20)
+        del_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; border: none; color: {TEXT}; font-weight: bold; }}
+            QPushButton:hover {{ color: #da373c; }}
+        """)
+        del_btn.clicked.connect(lambda _=False, w=word: remove(w))
+        row_layout.addWidget(del_btn)
+        item = QListWidgetItem()
+        item.setSizeHint(QSize(200, 26))
+        list_widget.insertItem(index, item)
+        list_widget.setItemWidget(item, row)
+        items[word] = item
+
+    def refresh():
+        list_widget.clear()
+        items.clear()
+        for word in json.loads(_settings.value(settings_key, "[]")):
+            insert_row(word)
+
+    def remove(word):
+        list_widget.takeItem(list_widget.row(items.pop(word)))
+        save()
+        on_change(word, False)
+
+    def add():
+        word = word_input.text().strip().lower()
+        if len(word.split()) != 1 or word in items:
+            return
+        insert_row(word)
+        save()
+        word_input.clear()
+        on_change(word, True)
+
+    add_btn.clicked.connect(add)
+    word_input.returnPressed.connect(add)
+
+    add_row = QHBoxLayout()
+    add_row.addWidget(word_input)
+    add_row.addWidget(add_btn)
+    layout.addLayout(add_row)
+
+    def reset():
+        if not container.window().ask_close("Nulstil ordbog", "Er du sikker?\nAlle dine ord bliver slettet.", "Nulstil"):
+            return
+        for word in items:
+            on_change(word, False)
+        _settings.remove(settings_key)
+        refresh()
+
+    reset_btn = QPushButton("Nulstil")
+    reset_btn.setStyleSheet(button_style)
+    reset_btn.clicked.connect(reset)
+    layout.addWidget(reset_btn)
+
+    container.refresh = refresh
+    refresh()
+    return container
+
 CONSTANT_LATEX = {
     r"\pi": "π",
     r"\exponentialE": "ℯ",
@@ -832,6 +930,7 @@ class _InterpreterBridge(QObject):
     leaked = Signal()
     bjerrumExported = Signal(str)
     styleChanged = Signal(bool, bool, str, str)
+    wordAdded = Signal(str)
 
     def __init__(self,parent = None):
         super().__init__(parent)
@@ -857,6 +956,7 @@ class _InterpreterBridge(QObject):
         words = json.loads(_settings.value("spell_words", "[]"))
         if word not in words:
             _settings.setValue("spell_words", json.dumps(words + [word]))
+            self.wordAdded.emit(word)
 
     @Slot(bool)
     def reportDirty(self, dirty):
@@ -3260,6 +3360,7 @@ class MainWindow(QMainWindow):
         bridge.dirtyChanged.connect(lambda dirty: self.set_dirty(view, dirty))
         bridge.historyChanged.connect(lambda u, r: self.update_history_buttons(u, r) if view is self.interpreter_view else None)
         bridge.definitionsChanged.connect(lambda defs: self.show_definitions(view, defs))
+        bridge.wordAdded.connect(lambda word: self.update_spell_word(word, True))
         channel.registerObject("bridge", bridge)
         view.page().setWebChannel(channel)
         view.loadFinished.connect(lambda ok: self.interpreter_loaded(view))
@@ -3489,10 +3590,12 @@ class MainWindow(QMainWindow):
         """)
         language.view().setFocusPolicy(Qt.NoFocus)
 
+        self.word_table = word_table("spell_words", self.update_spell_word)
         self.settings_page = category_page("Indstillinger", [
             ("Tilpasning", [
                 ("Animation mellem sider:", toggle_switch("slide_animation")),
-                ("Sprog:", language)
+                ("Sprog:", language),
+                ("Ordbog:", self.word_table)
             ]),
             ("Data", [
                 ("pKs tabel:", pk_table(pKa_values, "Navn", "pKs", "pKa_values")),
@@ -3501,6 +3604,11 @@ class MainWindow(QMainWindow):
         ])
         self.settings_page.setWindowIcon(QIcon(str(ASSETS_DIR / "Settings_Icon.svg")))
         self.stack.addWidget(self.settings_page)
+
+    def update_spell_word(self, word, known):
+        js = f"spell.ignored.{'add' if known else 'delete'}({json.dumps(word)}); lines().forEach(spellSchedule)"
+        for i in range(self.interpreter_stack.count()):
+            self.interpreter_stack.widget(i).page().runJavaScript(js)
 
     def create_periodic_page(self):
         from mendeleev.fetch import fetch_table
@@ -3857,6 +3965,7 @@ class MainWindow(QMainWindow):
         self.slide_to(self.biotek_page)
 
     def open_settings(self):
+        self.word_table.refresh()
         self.slide_to(self.settings_page)
 
     def open_regneark(self):
@@ -3926,6 +4035,7 @@ class MainWindow(QMainWindow):
                 return
         for view in views:
             view.page().setWebChannel(None)
+        _settings.sync()
         super().closeEvent(event)
 
 def log_error(kind, value, tb):

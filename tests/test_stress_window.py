@@ -552,7 +552,7 @@ def test_pk_table_add_stays_fast_with_200_entries(window):
         chem.pKa_values.update({f"syre{i:03d}": 5.0 for i in range(200)})
         window.open_settings()
         settle(400)
-        box = window.settings_page.findChildren(QListWidget)[0].parentWidget()
+        box = window.settings_page.findChildren(QListWidget)[1].parentWidget()
         name, value = box.findChildren(QLineEdit)[:2]
         name.setText("ny syre")
         value.setText("4")

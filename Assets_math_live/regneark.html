@@ -646,7 +646,7 @@
         applyMode(mf, mode);
         mf.style.fontSize = size;
         setLine(mf, raw);
-        mf.addEventListener("input", () => { const text = isText(mf); clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); spellInput(mf); });
+        mf.addEventListener("input", () => { const text = isText(mf); clearOutput(mf); if (!text) makeSqrt(mf); recolour(mf); rember(mf); if (modeOf(mf) === "math") updateSuggest(mf); record(); spellSchedule(mf); });
         mf.addEventListener("blur",hideSuggest);
         return mf;
     }
@@ -693,7 +693,6 @@
     function step(from, to) {
         const s = from.pop();
         if (!s) return;
-        if (s.corrected) spell.kept.add(s.corrected.toLowerCase());
         to.push(snapshot());
         hideSuggest();
         const all = lines();
@@ -1403,7 +1402,6 @@
 
 
     const SPELL_LETTERS = "abcdefghijklmnopqrstuvwxyzæøåé";
-    const SPELL_FIXES = { teh: "the", adn: "and", taht: "that", hvsi: "hvis", ikek: "ikke", dne: "den", nogel: "nogle" };
     const SPELL_WAVE = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 3 L1.5 1 L3 3 L4.5 1 L6 3' fill='none' stroke='%23ff5d8f' stroke-width='1.2'/%3E%3C/svg%3E")`;
     const CHEM_STRONG = `form acet acetyl acetylen acetylene phenylen phenylene formyl acryl vinyl allyl phenyl fenyl benzyl benz benzen benzene toluen toluene xylen xylene naphthalen naphthalene anthracen anthracene phenol fenol pyridin pyridine furan pyrrol indol styren styrene
         hydroxy hydroxo hydroxid hydroxide hydroxido amino amin amine amid amide imin imine imid imide nitril nitrile nitro nitroso nitr nitrat nitrate nitrit nitrite nitrito nitrosyl nitrogen
@@ -1428,7 +1426,7 @@
     const CHEM = new Map();
     for (const [list, kind] of [[CHEM_SUFFIX, 0], [CHEM_STRONG.filter(m => ![...CHEM_BOUND, ...CHEM_METAL_STEM, ...CHEM_PREFIX, ...CHEM_NOT_END].includes(m)), 1], [CHEM_PREFIX, 2], [CHEM_ROOT, 3], [CHEM_MULT, 4], [CHEM_ELIDED, 5], [CHEM_BOUND, 6], [CHEM_METAL_STEM, 7], [CHEM_NOT_END, 9]])
         for (const m of list) CHEM.set(m, [...(CHEM.get(m) ?? []), kind]);
-    const spell = { ready: false, busy: false, da: null, en: null, ignored: new Set(), kept: new Set(), known: new Map(), parts: new Map(), pending: new Set() };
+    const spell = { ready: false, da: null, en: null, ignored: new Set(), known: new Map(), parts: new Map(), pending: new Set() };
     const spellMenu = document.getElementById("spellmenu");
 
     const spellRead = path => new Promise((ok, fail) => {
@@ -1686,19 +1684,6 @@
         return (direct.length ? direct : ranked.slice(0, 3)).slice(0, limit).map(([c]) => spellCase(word, c));
     }
 
-    function spellFix(word) {
-        const lower = word.toLowerCase();
-        let fix = SPELL_FIXES[lower];
-        if (!fix) {
-            const found = new Set();
-            for (let i = 0; i < lower.length - 1; i++)
-                for (const c of [spellSwap(lower, i), lower[i] === lower[i + 1] ? lower.slice(0, i) + lower.slice(i + 1) : null])
-                    if (c && c !== lower && spellInDict(c) && !spellTSpelling(c)) found.add(c);
-            if (found.size === 1) [fix] = found;
-        }
-        return fix && spellCase(word, fix);
-    }
-
     function spellWords(mf) {
         const model = mf._mathfield.model, chars = [], words = [];
         for (let i = 1; i <= mf.lastOffset; i++) {
@@ -1755,32 +1740,9 @@
 
     function spellReplace(mf, w, text) {
         const pos = mf.position, style = { ...mf._mathfield.model.at(w.start + 1).style };
-        spell.busy = true;
         mf.selection = { ranges: [[w.start, w.end]], direction: "forward" };
         mf.insert(text, { insertionMode: "replaceSelection", mode: "text", format: "text", style });
         mf.position = pos >= w.end ? pos + text.length - (w.end - w.start) : pos;
-        spell.busy = false;
-        spellSchedule(mf);
-    }
-
-    function spellAutocorrect(mf) {
-        if (!spell.ready || !isText(mf) || !mf.selectionIsCollapsed) return null;
-        const model = mf._mathfield.model;
-        let end = mf.position;
-        while (end > 0 && model.at(end)?.type === "text" && /^[\s.,!?;:]$/.test(model.at(end).value)) end--;
-        if (end === mf.position) return null;
-        const w = spellWords(mf).find(w => w.end === end);
-        if (!w || /.\p{Lu}/u.test(w.text) || spellKnown(w.text) || spell.kept.has(w.text.toLowerCase())) return null;
-        const fix = spellFix(w.text);
-        if (!fix) return null;
-        spellReplace(mf, w, fix);
-        return w.text;
-    }
-
-    function spellInput(mf) {
-        if (spell.busy) return;
-        const corrected = spellAutocorrect(mf);
-        if (corrected) { record(); undoStack.at(-1).corrected = corrected; }
         spellSchedule(mf);
     }
 

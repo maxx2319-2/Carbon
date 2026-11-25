@@ -16,7 +16,7 @@ def pka():
 def table(window, pka):
     window.open_settings()
     settle(400)
-    box = window.settings_page.findChildren(QListWidget)[0].parentWidget()
+    box = window.settings_page.findChildren(QListWidget)[1].parentWidget()
     name, value = box.findChildren(QLineEdit)[:2]
     buttons = {b.text(): b for b in box.findChildren(QPushButton) if b.text() in ("+", "Nulstil")}
 
@@ -29,7 +29,7 @@ def table(window, pka):
 
 
 def shown(window):
-    lst = window.settings_page.findChildren(QListWidget)[0]
+    lst = window.settings_page.findChildren(QListWidget)[1]
     return [lst.itemWidget(lst.item(i)).findChild(QLabel).text() for i in range(lst.count())]
 
 
@@ -38,7 +38,7 @@ def expected(pka):
 
 
 def delete(window, name):
-    lst = window.settings_page.findChildren(QListWidget)[0]
+    lst = window.settings_page.findChildren(QListWidget)[1]
     for i in range(lst.count()):
         row = lst.itemWidget(lst.item(i))
         if row.findChild(QLabel).text().startswith(f"{name}: "):

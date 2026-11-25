@@ -19,8 +19,5 @@
     }
     const missed = typos.filter(w => spellKnown(w));
     console.log(`typos caught: ${typos.length - missed.length}/${typos.length} ${missed.length ? "| missed: " + missed.join(", ") : ""}`);
-    const all = [...da.split(" "), ...en.split(" ")];
-    console.log(`autocorrect breaks a correct name: ${all.filter(w => spellFix(w) && !spellKnown(w)).join(", ") || "never"}`);
-    console.log(`autocorrect into a t-spelling: ${["mteanol", "mtean", "emtyl"].map(w => `${w}->${spellFix(w) ?? "-"}`).join(" ")}`);
     console.log("DONE");
 })();
