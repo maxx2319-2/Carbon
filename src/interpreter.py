@@ -963,7 +963,8 @@ class EV:
                                 expr = safe_parse(b, {**SYMPY_FUNCTIONS, "π": sympy.pi, **{str(s): s for s in args}})
                                 self.custom_exprs[fm[1]] = sympy.Lambda(tuple(args), expr)
                                 self.custom_funcsions[fm[1]] = lambda *vals, names=[str(s) for s in args], body=b: parser.evaluate(body, self.custom_funcsions, dict(zip(names, vals)))
-                                self.new_method(output, pc, a, b)
+                                display = safe_parse(b, {**{n: sympy.Function(n) for n in {**SYMPY_FUNCTIONS, **self.custom_exprs}}, "π": sympy.pi, **{str(s): s for s in args}})
+                                output[pc] = sympy.Eq(sympy.Function(fm[1])(*args), display, evaluate=False)
                                 pc += 1
                                 continue
                             if not re.fullmatch(r"[^\W\d]\w*", a) or a in self.functions or a in SYMPY_FUNCTIONS or a in CONSTANTS:
@@ -1013,9 +1014,6 @@ class EV:
                 output[pc] = f"Error: {e}"
                 pc += 1
         return output
-
-    def new_method(self, output, pc, a, b):
-        output[pc] = f"{a} = {b}"
 
     def _invalidate_pattern(self):
         self._pattern_dirty = True
